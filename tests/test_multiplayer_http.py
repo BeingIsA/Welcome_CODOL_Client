@@ -15,6 +15,23 @@ class Response(BytesIO):
 
 
 class HttpGatewayTests(unittest.TestCase):
+    def test_list_contract_and_cursor_encoding(self):
+        from test_room_list import room
+        data = {'rooms': [room()], 'nextCursor': None}
+        self.gateway._opener.open.return_value = Response({'apiVersion': '1', 'data': data})
+        self.assertEqual(self.gateway.list_rooms('pl_saved', 'time+zone|rm_one'), data)
+        request = self.gateway._opener.open.call_args.args[0]
+        self.assertIn('cursor=time%2Bzone%7Crm_one', request.full_url)
+        self.assertEqual(request.get_method(), 'GET')
+        self.assertEqual(request.get_header('X-player-id'), 'pl_saved')
+        for key, value in [('playerCount', True), ('maxPlayers', 0), ('playerCount', 1000),
+                           ('hasPassword', 1), ('mode', None), ('ownerDisplayName', 'a\0b')]:
+            broken = {**room(), key: value}
+            self.gateway._opener.open.return_value = Response({'apiVersion': '1', 'data': {
+                'rooms': [broken], 'nextCursor': None}})
+            with self.subTest(key=key, value=value), self.assertRaises(MultiplayerError):
+                self.gateway.list_rooms('pl_saved', None)
+
     def setUp(self):
         self.gateway = HttpGateway('http://127.0.0.1:8080')
         self.gateway._opener = Mock()
@@ -51,6 +68,51 @@ class HttpGatewayTests(unittest.TestCase):
             'playerId': 'pl_other', 'displayName': '玩家', 'firstLogin': True}})
         with self.assertRaisesRegex(MultiplayerError, '不同身份'):
             self.gateway.login('fp-test', '玩家', 'pl_saved')
+
+    def test_create_carries_settings_and_validates_echo(self):
+        settings = {'mode': 'td', 'modeTimeLimit': 10.5, 'weaponRestrictMask': 32768}
+        self.gateway._opener.open.return_value = Response({'apiVersion': '1', 'data': {
+            'roomId': 'rm_new', 'ownerPlayerId': 'pl_saved', 'maxPlayers': 4,
+            'members': [{'playerId': 'pl_saved', 'displayName': '玩家', 'isOwner': True}],
+            'revision': 0, 'settings': settings}})
+        created = self.gateway.create('pl_saved', '玩家', 4, None, settings)
+        self.assertEqual(created['revision'], 0)
+        request = self.gateway._opener.open.call_args.args[0]
+        self.assertEqual(json.loads(request.data)['settings'], settings)
+        # 回显不一致时视为可疑响应，不静默接受。
+        self.gateway._opener.open.return_value = Response({'apiVersion': '1', 'data': {
+            'roomId': 'rm_new', 'ownerPlayerId': 'pl_saved', 'maxPlayers': 4,
+            'members': [{'playerId': 'pl_saved', 'displayName': '玩家', 'isOwner': True}],
+            'settings': {'mode': 'dm'}}})
+        with self.assertRaises(MultiplayerError) as caught:
+            self.gateway.create('pl_saved', '玩家', 4, None, settings)
+        self.assertEqual(caught.exception.code, 'INVALID_RESPONSE')
+
+    def test_update_settings_patches_with_expected_revision(self):
+        settings = {'mode': 'sd', 'map': 'mp_crash'}
+        self.gateway._opener.open.return_value = Response({'apiVersion': '1', 'data': {
+            'roomId': 'rm_new', 'revision': 1, 'settings': settings, 'members': []}})
+        self.gateway.update_settings('pl_saved', 'rm_new', settings, 0)
+        request = self.gateway._opener.open.call_args.args[0]
+        self.assertEqual(request.get_method(), 'PATCH')
+        self.assertEqual(request.full_url, 'http://127.0.0.1:8080/api/v1/rooms/rm_new/settings')
+        self.assertEqual(json.loads(request.data),
+                         {'settings': settings, 'expectedRevision': 0})
+        # 冲突错误码原样透传且非不确定写入。
+        self.gateway._opener.open.return_value = Response(
+            {'error': {'code': 'REVISION_CONFLICT', 'message': '修订号过期'}}, 409)
+        with self.assertRaises(MultiplayerError) as caught:
+            self.gateway.update_settings('pl_saved', 'rm_new', settings, 0)
+        self.assertEqual(caught.exception.code, 'REVISION_CONFLICT')
+        self.assertFalse(caught.exception.uncertain)
+
+    def test_room_detail_reads_revision(self):
+        self.gateway._opener.open.return_value = Response({'apiVersion': '1', 'data': {
+            'roomId': 'rm_new', 'revision': 5, 'members': []}})
+        detail = self.gateway.room_detail('pl_saved', 'rm_new')
+        self.assertEqual(detail['revision'], 5)
+        request = self.gateway._opener.open.call_args.args[0]
+        self.assertEqual(request.full_url, 'http://127.0.0.1:8080/api/v1/rooms/rm_new')
 
     def test_wrong_owner_response_is_uncertain(self):
         self.gateway._opener.open.return_value = Response({'apiVersion': '1', 'data': {

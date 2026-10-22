@@ -45,8 +45,18 @@ class Gateway(Protocol):
         """获取或复用身份。"""
         ...
 
-    def create(self, player_id: str, username: str, max_players: int, password: str | None) -> dict:
-        """创建房间并返回成员快照。"""
+    def create(self, player_id: str, username: str, max_players: int,
+               password: str | None, settings: dict | None = None) -> dict:
+        """创建房间并返回成员快照；settings 为可选的对局设置快照。"""
+        ...
+
+    def update_settings(self, player_id: str, room_id: str, settings: dict,
+                        expected_revision: int) -> dict:
+        """整表替换房间对局设置；返回包含新修订号的房间详情。"""
+        ...
+
+    def room_detail(self, player_id: str, room_id: str) -> dict:
+        """读取房间详情（含修订号与设置），用于冲突恢复。"""
         ...
 
     def leave(self, player_id: str, room_id: str) -> dict:
@@ -54,7 +64,7 @@ class Gateway(Protocol):
         ...
 
     def list_rooms(self, player_id: str, cursor: str | None) -> dict:
-        """分页读取房间，用于恢复结果未知的创建请求。"""
+        """分页读取大厅摘要，也用于恢复结果未知的创建请求。"""
         ...
 
 
@@ -95,12 +105,24 @@ PERMISSION_ERROR_CODES = frozenset({'BANNED', 'FORBIDDEN', 'UNAUTHENTICATED'})
 class MultiplayerPort(Protocol):
     """原生桥使用的异步用例接口；调用方不得直接访问工作线程状态。"""
     def begin(self, operation: str, username: str, *, max_players: int = 4,
-              password: str | None = None) -> bool:
-        """发起登录、创建或退出；有未消费操作时返回 False。"""
+              password: str | None = None, settings: dict | None = None) -> bool:
+        """发起登录、创建、退出或同步设置；有未消费操作时返回 False。"""
         ...
 
     def poll(self) -> Completion | None:
         """非阻塞地消费一次完成结果。"""
+        ...
+
+    def begin_list(self, username: str) -> bool:
+        """刷新大厅列表；替换旧批次，网络查询不改变当前房间。"""
+        ...
+
+    def poll_list(self) -> Completion | None:
+        """非阻塞消费最新批次的完整列表，旧批次结果不向调用方发布。"""
+        ...
+
+    def cancel_list(self) -> None:
+        """取消列表发布，并在当前分页请求结束后停止继续查询。"""
         ...
 
     def invalidated(self) -> bool:

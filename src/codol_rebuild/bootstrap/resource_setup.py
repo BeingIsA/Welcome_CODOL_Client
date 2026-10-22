@@ -1,7 +1,7 @@
 """离线资源装配：独立运行文件、缓存、设置恢复、ACL 与挂载顺序。"""
 import hashlib, json, shutil
 from pathlib import Path
-from codol_rebuild.core.paths import REBUILD_ROOT as ROOT
+from codol_rebuild.core.paths import REBUILD_ROOT as ROOT, accounts_dir
 from codol_rebuild.resources.runtime_cache import prepare_cache, prepare_library, link_resource
 from codol_rebuild.resources.library_manifest import validate_library_manifest
 from codol_rebuild.platform.resource_cache_acl import protect_cache
@@ -133,7 +133,7 @@ def prepare(args, run_dir, stage, log, phase_done):
     if shared_overlay:
         raise ValueError('共享目录存在未登记的overlay资源: ' + next(iter(shared_overlay)))
     from codol_rebuild.adapters.persistence.game_settings import SettingsStore, SettingsSession
-    settings_store = SettingsStore(ROOT / 'data/accounts/game-settings.sqlite3')
+    settings_store = SettingsStore(accounts_dir() / 'game-settings.sqlite3')
     settings_session = SettingsSession(settings_store, stage / 'players')
     log['game_settings'] = {'database': str(settings_store.path), 'restored_files': settings_session.restore()}
     pe = prepare_runtime_image(exe, args.patches, log)

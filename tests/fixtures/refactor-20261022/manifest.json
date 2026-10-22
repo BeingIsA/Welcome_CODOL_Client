@@ -29,7 +29,7 @@
   },
   {
     "path": "client/v1649370/multiplayer_bridge.py",
-    "sha256": "892cb73555373deb92ab74be31e31ed191e6ebb9a41b46f31da676eaf86fccac"
+    "sha256": "364281c5f8ac0556bd06806b5caa1a32ea2f6624aa712a8d1a37f3c817f4a595"
   },
   {
     "path": "client/v1649370/observation_points.py",

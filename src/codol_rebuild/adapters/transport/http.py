@@ -96,9 +96,11 @@ class HttpGateway:
             raise MultiplayerError('INVALID_RESPONSE', str(error), uncertain=True) from error
         return data
 
-    def create(self, player_id, username, max_players, password):
-        data = self._request('POST', '/api/v1/rooms',
-                             {'displayName': username, 'maxPlayers': max_players, 'password': password}, player_id)
+    def create(self, player_id, username, max_players, password, settings=None):
+        payload = {'displayName': username, 'maxPlayers': max_players, 'password': password}
+        if settings is not None:
+            payload['settings'] = _settings_payload(settings)
+        data = self._request('POST', '/api/v1/rooms', payload, player_id)
         try:
             _identifier(data.get('roomId'), 'rm')
             if (data.get('ownerPlayerId') != player_id or data.get('maxPlayers') != max_players
@@ -106,8 +108,34 @@ class HttpGateway:
                     or not any(isinstance(m, dict) and m.get('playerId') == player_id
                                and m.get('isOwner') is True for m in data['members'])):
                 raise ValueError('房间响应与创建者或人数不匹配')
+            if settings is not None and data.get('settings') != settings:
+                raise ValueError('房间响应设置与提交值不匹配')
         except ValueError as error:
             raise MultiplayerError('INVALID_RESPONSE', str(error), uncertain=True) from error
+        return data
+
+    def update_settings(self, player_id, room_id, settings, expected_revision):
+        room_id = _identifier(room_id, 'rm')
+        data = self._request('PATCH', f'/api/v1/rooms/{room_id}/settings',
+                             {'settings': _settings_payload(settings),
+                              'expectedRevision': expected_revision}, player_id)
+        try:
+            if type(data.get('revision')) is not int or data.get('revision') < 0:
+                raise ValueError('设置响应修订号无效')
+            if data.get('settings') != _settings_payload(settings):
+                raise ValueError('设置响应与提交值不匹配')
+        except ValueError as error:
+            raise MultiplayerError('INVALID_RESPONSE', str(error), uncertain=True) from error
+        return data
+
+    def room_detail(self, player_id, room_id):
+        room_id = _identifier(room_id, 'rm')
+        data = self._request('GET', f'/api/v1/rooms/{room_id}', player_id=player_id)
+        try:
+            if data.get('roomId') != room_id or type(data.get('revision')) is not int:
+                raise ValueError('房间详情响应不完整')
+        except ValueError as error:
+            raise MultiplayerError('INVALID_RESPONSE', str(error)) from error
         return data
 
     def leave(self, player_id, room_id):
@@ -123,6 +151,8 @@ class HttpGateway:
         try:
             if not isinstance(data.get('rooms'), list) or 'nextCursor' not in data:
                 raise ValueError('房间列表响应不完整')
+            if len(data['rooms']) > 100:
+                raise ValueError('房间列表超出请求分页大小')
             if data['nextCursor'] is not None and not isinstance(data['nextCursor'], str):
                 raise ValueError('房间游标无效')
             for room in data['rooms']:
@@ -130,6 +160,28 @@ class HttpGateway:
                     raise ValueError('房间列表项无效')
                 _identifier(room.get('roomId'), 'rm')
                 _identifier(room.get('ownerPlayerId'), 'pl')
+                for key, maximum in (('ownerDisplayName', 128), ('map', 256), ('mode', 256)):
+                    value = room.get(key)
+                    if (not isinstance(value, str) or len(value) > maximum
+                            or '\0' in value):
+                        raise ValueError('房间展示文本无效：' + key)
+                if (type(room.get('maxPlayers')) is not int or not 1 <= room['maxPlayers'] <= 255
+                        or type(room.get('playerCount')) is not int
+                        or not 0 <= room['playerCount'] <= room['maxPlayers']
+                        or type(room.get('hasPassword')) is not bool
+                        or type(room.get('revision')) is not int or room['revision'] < 0):
+                    raise ValueError('房间人数、锁定状态或修订号无效')
         except ValueError as error:
             raise MultiplayerError('INVALID_RESPONSE', str(error)) from error
         return data
+
+def _settings_payload(settings):
+    """校验设置快照外形并原样返回；键集与服务端契约一致。"""
+    if not isinstance(settings, dict) or not settings or len(settings) > 64:
+        raise ValueError('设置快照必须是1~64项的对象')
+    for name, value in settings.items():
+        if not isinstance(name, str):
+            raise ValueError('设置字段名必须是文本')
+        if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+            raise ValueError(f'设置字段 {name} 的值类型无效')
+    return settings

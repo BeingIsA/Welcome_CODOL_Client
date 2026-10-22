@@ -11,6 +11,11 @@ from codol_rebuild.adapters.game.v1649370.player_name import native_name, LANGUA
 ROOM_POINTER = 0x82E13FC
 POLL, ACTION, ROOM, SESSION, LEAVE_ARG, LOGIN, IDENTITY = 0, 4, 8, 12, 16, 20, 24
 UNDEFINED, MESSAGE = 64, 128
+# 房间设置提交方法本体（房间管理器 vtable+0x7C，构造 0x62C000 写 vtable
+# 0xDC7274 得出）。所有配置变更——建房、规则设置页应用、单项改地图/模式
+# 及管理器内部路径——最终都经此处把新配置拷入管理器 +0x105F0，拦入口
+# 一处即可覆盖全部调用方（0x6300BD/0x6300C6 的两次 637AB0 拷贝之前）。
+SETTINGS_SUBMIT = 0x6300A0
 
 
 def display_message(error) -> str:
@@ -33,21 +38,89 @@ def checked_write(process, address, value):
 
 
 def room_options(read, room):
-    """读取原生已深拷贝配置；maxPlayer 在 +0xE，password 在 +0x18。
+    """读取原生已深拷贝配置：maxPlayer、password 与完整对局设置。
 
-来源：5CF6FC/5CF702 的容量写入、5CF5E6 的密码写入、637AB0 配置拷贝。
-"""
+    配置基址为 room+0x105F0 的 0x70 结构；来源见 637AB0 拷贝构造与
+    5CF530 UI 填装（字段映射见 research/room-config-native-findings.md）。
+    """
     maximum = read(room+0x105FE, 1)[0]
-    pointer = u32(read, room+0x10608)
-    if not 1 <= maximum <= 255 or pointer < 0x10000:
+    if not 1 <= maximum <= 255:
         raise ValueError('原生房间配置未就绪')
+    password = native_string(read, u32(read, room+0x10608))
+    settings = read_settings(read, room+0x105F0)
+    return maximum, (password or None), settings
+
+
+# 标量字段：传输键 →（配置偏移, struct 格式）。与 0x5CF530 填装偏移一致。
+SETTING_SCALARS = {
+    'weaponRestrictPreset': (0x0C, '<B'),
+    'difficulty': (0x14, '<B'),
+    'modeTimeLimit': (0x30, '<f'),
+    'modeScoreLimit': (0x34, '<H'),
+    'modeRoundLimit': (0x36, '<B'),
+    'modeWinLimit': (0x37, '<B'),
+    'modeRoundSwitch': (0x38, '<B'),
+    'modeNumLives': (0x39, '<B'),
+    'modePlayerRespawnDelay': (0x3C, '<f'),
+    'modeWaveRespawnDelay': (0x40, '<f'),
+    'modeBombTimer': (0x44, '<f'),
+    'modePlantTime': (0x48, '<f'),
+    'modeDefuseTime': (0x4C, '<f'),
+    'playerMaxHealth': (0x50, '<H'),
+    'playerHealthRegenTime': (0x52, '<H'),
+    'playerHealthRegenRate': (0x54, '<f'),
+    'teamFFType': (0x58, '<B'),
+    'gameSpectateType': (0x59, '<B'),
+    'gameAllowKillCam': (0x5A, '<B'),
+    'gameEnableHardcore': (0x5B, '<B'),
+    'gameForceUAV': (0x5C, '<B'),
+    'gameOnlyHeadshots': (0x5D, '<B'),
+    'restrictWpnsAtStart': (0x5E, '<B'),
+    'combatHighHostileActionEnd': (0x5F, '<B'),
+    'botsAddAll': (0x60, '<H'),
+    'clashMode': (0x62, '<B'),
+    'clashFOV': (0x63, '<B'),
+    'gameEnableBuddyMode': (0x64, '<B'),
+    'isEndless': (0x65, '<B'),
+    'gameForbidSpawnBulletWeapon': (0x66, '<B'),
+    'gameForbidSpawnGrenade': (0x67, '<B'),
+    'classRestriction': (0x68, '<B'),
+    'weaponRestrictMask': (0x6C, '<I'),
+}
+# 字符串字段：传输键 → 指针偏移（指向单字节串，空指针视为空串）。
+SETTING_STRINGS = {'mode': 0x00, 'map': 0x08}
+
+
+def native_string(read, pointer):
+    """读取原生单字节字符串；UTF-8 失败回退 GBK，上限 256 字节。"""
+    if pointer < 0x10000:
+        return ''
     raw = bytearray()
     for index in range(257):
         value = read(pointer+index, 1)
         if value == b'\0':
-            return maximum, raw.decode('utf-8') or None
+            for encoding in ('utf-8', 'gbk'):
+                try:
+                    return raw.decode(encoding)
+                except UnicodeDecodeError:
+                    continue
+            return raw.decode('utf-8', errors='replace')
         raw.extend(value)
-    raise ValueError('房间密码超出原生字符串上限')
+    raise ValueError('原生字符串超出上限')
+
+
+def read_settings(read, config):
+    """把 0x70 配置结构读成对局设置字典（camelCase 传输键）。"""
+    if config < 0x10000:
+        raise ValueError('原生房间配置未就绪')
+    settings = {}
+    for key, offset in SETTING_STRINGS.items():
+        settings[key] = native_string(read, u32(read, config+offset))
+    for key, (offset, form) in SETTING_SCALARS.items():
+        settings[key] = struct.unpack_from(form, read(config+offset, struct.calcsize(form)))[0]
+        if form == '<f':
+            settings[key] = round(settings[key], 6)
+    return settings
 
 
 def username(read):
@@ -66,12 +139,37 @@ def validate_contract(read):
         0x730280: bytes.fromhex('558bec83ec4ca198bb770c'),
         0x5CF5E6: bytes.fromhex('8b4d085083c118'),
         0x5CF6FC: bytes.fromhex('8a45f08b4d0888410e88410f'),
+        SETTINGS_SUBMIT: bytes.fromhex('558bec83ec10'),
     }.items():
         if read(address, len(expected)) != expected:
             raise ValueError(f'联机桥原生 ABI 不匹配：{address:#x}')
 
 
-def build_tick(entry, state, ready, preview_entry, room_entries):
+def build_settings_detours(entry):
+    """生成设置提交方法（0x6300A0）入口的重定向桩与补丁计划。
+
+    被替换的 6 字节是原函数序幕（push ebp; mov ebp,esp; sub esp,0x10）。
+    入口必须用 E9 JMP 重定向而不是 CALL：JMP 不压返回地址，桩入口的
+    栈与原方法入口完全一致（[esp]=调用者返回地址、[esp+4]=新配置指针），
+    否则整个方法在 esp 偏移 4 的栈上运行，ret 4 会吞掉调用者返回地址
+    （2026-10-23 实机崩溃教训）。桩先以 int3 陷阱上报，再执行原序幕
+    并跳回 0x6300A6 继续原方法，原生行为保持不变。
+    """
+    code, traps, patches = bytearray(), {}, []
+    stub = 0
+    traps[entry+stub] = 'settings_submit'
+    code.append(0xCC)                       # 陷阱：读取 [esp+4] 的配置指针
+    code.extend(bytes.fromhex('558bec83ec10'))  # 原序幕 6 字节
+    code.extend(b'\xe9')                    # jmp 0x6300A6（相对跳回）
+    code.extend(struct.pack('<i', (SETTINGS_SUBMIT+6)-(entry+len(code))-4))
+    before = bytes.fromhex('558bec83ec10')
+    after = b'\xe9' + struct.pack('<I', (entry+stub-SETTINGS_SUBMIT-5) & 0xffffffff)
+    after += b'\x90'
+    patches.append({'va': SETTINGS_SUBMIT, 'before': before, 'after': after})
+    return {'code': bytes(code), 'patches': patches, 'traps': traps}
+
+
+def build_tick(entry, state, ready, preview_entry, room_entries, list_publish=None):
     """包装既有前端帧；网络等待时立即返回，仅就绪结果进入原生回调。"""
     code, labels, refs, traps = bytearray(), {}, [], {}
     def emit(value): code.extend(bytes.fromhex(value))
@@ -91,6 +189,8 @@ def build_tick(entry, state, ready, preview_entry, room_entries):
     emit('833d'); word(state+36); emit('06'); branch('0f82', 'done')
     emit('c705'); word(state+36); word(0)
     trap('poll')
+    if list_publish is not None:
+        emit('83e4f0'); call(list_publish); emit('8be5')
     emit('a1'); word(state+ACTION)
     for value, target in ((1, 'created'), (2, 'create_failed'), (3, 'left'), (4, 'leave_failed')):
         emit('83f8'+f'{value:02x}'); branch('0f84', target)
@@ -126,8 +226,12 @@ class MultiplayerBridge:
         self.pending = None
         self.login_started = False
         self.login_done = False
+        # 已提交但尚未被 _poll 消费的设置补交；主流程收尾时据此保持轮询，
+        # 否则设置结果会被搁浅、通道永久占用。
+        self._settings_outstanding = False
         # 失效后丢弃迟到完成结果的窗口，重新鉴权成功后关闭。
         self.discard_results = False
+        self.room_list = None
 
     def allocate(self):
         """在已暂停的初始化边分配独立通信页。"""
@@ -141,12 +245,32 @@ class MultiplayerBridge:
     def install_tick(self, ready, preview_entry, room_plan):
         """安装主线程完成调度；返回替换原预览 CALL 的新入口。"""
         entry = self.process.allocate(4096)
-        plan = build_tick(entry, self.state, ready, preview_entry, room_plan['entries'])
+        from codol_rebuild.adapters.game.v1649370.room_list import RoomListBridge
+        self.room_list = RoomListBridge(self.process, self.port, self.record,
+                                       lambda: username(self.process.read), display_message)
+        publisher = self.room_list.install()
+        plan = build_tick(entry, self.state, ready, preview_entry, room_plan['entries'], publisher)
         if len(plan['code']) > 4096:
             raise ValueError('联机帧桥超出代码页')
         checked_write(self.process, entry, plan['code'])
         self.process.executable(entry, 4096)
-        self.traps = {**room_plan['traps'], **plan['traps']}
+        self.traps = {**room_plan['traps'], **plan['traps'], **self.room_list.traps}
+        return entry
+
+    def install_settings_detours(self):
+        """安装房内改设置两处提交调用的重定向桩；原生行为不变。"""
+        validate_contract(self.process.read)
+        entry = self.process.allocate(4096)
+        plan = build_settings_detours(entry)
+        if len(plan['code']) > 4096:
+            raise ValueError('设置同步桩超出代码页')
+        checked_write(self.process, entry, plan['code'])
+        self.process.executable(entry, 4096)
+        for patch in plan['patches']:
+            if self.process.read(patch['va'], len(patch['before'])) != patch['before']:
+                raise ValueError(f'设置调用边字节与预期不符：{patch["va"]:#x}')
+            checked_write(self.process, patch['va'], patch['after'])
+        self.traps = {**self.traps, **plan['traps']}
         return entry
 
     def _word(self, offset, value):
@@ -173,8 +297,16 @@ class MultiplayerBridge:
         try:
             phase = self.traps[address]
             frame = struct.unpack_from('<I', ctx, 196)[0]
-            if phase in ('create', 'leave'):
+            if phase.startswith('room_list_'):
+                self.room_list.handle(phase, ctx, self.login_done)
+                if self.room_list.active:
+                    self._word(POLL, 1)
+                    self._word(36, 0)
+            elif phase in ('create', 'leave'):
                 self._request(phase, frame)
+            elif phase == 'settings_submit':
+                # JMP 重定向后桩入口栈与原方法一致：[esp]=调用者返回、[esp+4]=配置。
+                self._submit_settings(u32(self.process.read, frame+4))
             elif phase == 'poll':
                 self._poll()
             else:
@@ -188,8 +320,10 @@ class MultiplayerBridge:
                     self.record({'multiplayer_native_completed': operation, 'success': action in (1, 3)})
                 self.pending = None
                 self._word(ACTION, 0)
-                # 重新鉴权还在后台进行时保持轮询，登录完成后由 _poll 清零。
-                self._word(POLL, 1 if self.login_started and not self.login_done else 0)
+                # 重新鉴权或设置补交仍在等待时保持轮询，两者都由 _poll 清零；
+                # 否则设置结果会被主流程收尾搁浅，通道被永久占用。
+                self._word(POLL, 1 if (self.login_started and not self.login_done)
+                           or self._settings_outstanding or self._listing() else 0)
             struct.pack_into('<I', ctx, 184, address+1)
             self.process.set_context(thread, ctx)
         finally:
@@ -198,6 +332,8 @@ class MultiplayerBridge:
     def _request(self, operation, frame):
         if self.pending is not None:
             return  # 既有原生等待任务保持不变，重复点击不提交新请求。
+        if self.room_list is not None:
+            self.room_list.cancel()
         read = self.process.read
         room = u32(read, frame+16) if operation == 'create' else u32(read, ROOM_POINTER)
         session = u32(read, frame) if operation == 'create' else u32(read, room+0x1C)
@@ -213,11 +349,39 @@ class MultiplayerBridge:
         try:
             if not self.login_done and not self.login_started:
                 raise ValueError('服务端登录尚未成功')
-            maximum, password = room_options(read, room) if operation == 'create' else (4, None)
-            if not self.port.begin(operation, username(read), max_players=maximum, password=password):
+            if operation == 'create':
+                maximum, password, settings = room_options(read, room)
+                submitted = self.port.begin(operation, username(read),
+                                            max_players=maximum, password=password,
+                                            settings=settings)
+            else:
+                submitted = self.port.begin(operation, username(read))
+            if not submitted:
                 raise ValueError('已有服务端请求正在处理，请稍后重试')
         except (OSError, ValueError) as error:
             self._failure(operation, str(error))
+
+    def _submit_settings(self, config):
+        """逐次提交设置，不按内容去重；原生提交继续执行，失败只记录。"""
+        try:
+            settings = read_settings(self.process.read, config)
+            if self.pending is not None:
+                # 建房/离房期间保留原有生命周期保护，不另提交房内设置请求。
+                return
+            if not (self.login_done or self.login_started):
+                self.record({'multiplayer_settings': 'skipped', 'reason': 'login not ready'})
+                return
+            if not self.port.begin('settings', username(self.process.read), settings=settings):
+                self.record({'multiplayer_settings': 'skipped', 'reason': 'busy'})
+                return
+            # 主流程收尾后帧桩已把 POLL 置 0，而设置结果只能由 _poll 消费；
+            # 不重新武装轮询，这个 future 会永久占住设置通道，此后每次改动
+            # 都按 busy 丢弃。计数清零与 _request 一致，使补交尽快被取走。
+            self._settings_outstanding = True
+            self._word(POLL, 1)
+            self._word(36, 0)
+        except (OSError, ValueError) as error:
+            self.record({'multiplayer_settings': 'error', 'error': str(error)})
 
     def _drop_pending(self):
         """丢弃仍在等待的原生请求结果，进入失效后丢弃窗口。"""
@@ -227,6 +391,8 @@ class MultiplayerBridge:
     def _invalidate_login(self):
         """实时身份被服务端拒绝：清除原生登录标志，弹出统一提示并重新鉴权。"""
         self.login_done = False
+        if self.room_list is not None:
+            self.room_list.cancel()
         self.login_started = False
         self._drop_pending()
         self._word(LOGIN, 0)
@@ -235,6 +401,11 @@ class MultiplayerBridge:
     def _poll(self):
         if self.login_done and self.port.invalidated():
             self._invalidate_login()
+        if self.room_list is not None:
+            self.room_list.poll()
+            if (self.login_done and self.pending is None and not self._settings_outstanding
+                    and not self._listing()):
+                self._word(POLL, 0)
         if not self.login_started:
             self.login_started = self.port.begin('login', username(self.process.read))
         if self.pending and not self._valid_room(*self.pending[1:]):
@@ -259,8 +430,16 @@ class MultiplayerBridge:
             self.discard_results = False
             self._word(LOGIN, 1)
             if self.pending is None:
-                self._word(POLL, 0)
+                self._word(POLL, int(self._listing()))
             self.record({'multiplayer': 'login', 'success': True})
+        elif result.operation == 'settings':
+            # 原生界面已本地生效，这里只确认服务端落库结果；失败不回滚。
+            self.record({'multiplayer_settings': 'done', 'success': result.error is None,
+                         **({'error': str(result.error)} if result.error else {})})
+            # 设置通道已腾空，无主流程在途时停止轮询，与登录分支同样处理。
+            self._settings_outstanding = False
+            if self.pending is None:
+                self._word(POLL, int(self._listing()))
         elif self.discard_results:
             # 失效窗口内迟到的创建/退出结果只记录，不再投递原生回调。
             self.record({'multiplayer_discarded': result.operation, 'success': result.error is None})
@@ -272,3 +451,7 @@ class MultiplayerBridge:
             self._word(ACTION, 1 if result.operation == 'create' else 3)
             self.record({'multiplayer': result.operation, 'success': True,
                          **({'roomId': result.data['roomId']} if result.operation == 'create' else {})})
+
+    def _listing(self):
+        """大厅查询和取消结果未消费完毕时维持主线程调度。"""
+        return self.room_list is not None and self.room_list.active

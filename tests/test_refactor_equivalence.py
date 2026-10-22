@@ -18,6 +18,7 @@ ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'client/src'))
 BASE=ROOT/'client/tests/fixtures/refactor-20261020'
 # 2026-10-22 重冻结基线：问题 2/7/8/10 修复后的当前源码快照，守护后续漂移。
+# multiplayer_bridge.py 于 2026-10-23 单独重冻结，原因见本目录 README.md。
 BASE22=ROOT/'client/tests/fixtures/refactor-20261022'
 PKG=ROOT/'client/src/codol_rebuild'
 CAPTURE=ROOT/'client/tests/fixtures/local-profile-capture'

@@ -14,3 +14,17 @@
 文件 SHA-256 见 manifest.json。一次性迁移差分仍使用
 `refactor-20261020`（账号初始化等价用例）。运行捕获样本见
 `local-profile-capture`。
+
+## 重冻结记录
+
+- 2026-10-23：经批准接入服务端大厅列表，更新 `multiplayer_bridge.py` 快照。
+  联机安装新增列表适配器，帧生成器通过可选发布入口驱动 GFx 列表发布，
+  并保持查询/取消结果消费期间的轮询。`list_publish=None` 的既有生成路径
+  保持不变；本目录安装轨迹用例不注入联机端口，原轨迹不变。列表 ABI
+  由 `test_room_list.py` 与独立 x86 执行测试 `test_room_list_native.py` 覆盖。
+
+- 2026-10-23：`multiplayer_bridge.py` 修复房内改设置/改地图不生效——
+  `_submit_settings` 提交后未武装 `POLL`，建房收尾把 `POLL` 归 0 后设置结果
+  再无人消费，通道被首个 future 永久占住，后续改动全被丢成 busy。改动只在
+  运行时处理函数（`_submit_settings`、`_poll` 的设置分支），未触及任何原生
+  代码生成器，故 install-trace 黄金轨迹无需重冻结。

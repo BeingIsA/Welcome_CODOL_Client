@@ -217,6 +217,8 @@ class GameSessionBridge:
         self.process.executable(entry, 4096)
         if self.multiplayer:
             tick = self.multiplayer.install_tick(profile_data+72, entry, room)
+            self.multiplayer.install_settings_detours()
+            self.record({'multiplayer_settings_detours': True})
             self.preview_caller_return = tick+9
             plan['patch_after'] = b'\xe8' + struct.pack('<I', (tick-plan['patch_va']-5) & 0xffffffff)
         self.process.write(plan['patch_va'], plan['patch_after'])

@@ -1,6 +1,6 @@
 """离线运行组合入口：创建依赖、注入版本桥并启动运行会话。"""
 import json, sqlite3, time, traceback
-from codol_rebuild.core.paths import REBUILD_ROOT as ROOT
+from codol_rebuild.core.paths import REBUILD_ROOT as ROOT, accounts_dir
 from codol_rebuild.bootstrap.config import parse_args
 from codol_rebuild.bootstrap.resource_setup import prepare, FORBIDDEN
 from codol_rebuild.adapters.persistence.sqlite_accounts import AccountRepository
@@ -16,8 +16,9 @@ def run(args):
     reporter=SessionLog(ROOT/'workspaces/offline-runs',args.name)
     run_dir,stage,log=reporter.run_dir,reporter.stage,reporter.data
     record,phase_done=reporter.record,reporter.phase_done
+    accounts = accounts_dir()
     def account_factory(schemas,tables,catalog):
-        return AccountSession(AccountRepository(ROOT/'data/accounts/local.sqlite3'),
+        return AccountSession(AccountRepository(accounts/'local.sqlite3'),
                               AccountCodec(schemas,tables,catalog))
     process=ProcessSession(args,run_dir,stage,log,record,phase_done,ROOT/'bin/offline_guard.exe')
     process.settings_errors=(OSError,ValueError,sqlite3.Error)

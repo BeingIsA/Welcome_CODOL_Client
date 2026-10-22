@@ -1,7 +1,7 @@
 """离线运行参数解析；不创建进程。"""
 import argparse
 from pathlib import Path
-from codol_rebuild.core.paths import REBUILD_ROOT as ROOT
+from codol_rebuild.core.paths import REBUILD_ROOT as ROOT, accounts_dir
 
 def parse_args(argv=None):
     """显式单次命令，所有会话放项目目录；不会把未验收窗口判成成功。"""
@@ -24,7 +24,8 @@ def parse_args(argv=None):
     parser.add_argument('--local-profile',action='store_true',help='Experimental build-specific local profile bridge')
     parser.add_argument('--server-url',help='启用服务端登录与房间接口，例如 http://127.0.0.1:8080')
     parser.add_argument('--server-timeout',type=float,default=5.0,help='业务请求超时秒数（0.1～30）')
-    parser.add_argument('--server-identity',type=Path,default=ROOT/'data/accounts/server-identities.json',
+    parser.add_argument('--server-identity',type=Path,
+                        default=accounts_dir()/'server-identities.json',
                         help='服务器身份文件；验证时指定隔离路径')
     parser.add_argument('--capture-schema',action='store_true',
                         help='在前端帧只读扫描 DDL 指纹并导出档案结构定义（不写目标进程）')

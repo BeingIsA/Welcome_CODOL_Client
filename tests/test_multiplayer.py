@@ -29,17 +29,38 @@ class Gateway:
             raise MultiplayerError('BANNED', '已封禁')
         return {'playerId': player_id or 'pl_test', 'displayName': username}
 
-    def create(self, player_id, username, max_players, password):
-        self.calls.append(('create', player_id, max_players, password))
+    def create(self, player_id, username, max_players, password, settings=None):
+        self.calls.append(('create', player_id, max_players, password, settings))
         if self.rooms:
             raise MultiplayerError('ALREADY_IN_OTHER_ROOM', '已有房间')
         self.serial += 1
-        room = {'roomId': 'rm_'+str(self.serial), 'ownerPlayerId': player_id}
+        room = {'roomId': 'rm_'+str(self.serial), 'ownerPlayerId': player_id,
+                'revision': 0, 'settings': settings or {}}
         self.rooms[room['roomId']] = room
         if self.fail_create:
             self.fail_create = False
             raise MultiplayerError('NETWORK_ERROR', '响应丢失', uncertain=True)
         return room
+
+    def update_settings(self, player_id, room_id, settings, expected_revision):
+        self.calls.append(('update_settings', room_id, expected_revision))
+        room = self.rooms.get(room_id)
+        if room is None:
+            raise MultiplayerError('ROOM_NOT_FOUND', '房间不存在')
+        if expected_revision != room['revision'] and not getattr(self, 'allow_retry', True):
+            raise MultiplayerError('REVISION_CONFLICT', '修订号过期')
+        if expected_revision != room['revision']:
+            raise MultiplayerError('REVISION_CONFLICT', '修订号过期')
+        room['revision'] += 1
+        room['settings'] = settings
+        return dict(room)
+
+    def room_detail(self, player_id, room_id):
+        self.calls.append(('detail', room_id))
+        room = self.rooms.get(room_id)
+        if room is None:
+            raise MultiplayerError('ROOM_NOT_FOUND', '房间不存在')
+        return dict(room)
 
     def list_rooms(self, player_id, cursor):
         self.calls.append(('list', player_id))
@@ -54,6 +75,69 @@ class Gateway:
 
 
 class MultiplayerTests(unittest.TestCase):
+    def wait_list(self):
+        """仅等待独立测试工作线程，不接触游戏或外部服务器。"""
+        for _ in range(300):
+            result = self.session.poll_list()
+            if result is not None:
+                return result
+            time.sleep(.005)
+        self.fail('列表查询未完成')
+
+    def test_list_collects_pages_deduplicates_without_leaving_current_room(self):
+        from test_room_list import room
+        self.assertIsNone(self.result('create').error)
+        calls = []
+        def pages(player, cursor):
+            calls.append(cursor)
+            if cursor is None:
+                return {'rooms': [room('rm_first','sd')], 'nextCursor': 'next'}
+            return {'rooms': [room('rm_second'), room('rm_first','sd')], 'nextCursor': None}
+        self.gateway.list_rooms = pages
+        before = list(self.gateway.calls)
+        self.session.begin_list('测试玩家')
+        result = self.wait_list()
+        self.assertIsNone(result.error)
+        self.assertEqual(calls, [None, 'next'])
+        self.assertEqual([r['roomId'] for r in result.data['rooms']], ['rm_first','rm_second'])
+        self.assertEqual(self.gateway.calls, before)
+        self.assertEqual(len(self.gateway.rooms), 1)
+
+    def test_refresh_and_cancel_discard_old_batch_without_queue_growth(self):
+        from test_room_list import room
+        entered, release = threading.Event(), threading.Event()
+        calls = []
+        def pages(player, cursor):
+            calls.append(cursor)
+            if len(calls) == 1:
+                entered.set()
+                release.wait(3)
+                return {'rooms': [room('rm_stale')], 'nextCursor': 'must-not-fetch'}
+            return {'rooms': [room('rm_latest')], 'nextCursor': None}
+        self.gateway.list_rooms = pages
+        self.addCleanup(release.set)
+        self.session.begin_list('玩家')
+        self.assertTrue(entered.wait(2))
+        for _ in range(5):
+            self.session.begin_list('玩家')
+        release.set()
+        result = self.wait_list()
+        self.assertEqual(calls, [None, None])
+        self.assertEqual(result.data['rooms'][0]['roomId'], 'rm_latest')
+        self.session.begin_list('玩家')
+        self.session.cancel_list()
+        self.assertEqual(self.wait_list().operation, 'list_cancelled')
+
+    def test_list_rejects_cyclic_cursor_and_reports_network_error(self):
+        self.gateway.list_rooms = lambda *_: {'rooms': [], 'nextCursor': 'same'}
+        self.session.begin_list('玩家')
+        self.assertEqual(self.wait_list().error.code, 'INVALID_RESPONSE')
+        def broken(*_):
+            raise MultiplayerError('NETWORK_ERROR', '断网')
+        self.gateway.list_rooms = broken
+        self.session.begin_list('玩家')
+        self.assertEqual(self.wait_list().error.code, 'NETWORK_ERROR')
+
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
@@ -148,3 +232,66 @@ class MultiplayerTests(unittest.TestCase):
         for address in ('file:///a', 'http://user:pass@host', 'http://host/path', 'http://host?q=1'):
             with self.subTest(address=address), self.assertRaises(ValueError):
                 normalize_server(address)
+
+class SettingsSyncTests(MultiplayerTests):
+    """房内设置同步：异步补交、修订号冲突自愈与离房重置。"""
+
+    def test_create_carries_settings_and_revision(self):
+        settings = {'mode': 'td', 'map': 'mp_crash', 'modeTimeLimit': 10.5}
+        result = self.result('create', max_players=8, password='pw', settings=settings)
+        self.assertIsNone(result.error)
+        create_call = next(c for c in self.gateway.calls if c[0] == 'create')
+        self.assertEqual(create_call[4], settings)
+
+    def test_settings_sync_uses_known_revision(self):
+        self.result('create', max_players=4)
+        result = self.result('settings', settings={'mode': 'sd'})
+        self.assertIsNone(result.error)
+        update = next(c for c in self.gateway.calls if c[0] == 'update_settings')
+        self.assertEqual(update[1], 'rm_1')
+        self.assertEqual(update[2], 0)
+        room = self.gateway.rooms['rm_1']
+        self.assertEqual(room['settings'], {'mode': 'sd'})
+        self.assertEqual(result.data['revision'], 1)
+
+    def test_identical_settings_requests_each_increment(self):
+        """创建为零；连续同值设置请求仍分别提交并递增。"""
+        settings = {'mode': 'td'}
+        created = self.result('create', settings=settings)
+        self.assertEqual(created.data['revision'], 0)
+        for revision in (1, 2, 3):
+            result = self.result('settings', settings=settings)
+            self.assertIsNone(result.error)
+            self.assertEqual(result.data['revision'], revision)
+        self.assertEqual([c[2] for c in self.gateway.calls if c[0] == 'update_settings'], [0, 1, 2])
+
+    def test_settings_conflict_refetches_detail_and_retries(self):
+        self.result('create', max_players=4)
+        # 模拟他处已推进修订号：记忆修订号落后于服务端。
+        self.gateway.rooms['rm_1']['revision'] = 5
+        result = self.result('settings', settings={'mode': 'sd'})
+        self.assertIsNone(result.error)
+        self.assertIn(('detail', 'rm_1'), self.gateway.calls)
+        room = self.gateway.rooms['rm_1']
+        self.assertEqual(room['revision'], 6)
+
+    def test_settings_without_room_reports_error(self):
+        result = self.result('settings', settings={'mode': 'sd'})
+        self.assertEqual(result.error.code, 'NO_ROOM')
+
+    def test_leave_resets_revision(self):
+        self.result('create', max_players=4)
+        self.result('settings', settings={'mode': 'sd'})
+        self.result('leave')
+        # 重新建房后修订号应从新房间响应重建，而不是沿用旧房间记忆。
+        self.result('create', max_players=4)
+        result = self.result('settings', settings={'mode': 'td'})
+        self.assertIsNone(result.error)
+        self.assertEqual(result.data['revision'], 1)
+
+    def test_settings_does_not_block_create(self):
+        self.assertTrue(self.session.begin('settings', '测试玩家', settings={'mode': 'sd'}))
+        # 设置同步进行中，主流程仍可提交。
+        self.assertTrue(self.session.begin('login', '测试玩家'))
+        self.consume()
+        self.consume()
