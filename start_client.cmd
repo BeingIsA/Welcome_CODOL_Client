@@ -1,8 +1,8 @@
 @echo off
 setlocal
-set "CODOL_PYTHON=C:\Python314\python.exe"
-if not exist "%CODOL_PYTHON%" (
-    echo Python not found: %CODOL_PYTHON%
+where python >nul 2>nul
+if errorlevel 1 (
+    echo Python not found in PATH. Please install Python or add it to PATH.
     pause
     exit /b 1
 )
@@ -14,7 +14,7 @@ if not exist "%CFG%" (
 )
 set "SERVER_IP="
 set "SERVER_PORT="
-for /f "usebackq eol=; tokens=1,2 delims==" %%a in ("%CFG%") do (
+for /f "usebackq eol=; tokens=1,2 delims== " %%a in ("%CFG%") do (
     if /i "%%a"=="ip" set "SERVER_IP=%%b"
     if /i "%%a"=="port" set "SERVER_PORT=%%b"
 )
@@ -30,7 +30,7 @@ set "SERVER_PORT=%SERVER_PORT: =%"
 echo CODOL 1649370 Local Full-Unlock Test
 echo Resource validation may take a while. UAC is for the temporary offline guard.
 echo Local account: data\accounts. Server: http://%SERVER_IP%:%SERVER_PORT%
-"%CODOL_PYTHON%" -B -X utf8 "%~dp0tools\launch_client.py" --resource-library "%~dp0resources\v1649370\offline-image-library" --loose-library "%~dp0resources\v1649370\offline-loose-library" --local-profile --server-url http://%SERVER_IP%:%SERVER_PORT% %*
+python -B -X utf8 "%~dp0tools\launch_client.py" --resource-library "%~dp0resources\v1649370\offline-image-library" --loose-library "%~dp0resources\v1649370\offline-loose-library" --local-profile --server-url http://%SERVER_IP%:%SERVER_PORT% %*
 set "CODOL_EXIT=%ERRORLEVEL%"
 if not "%CODOL_EXIT%"=="0" (
     echo Launch or runtime failed. Exit code: %CODOL_EXIT%. Please keep the log.
