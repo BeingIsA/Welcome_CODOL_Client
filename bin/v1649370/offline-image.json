@@ -1,0 +1,330 @@
+{
+  "source_sha256": "893f20f82cb81e54aab99090eea6e9f0304762278637ab8a441af7f2ea2c3a38",
+  "sha256": "55f067ac24e7d5ea9bea5acd46a1514eb1b7780a627b73c2094f41133dce3ffd",
+  "bytes": 11075584,
+  "old_entry_rva": "0xe5dc690",
+  "entry_rva": "0x8427db",
+  "entry_bytes": "e8dbff0000e989feffff",
+  "image_base": "0x400000",
+  "fixed_base_no_relocations": true,
+  "resource_directory_restored": true,
+  "tls": {
+    "template_rva": "0xe5c8000",
+    "template_bytes": 48,
+    "index_rva": "0x156930c",
+    "index_writable": true,
+    "callbacks_rva": "0x8ada3c",
+    "callbacks": [],
+    "preserved": true
+  },
+  "imports": {
+    "dll_count": 19,
+    "import_count": 455,
+    "groups": [
+      {
+        "dll": "advapi32.dll",
+        "count": 13
+      },
+      {
+        "dll": "gcloudvoice.dll",
+        "count": 12
+      },
+      {
+        "dll": "gdi32.dll",
+        "count": 1
+      },
+      {
+        "dll": "imm32.dll",
+        "count": 19
+      },
+      {
+        "dll": "iphlpapi.dll",
+        "count": 3
+      },
+      {
+        "dll": "kernel32.dll",
+        "count": 166
+      },
+      {
+        "dll": "oleaut32.dll",
+        "count": 6
+      },
+      {
+        "dll": "shlwapi.dll",
+        "count": 1
+      },
+      {
+        "dll": "user32.dll",
+        "count": 71
+      },
+      {
+        "dll": "version.dll",
+        "count": 3
+      },
+      {
+        "dll": "winmm.dll",
+        "count": 3
+      },
+      {
+        "dll": "ws2_32.dll",
+        "count": 23
+      },
+      {
+        "dll": "wsock32.dll",
+        "count": 11
+      },
+      {
+        "dll": "bink2w32.dll",
+        "count": 20
+      },
+      {
+        "dll": "d3d9.dll",
+        "count": 3
+      },
+      {
+        "dll": "dbghelp.dll",
+        "count": 15
+      },
+      {
+        "dll": "libcef.dll",
+        "count": 31
+      },
+      {
+        "dll": "mss32.dll",
+        "count": 47
+      },
+      {
+        "dll": "ole32.dll",
+        "count": 7
+      }
+    ]
+  },
+  "manifests": [
+    {
+      "resource_id": 1,
+      "language": 1033,
+      "rva": "0xe5d1bfc",
+      "bytes": 1074,
+      "elevation_attributes_demoted": 0,
+      "sha256": "4d788de715689e1ca3d5fdd441904c54e4a96378b0ca2ad91a59e4741350c241"
+    },
+    {
+      "resource_id": 130,
+      "language": 1033,
+      "rva": "0xe5d2030",
+      "bytes": 502,
+      "elevation_attributes_demoted": 1,
+      "sha256": "ae597c96385502914c25ab046cfd55cecc99e426ba2a97af9503f78986491301"
+    }
+  ],
+  "code_sections_unchanged": true,
+  "checksum_valid": true,
+  "stub_modules": [],
+  "candidate_kind": "original_CRT_entry_trial_image",
+  "runtime_verified": false,
+  "offline_lobby_verified": false,
+  "remaining": [
+    "TVM 运行初始化未观测",
+    "动态保护组件加载必须由受控宿主拒绝",
+    "缺少本地依赖/资源的候选不能视为完整运行安装",
+    "需要实际调试事件确认进入 CRT 和游戏初始化"
+  ],
+  "source": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\bootstrap1649370-imports\\codol1649370-imports-analysis-candidate.bin",
+  "output": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-launch\\codol1649370-offline.exe",
+  "dependencies": {
+    "local_modules": [
+      {
+        "name": "gcloudvoice.dll",
+        "source": "D:\\Games\\CODOL_Final\\Original Client\\GCloudVoice.dll",
+        "bytes": 2722896,
+        "sha256": "c9af7b75fbb9c0e7aae1a1b65058ac3d14472e5e48603cd9592c119997adcf6f",
+        "imports": [
+          "KERNEL32.dll",
+          "USER32.dll",
+          "WS2_32.dll",
+          "IPHLPAPI.DLL",
+          "WINMM.dll",
+          "VERSION.dll",
+          "ADVAPI32.dll",
+          "ole32.dll",
+          "WLDAP32.dll",
+          "DSOUND.dll"
+        ],
+        "delay_imports": []
+      },
+      {
+        "name": "bink2w32.dll",
+        "source": "D:\\Games\\CODOL_Final\\Original Client\\bink2w32.dll",
+        "bytes": 340992,
+        "sha256": "6fca2816b77584a5cfc96f567c0b808890cdeb85cbb390810ce26fa7cb531e66",
+        "imports": [
+          "USER32.dll",
+          "GDI32.dll",
+          "KERNEL32.dll",
+          "WINMM.dll",
+          "ole32.dll"
+        ],
+        "delay_imports": [
+          "mss32.dll"
+        ]
+      },
+      {
+        "name": "dbghelp.dll",
+        "source": "D:\\Games\\CODOL_Final\\Original Client\\dbghelp.dll",
+        "bytes": 1213200,
+        "sha256": "c06430b8cb025be506be50a756488e1bcc3827c4f45158d93e4e3eeb98ce1e4f",
+        "imports": [
+          "msvcrt.dll",
+          "KERNEL32.dll"
+        ],
+        "delay_imports": [
+          "ADVAPI32.dll",
+          "RPCRT4.dll"
+        ]
+      },
+      {
+        "name": "libcef.dll",
+        "source": "D:\\Games\\CODOL_Final\\Original Client\\libcef.dll",
+        "bytes": 56750080,
+        "sha256": "7e23d62507f9b2233d40a4542f5263e3da74c1f57b5e866fa8d0198ebe68e51d",
+        "imports": [
+          "VERSION.dll",
+          "USP10.dll",
+          "PSAPI.DLL",
+          "SHLWAPI.dll",
+          "ADVAPI32.dll",
+          "GDI32.dll",
+          "KERNEL32.dll",
+          "WINSPOOL.DRV",
+          "COMDLG32.dll",
+          "ole32.dll",
+          "OLEAUT32.dll",
+          "WINHTTP.dll",
+          "USERENV.dll",
+          "urlmon.dll",
+          "dhcpcsvc.DLL",
+          "WTSAPI32.dll",
+          "COMCTL32.dll",
+          "OLEACC.dll",
+          "WINMM.dll",
+          "WS2_32.dll",
+          "Secur32.dll",
+          "CRYPT32.dll",
+          "IPHLPAPI.DLL",
+          "IMM32.dll",
+          "RPCRT4.dll"
+        ],
+        "delay_imports": [
+          "dbghelp.dll",
+          "CFGMGR32.dll",
+          "POWRPROF.dll",
+          "USER32.dll",
+          "SHELL32.dll",
+          "SETUPAPI.dll",
+          "dwmapi.dll",
+          "bthprops.cpl",
+          "BluetoothApis.dll",
+          "MF.dll",
+          "MFPlat.DLL",
+          "MFReadWrite.dll",
+          "d3d9.dll",
+          "d3d11.dll",
+          "dxva2.dll"
+        ]
+      },
+      {
+        "name": "mss32.dll",
+        "source": "D:\\Games\\CODOL_Final\\Original Client\\mss32.dll",
+        "bytes": 450560,
+        "sha256": "1f967f31b8f04d7d8f608f17fea57836b86a7b0bd84d519c7f48a49cfd0b5de2",
+        "imports": [
+          "USER32.dll",
+          "KERNEL32.dll",
+          "WINMM.dll"
+        ],
+        "delay_imports": []
+      }
+    ],
+    "system_or_api_set_names": [
+      "advapi32.dll",
+      "BluetoothApis.dll",
+      "bthprops.cpl",
+      "CFGMGR32.dll",
+      "COMCTL32.dll",
+      "COMDLG32.dll",
+      "CRYPT32.dll",
+      "d3d11.dll",
+      "d3d9.dll",
+      "dhcpcsvc.DLL",
+      "DSOUND.dll",
+      "dwmapi.dll",
+      "dxva2.dll",
+      "gdi32.dll",
+      "imm32.dll",
+      "iphlpapi.dll",
+      "kernel32.dll",
+      "MF.dll",
+      "MFPlat.DLL",
+      "MFReadWrite.dll",
+      "msvcrt.dll",
+      "ole32.dll",
+      "OLEACC.dll",
+      "oleaut32.dll",
+      "POWRPROF.dll",
+      "PSAPI.DLL",
+      "RPCRT4.dll",
+      "Secur32.dll",
+      "SETUPAPI.dll",
+      "SHELL32.dll",
+      "shlwapi.dll",
+      "urlmon.dll",
+      "user32.dll",
+      "USERENV.dll",
+      "USP10.dll",
+      "version.dll",
+      "WINHTTP.dll",
+      "winmm.dll",
+      "WINSPOOL.DRV",
+      "WLDAP32.dll",
+      "ws2_32.dll",
+      "wsock32.dll",
+      "WTSAPI32.dll"
+    ],
+    "dlls_loaded": false,
+    "dlls_copied": false,
+    "note": "仅覆盖 PE import/delay-import；LoadLibrary 和子进程仍须受控宿主监测。"
+  },
+  "source_unchanged": true,
+  "dynamic_loader_iat": {
+    "LoadLibraryA": "0xca8158",
+    "LoadLibraryW": "0xca8358",
+    "GetProcAddress": "0xca8150",
+    "CreateProcessA": "0xca8108",
+    "CreateProcessW": "0xca81d0"
+  },
+  "dynamic_protection_calls": [
+    {
+      "module": "TenProxy.dll",
+      "string_rva": "0x9c6edc",
+      "load_call_va": "0x63e79f"
+    },
+    {
+      "module": "TerSafe.dll",
+      "string_rva": "0x9c6ef4",
+      "load_call_va": "0x642766"
+    }
+  ],
+  "forbidden_runtime_modules": [
+    "ace-ats32.dll",
+    "ace-drv32.dll",
+    "codomp_client_shipretailbase.dll",
+    "gamerpcs.dll",
+    "policyprobe.dll",
+    "tenproxy.dll",
+    "tenrpcs.dll",
+    "tenslx.dll",
+    "tersafe.dll",
+    "tp3helper.exe",
+    "vsddrvdll.dll"
+  ]
+}

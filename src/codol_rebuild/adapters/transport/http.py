@@ -1,0 +1,135 @@
+"""标准库 HTTP 玩家接口客户端；统一地址、超时、错误和响应契约检查。"""
+import http.client
+import json
+import re
+import urllib.error
+import urllib.parse
+import urllib.request
+import uuid
+from codol_rebuild.application.multiplayer.contracts import MultiplayerError
+
+
+def normalize_server(value: str) -> str:
+    """规范服务器根地址；保留 HTTPS 默认验证，不允许凭据或查询串。"""
+    parts = urllib.parse.urlsplit(value.strip())
+    if (parts.scheme not in ('http', 'https') or not parts.hostname or parts.username
+            or parts.password or parts.query or parts.fragment or parts.path not in ('', '/')):
+        raise ValueError('服务器地址须为 http(s)://主机[:端口]')
+    port = parts.port
+    host = parts.hostname.lower()
+    if ':' in host:
+        host = '[' + host + ']'
+    suffix = f':{port}' if port and port != (443 if parts.scheme == 'https' else 80) else ''
+    return f'{parts.scheme}://{host}{suffix}'
+
+
+def _identifier(value, prefix):
+    if not isinstance(value, str) or not re.fullmatch(prefix + r'_[A-Za-z0-9_-]{1,96}', value):
+        raise ValueError('服务端身份或房间标识不符合契约')
+    return value
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """写请求不自动重定向，以免改变方法或向其他地址发送身份。"""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+class HttpGateway:
+    """不重试写请求；连接与响应异常显式标记结果不确定。"""
+    def __init__(self, server, timeout=5.0):
+        self.server = normalize_server(server)
+        if not 0.1 <= timeout <= 30:
+            raise ValueError('请求超时须为 0.1～30 秒')
+        self.timeout = timeout
+        self._opener = urllib.request.build_opener(_NoRedirect())
+
+    def _request(self, method, path, payload=None, player_id=None):
+        headers = {'Accept': 'application/json', 'X-Request-Id': uuid.uuid4().hex}
+        if player_id:
+            headers['X-Player-Id'] = _identifier(player_id, 'pl')
+        body = None
+        if payload is not None:
+            body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+            headers['Content-Type'] = 'application/json; charset=utf-8'
+        request = urllib.request.Request(self.server + path, body, headers, method=method)
+        try:
+            try:
+                response = self._opener.open(request, timeout=self.timeout)
+            except urllib.error.HTTPError as error:
+                response = error
+            with response:
+                raw = response.read(1024 * 1024 + 1)
+                if len(raw) > 1024 * 1024:
+                    raise ValueError('接口响应过大')
+                data = json.loads(raw)
+                if not isinstance(data, dict):
+                    raise ValueError('接口响应不是对象')
+                if not 200 <= response.status < 300:
+                    detail = data.get('error', {})
+                    if not isinstance(detail, dict):
+                        raise ValueError('接口错误响应不符合契约')
+                    raise MultiplayerError(str(detail.get('code', 'HTTP_ERROR')),
+                                           str(detail.get('message', '服务端请求失败')),
+                                           uncertain=response.status >= 500)
+                if data.get('apiVersion') != '1' or not isinstance(data.get('data'), dict):
+                    raise ValueError('接口版本或响应结构不符合契约')
+                return data['data']
+        except MultiplayerError:
+            raise
+        except (OSError, ValueError, urllib.error.URLError, http.client.HTTPException) as error:
+            raise MultiplayerError('NETWORK_ERROR', '无法完成服务端请求：' + str(error),
+                                   uncertain=method == 'POST') from error
+
+    def login(self, fingerprint, username, player_id):
+        payload = {'fingerprint': fingerprint, 'username': username}
+        if player_id:
+            payload['playerId'] = player_id
+        data = self._request('POST', '/api/v1/login', payload)
+        try:
+            _identifier(data.get('playerId'), 'pl')
+            if not isinstance(data.get('displayName'), str) or type(data.get('firstLogin')) is not bool:
+                raise ValueError('登录响应字段不完整')
+            if player_id and data['playerId'] != player_id:
+                raise ValueError('服务端返回了不同身份，拒绝覆盖原身份')
+        except ValueError as error:
+            raise MultiplayerError('INVALID_RESPONSE', str(error), uncertain=True) from error
+        return data
+
+    def create(self, player_id, username, max_players, password):
+        data = self._request('POST', '/api/v1/rooms',
+                             {'displayName': username, 'maxPlayers': max_players, 'password': password}, player_id)
+        try:
+            _identifier(data.get('roomId'), 'rm')
+            if (data.get('ownerPlayerId') != player_id or data.get('maxPlayers') != max_players
+                    or not isinstance(data.get('members'), list)
+                    or not any(isinstance(m, dict) and m.get('playerId') == player_id
+                               and m.get('isOwner') is True for m in data['members'])):
+                raise ValueError('房间响应与创建者或人数不匹配')
+        except ValueError as error:
+            raise MultiplayerError('INVALID_RESPONSE', str(error), uncertain=True) from error
+        return data
+
+    def leave(self, player_id, room_id):
+        room_id = _identifier(room_id, 'rm')
+        data = self._request('POST', f'/api/v1/rooms/{room_id}/leave', {}, player_id)
+        if type(data.get('left')) is not bool or type(data.get('roomClosed')) is not bool:
+            raise MultiplayerError('INVALID_RESPONSE', '离房响应字段不完整', uncertain=True)
+        return data
+
+    def list_rooms(self, player_id, cursor):
+        query = urllib.parse.urlencode({'limit': 100, **({'cursor': cursor} if cursor else {})})
+        data = self._request('GET', '/api/v1/rooms?' + query, player_id=player_id)
+        try:
+            if not isinstance(data.get('rooms'), list) or 'nextCursor' not in data:
+                raise ValueError('房间列表响应不完整')
+            if data['nextCursor'] is not None and not isinstance(data['nextCursor'], str):
+                raise ValueError('房间游标无效')
+            for room in data['rooms']:
+                if not isinstance(room, dict):
+                    raise ValueError('房间列表项无效')
+                _identifier(room.get('roomId'), 'rm')
+                _identifier(room.get('ownerPlayerId'), 'pl')
+        except ValueError as error:
+            raise MultiplayerError('INVALID_RESPONSE', str(error)) from error
+        return data

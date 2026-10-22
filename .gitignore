@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+workspaces/
+resources/
+data/
+*.zone
+.idea/
+*.zip
+

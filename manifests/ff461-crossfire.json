@@ -1,0 +1,24 @@
+{
+  "build": "1649370",
+  "format_version": 461,
+  "files": [
+    {
+      "path": "workspaces/ff461-inputs/mp_cross_fire.ff",
+      "bytes": 37331221,
+      "sha256": "45b964b1386479d7e86ee8bcff30ed72bbbfbcbeb76dc5cb4b2b8e22b4fb9c7e",
+      "extracted_source_package": "ff_init_mp_cross_fire_V70.ifs"
+    },
+    {
+      "path": "workspaces/ff461-inputs/mp_cross_fire_const.ff",
+      "bytes": 49429,
+      "sha256": "0ca264e7480c48ac61a6a4b1a8c8880654762cdbef62dc7eb631b105f56c8673",
+      "extracted_source_package": "ff_init_mp_cross_fire_V70.ifs"
+    },
+    {
+      "path": "workspaces/ff461-inputs/mp_cross_fire_load.ff",
+      "bytes": 24853,
+      "sha256": "dd9caec41616cf1edd6a0320fc3d4bb5887028292f45c9cad798e98c782e5be5",
+      "extracted_source_package": "ff_init_mp_cross_fire_V70.ifs"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+pefile==2024.8.26
+capstone==5.0.9
+pycryptodome==3.23.0
+aplib==0.6
+websockets==15.0.1
+websockets==15.0.1

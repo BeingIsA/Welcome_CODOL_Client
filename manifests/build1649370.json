@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "build": "1649370",
+  "scope": "Eight fixed analysis inputs, not a complete runnable client installation",
+  "provenance": "research/evidence.json from 2026-10-17 static investigation",
+  "files": [
+    {
+      "path": "codoMP_client_shipRetail.exe",
+      "bytes": 7841344,
+      "sha256": "36997674b18f2896de5e9d755686f6922af10708f355175714058d0a0172b537"
+    },
+    {
+      "path": "codoMP_client_shipRetailBase.dll",
+      "bytes": 60327992,
+      "sha256": "ef75220de1d6973f34c7069f5bf211b11bd61520c6c0de1882f7359fa5bc6a20"
+    },
+    {
+      "path": "GameRpcs.dll",
+      "bytes": 2488888,
+      "sha256": "277a43306b940e77a20b26529f087b7bdea71e1c0f55ca0c1f4820f7d528cc38"
+    },
+    {
+      "path": "TenRpcs.dll",
+      "bytes": 17408064,
+      "sha256": "0ccd33e7cf7c3a909c2986d65ad4b891527ff207636d09ae1623a23df3be7fae"
+    },
+    {
+      "path": "GameDataPlatformServer.dll",
+      "bytes": 354808,
+      "sha256": "bbb5808b070dc50e93092100b659e7e2b2b83402c10f0c2f0196f98121b35cc9"
+    },
+    {
+      "path": "GDPOpenProtocol.tdr",
+      "bytes": 438856,
+      "sha256": "b0c5d029a582b11d053bcb4069b348ad8abdf4a5b028acd93207a09eec7a52cb"
+    },
+    {
+      "path": "IIPS/IFS2.dll",
+      "bytes": 601656,
+      "sha256": "5b0324e0b2ba3545a6c02626287d4fbc6a3116594744f4647333982d85508421"
+    },
+    {
+      "path": "IIPS/IIPSVFS.dll",
+      "bytes": 216120,
+      "sha256": "be61df01a23bc3c817b1a4058d588aee0316aa059c0da9e16679365de3e5f449"
+    }
+  ]
+}

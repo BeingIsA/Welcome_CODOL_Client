@@ -1,0 +1,226 @@
+"""本地房间服务边界：保留原生参数解析、成员构造、任务通知和 UI。
+
+仅接管本地档案就绪且 DW=0 的创建请求。状态区显式记录房间及会话所有权；
+不改变在线服务状态。原生离房清除会话后，所有权检查自然失效。
+未来服务端应替换创建完成供应方，而不是修改 GFx 页面跳转。
+"""
+from __future__ import annotations
+
+import struct
+
+CREATE = 0x62CCEA
+VALID = 0x62FDE0
+IDENTITY = 0x7CADFA
+LEAVE = 0x7CF9CC
+MEMBER_INIT = 0x62B4F3
+MEMBER_IDENTITY = 0x7C72F3
+PLAYER_ID = 0x67EC4D
+MEMBER_REFRESH = 0x630635
+AVATAR_IDENTITY = 0x7C64AF
+# 仅本地房间命名空间的单人标识；不是平台账号或服务端玩家 ID。
+LOCAL_MEMBER_ID = 1
+CONTRACT = {
+    CREATE: bytes.fromhex('e841b11b00'),
+    VALID: bytes.fromhex('8b411c5685c0'),
+    IDENTITY: bytes.fromhex('e801680300'),
+    LEAVE: bytes.fromhex('e84fece6ff'),
+    MEMBER_INIT: bytes.fromhex('e818faffff'),
+    MEMBER_IDENTITY: bytes.fromhex('e808a30300'),
+    PLAYER_ID: bytes.fromhex('505268bc6cdb00'),
+    MEMBER_REFRESH: bytes.fromhex('5f5ec20400'),
+    AVATAR_IDENTITY: bytes.fromhex('0f84cc000000'),
+    0x7CF9F1: bytes.fromhex('5e8be55dc20400'),
+    0x62F640: bytes.fromhex('568bf1'),
+    0x633FE0: bytes.fromhex('558bec'),
+    0x62B3D0: bytes.fromhex('558bec83e4f8'),
+}
+
+
+def validate_room_contract(read):
+    """固定版本调用边不一致时拒绝安装。"""
+    for address, expected in CONTRACT.items():
+        if read(address, len(expected)) != expected:
+            raise ValueError(f'本地房间 ABI 不匹配：{address:#x}')
+
+
+def build_room_adapter(entry: int, state: int, ready: int, *, deferred=False, identity_address=None) -> dict:
+    """生成代码与补丁计划；state 为独立的12字节所有权/发布重入记录。"""
+    for address in (entry, state, ready):
+        if type(address) is not int or not 0x10000 <= address <= 0xffffe000:
+            raise ValueError('房间适配地址必须为有效32位地址')
+    code, labels, refs, traps = bytearray(), {}, [], {}
+
+    def emit(value):
+        code.extend(bytes.fromhex(value))
+
+    def word(value):
+        code.extend(struct.pack('<I', value))
+
+    def label(name):
+        labels[name] = len(code)
+
+    def branch(op, name):
+        emit(op); refs.append((len(code), name)); word(0)
+
+    def native(op, address):
+        emit(op); word((address-entry-len(code)-4) & 0xffffffff)
+
+    def offline(fallback):
+        emit('833d'); word(ready); emit('01'); branch('0f85', fallback)
+        emit('a1'); word(0x849B874); emit('85c0'); branch('0f84', fallback)
+        emit('83780c00'); branch('0f85', fallback)
+
+    def owned(fallback):
+        # ECX 指向房间；离房、其他房间和被回收的 session 都不属于本适配。
+        emit('3b0d'); word(state); branch('0f85', fallback)
+        emit('8b411c 85c0'); branch('0f84', fallback)
+        emit('3b05'); word(state+4); branch('0f85', fallback)
+        emit('803800'); branch('0f84', fallback)
+        emit('3988c8250000'); branch('0f85', fallback)
+
+    label('create')
+    emit('9c60')
+    offline('create_original')
+    # 原 create 已完成 config 深拷贝和会话分配，EBX=room、EDI=session。
+    emit('85db'); branch('0f84', 'create_original')
+    emit('85ff'); branch('0f84', 'create_original')
+    emit('3b7b1c'); branch('0f85', 'create_original')
+    emit('399fc8250000'); branch('0f85', 'create_original')
+    if deferred:
+        traps[entry+len(code)] = 'create'
+        emit('cc 619d b001 c3')  # 原生任务保持等待，完成由主线程帧回调投递。
+        label('create_complete'); emit('9c60')
+    emit('891d'); word(state)
+    emit('893d'); word(state+4)
+    # 单机房间没有远程会话 ID/广告，也不设置 connected 或 DW 在线标志。
+    emit('c7471000000000 c7471400000000 c7471801000000')
+    emit('c7472000000000 c7472400000000 c7474000000000 c7474400000000')
+    emit('8d4720 50'); native('e8', 0x801600); emit('83c404')
+    # 保留可用的原生身份；无登录对象时用独立本地身份，零是原版空槽哨兵。
+    emit('8b4720 0b4724'); branch('0f85', 'session_identity')
+    emit('c74720'); word(LOCAL_MEMBER_ID)
+    label('session_identity')
+    if identity_address is not None:
+        emit('a1'); word(identity_address); emit('894720')
+        emit('a1'); word(identity_address+4); emit('894724')
+    emit('8b4720 894740 8b4724 894744')
+    emit('c6838102000000')
+    emit('6a01 57'); native('e8', 0x633FE0); emit('83c408')
+    emit('61 9d b001 c3')
+    label('create_original'); emit('619d'); native('e9', 0x7E7E30)
+
+    label('valid')
+    emit('9c50')
+    offline('valid_original')
+    owned('valid_original')
+    emit('589d b801000000 c3')
+    label('valid_original'); emit('589d'); code.extend(CONTRACT[VALID])
+    native('e9', VALID+len(CONTRACT[VALID]))
+
+    label('identity')
+    emit('9c60')
+    offline('identity_original')
+    emit('8b0d'); word(0x82E13FC)
+    emit('85c9'); branch('0f84', 'identity_original')
+    owned('identity_original')
+    # 外层发布与内层 GFx 成员转换必须读取同一身份；只改房间调用边。
+    emit('8b542428 85d2'); branch('0f84', 'identity_original')
+    emit('8b8168e30000 8902 8b816ce30000 894204')
+    emit('619d b001 c3')
+    label('identity_original'); emit('619d'); native('e9', 0x801600)
+
+    label('member_init')
+    # 原生成员初始化是 stdcall(room)，必须先保留完整的原生成员构造。
+    emit('ff742404'); native('e8', 0x62AF10)
+    emit('9c60')
+    offline('member_done')
+    emit('8b4c2428')
+    owned('member_done')
+    # owned 留 EAX=session。成员、会话房主和会话成员使用相同64位标识。
+    emit('8b5020 899168e30000 8b5024 89916ce30000')
+    label('member_done'); emit('619d c20400')
+
+    label('player_id')
+    emit('9c60')
+    offline('player_id_done')
+    # UI 在进房前就缓存 PlayerObj.id；本地档案期间保持稳定，不能只在房间内替换。
+    # 原生身份非零时完整保留 EAX:EDX，不改变任何登录对象。
+    if identity_address is None:
+        emit('8b44241c 0b442414'); branch('0f85', 'player_id_done')
+        emit('c7442414'); word(LOCAL_MEMBER_ID)
+    else:
+        # 原版用 EDX 保存低位、EAX 保存高位；与 session 的小端64位字段对应。
+        emit('a1'); word(identity_address); emit('89442414')
+        emit('a1'); word(identity_address+4); emit('8944241c')
+    label('player_id_done'); emit('619d')
+    code.extend(CONTRACT[PLAYER_ID]); native('e9', PLAYER_ID+len(CONTRACT[PLAYER_ID]))
+
+    label('member_refresh')
+    # 原生刷新只置 dirty；发布原本依赖未运行的在线周期。仅补本地发布。
+    emit('9c60')
+    offline('member_refresh_done')
+    emit('8bcf')  # 原生6305F0在尾部仍以EDI持有room。
+    owned('member_refresh_done')
+    emit('833d'); word(state+8); emit('00'); branch('0f85','member_refresh_done')
+    emit('c705'); word(state+8); word(1)
+    # 原版靠下一帧重试500ms节流；本地事件没有在线tick，确保当前变更可发布。
+    # 重入保护避免发布回调同步触发刷新时递归。
+    native('e8',0x77FFB0)
+    emit('8b0d'); word(0x8249B78)
+    emit('85c9'); branch('0f84','member_publish')
+    emit('2b410c a3'); word(0x8249B74)
+    label('member_publish')
+    native('e8',0x7CAD60)
+    emit('c705'); word(state+8); word(0)
+    label('member_refresh_done'); emit('619d'); code.extend(CONTRACT[MEMBER_REFRESH])
+
+    label('avatar_identity')
+    # 被替换的是JE；真实登录对象存在时必须保留原分支，不能改写其身份。
+    branch('0f85','avatar_native_login')
+    emit('9c60')
+    offline('avatar_missing')
+    emit('8b0d'); word(0x82E13FC)
+    emit('85c9'); branch('0f84','avatar_missing')
+    owned('avatar_missing')
+    emit('8b8168e30000 89442404 8b816ce30000 890424')
+    emit('619d'); native('e9',0x7C64C0)
+    label('avatar_missing'); emit('619d'); native('e9',0x7C6581)
+    label('avatar_native_login'); native('e9',0x7C64B5)
+
+    label('leave')
+    emit('9c60')
+    offline('leave_original')
+    emit('8b0d'); word(0x82E13FC)
+    emit('85c9'); branch('0f84', 'leave_original')
+    owned('leave_original')
+    if deferred:
+        traps[entry+len(code)] = 'leave'
+        emit('cc 619d c3')
+        label('leave_complete'); emit('9c60')
+    # 保留原生公共清理；离线状态下它跳过房间对象，随后补调原生离房。
+    emit('ff742428'); native('e8', 0x63E620); emit('83c404')
+    emit('8b0d'); word(state)
+    owned('leave_done')
+    native('e8', 0x62F640)
+    label('leave_done')
+    emit('c705'); word(state); word(0)
+    emit('c705'); word(state+4); word(0)
+    # 返回原调用点，让 GFx 入口自行检查离房结果并完成同步通知。
+    # 不能跳过 7CF9D1：原生对象清理完成不等同于页面任务已经完成。
+    emit('619d c3')
+    label('leave_original'); emit('619d'); native('e9', 0x63E620)
+
+    for position, name in refs:
+        struct.pack_into('<i', code, position, labels[name]-position-4)
+    patches = []
+    for address, name, opcode in ((CREATE,'create',0xe8),(VALID,'valid',0xe9),(IDENTITY,'identity',0xe8),(LEAVE,'leave',0xe8),
+                                  (MEMBER_INIT,'member_init',0xe8),(MEMBER_IDENTITY,'identity',0xe8),(PLAYER_ID,'player_id',0xe9),
+                                  (MEMBER_REFRESH,'member_refresh',0xe9),(AVATAR_IDENTITY,'avatar_identity',0xe9)):
+        before = CONTRACT[address]
+        after = bytes([opcode])+struct.pack('<I',(entry+labels[name]-address-5)&0xffffffff)
+        patches.append({'va':address,'before':before,'after':after+b'\x90'*(len(before)-5)})
+    entries = ('create','valid','identity','leave','member_init','player_id','member_refresh','avatar_identity')
+    if deferred:
+        entries += ('create_complete', 'leave_complete')
+    return {'code':bytes(code),'patches':patches,'traps':traps,
+            'entries':{k:entry+labels[k] for k in entries}}
