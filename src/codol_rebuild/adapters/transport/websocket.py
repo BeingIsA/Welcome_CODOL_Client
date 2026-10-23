@@ -20,6 +20,7 @@ class WebSocketConnection:
         self._stop = threading.Event()
         self._thread = None
         self._player_id = None
+        self._machine_code = None
         self._status = RealtimeStatus.CLOSED
         self._invalidated_handler = None
 
@@ -31,26 +32,27 @@ class WebSocketConnection:
         """返回连接状态；身份被拒为 INVALIDATED，主动关闭后为 CLOSED。"""
         return self._status
 
-    def _connect(self, player_id):
+    def _connect(self, player_id, machine_code):
         url = ('wss' if self._server.startswith('https:') else 'ws') + self._server[self._server.index(':'):]
-        return connect(url + '/ws?' + urlencode({'playerId': player_id}),
+        return connect(url + '/ws?' + urlencode({'playerId': player_id, 'machine_code': machine_code}),
                        open_timeout=self._timeout, close_timeout=1,
                        ping_interval=10, ping_timeout=10, max_size=1024 * 1024,
                        max_queue=16, proxy=None)
 
-    def start(self, player_id: str) -> None:
-        """首次握手完成后返回；身份不变时保留现有连接和重连任务。"""
+    def start(self, player_id: str, fingerprint: str) -> None:
+        """首次握手携带登录机器码；玩家与机器码不变时复用连接及重连任务。"""
         if self._stop.is_set():
             raise MultiplayerError('WS_CLOSED', '实时通道已关闭')
         if self._thread is not None:
-            if self._player_id != player_id:
+            if self._player_id != player_id or self._machine_code != fingerprint:
                 raise MultiplayerError('WS_IDENTITY_CHANGED', '实时通道身份不一致')
             return
         try:
-            connection = self._connect(player_id)
+            connection = self._connect(player_id, fingerprint)
         except (OSError, TimeoutError, InvalidHandshake) as error:
             raise MultiplayerError('WS_CONNECT_FAILED', '实时连接失败，请检查服务端后重试') from error
         self._player_id = player_id
+        self._machine_code = fingerprint
         self._status = RealtimeStatus.CONNECTED
         self._thread = threading.Thread(target=self._run, args=(connection,),
                                         name='codol-websocket', daemon=True)
@@ -61,6 +63,7 @@ class WebSocketConnection:
         LOGGER.warning('实时连接身份被拒绝，停止重连')
         self._thread = None
         self._player_id = None
+        self._machine_code = None
         self._status = RealtimeStatus.INVALIDATED
         if self._invalidated_handler is not None:
             try:
@@ -89,7 +92,7 @@ class WebSocketConnection:
                 connection.close()
             while not self._stop.wait(delay):
                 try:
-                    connection = self._connect(self._player_id)
+                    connection = self._connect(self._player_id, self._machine_code)
                     self._status = RealtimeStatus.CONNECTED
                     break
                 except InvalidStatus as error:

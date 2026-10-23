@@ -78,7 +78,7 @@ class RealtimeStatus(Enum):
 
 class RealtimeConnection(Protocol):
     """实时连接生命周期端口；实现负责接收、保活和断线重连。"""
-    def start(self, player_id: str) -> None:
+    def start(self, player_id: str, fingerprint: str) -> None:
         """建立首次连接，失败抛出联机错误；同一身份重复调用不重建连接。
 
         身份失效（INVALIDATED）后线程痕迹已清理，再次调用会真正重建连接。

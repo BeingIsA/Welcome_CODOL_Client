@@ -29,7 +29,7 @@ class RealtimeTests(unittest.TestCase):
         connection = Mock()
         connection.recv.side_effect = ConnectionClosedOK(None, None)
         client._connect = Mock(return_value=connection)
-        client.start('pl_test')
+        client.start('pl_test', 'fp +&中文')
         wait_for(lambda: connection.close.called)
         client.close()
         self.assertEqual(client._connect.call_count, 1)
@@ -39,7 +39,7 @@ class RealtimeTests(unittest.TestCase):
         client = WebSocketConnection('http://localhost')
         client._connect = Mock(side_effect=OSError('offline'))
         with self.assertRaises(MultiplayerError):
-            client.start('pl_test')
+            client.start('pl_test', 'fp +&中文')
         self.assertIsNone(client._thread)
         client.close()
 
@@ -59,12 +59,12 @@ class RealtimeTests(unittest.TestCase):
             thread.start()
             client = WebSocketConnection('http://127.0.0.1:' + str(server.socket.getsockname()[1]))
             try:
-                client.start('pl_test')
+                client.start('pl_test', 'fp +&中文')
                 wait_for(lambda: len(connections) == 1)
-                client.start('pl_test')
+                client.start('pl_test', 'fp +&中文')
                 connections[0].close(code=1012)
                 wait_for(lambda: len(connections) == 2)
-                self.assertEqual(paths, ['/ws?playerId=pl_test'] * 2)
+                self.assertEqual(paths, ['/ws?playerId=pl_test&machine_code=fp+%2B%26%E4%B8%AD%E6%96%87'] * 2)
             finally:
                 client.close()
             wait_for(lambda: connections[-1].close_code is not None)
@@ -91,13 +91,13 @@ class RealtimeTests(unittest.TestCase):
             client = WebSocketConnection('http://127.0.0.1:' + str(server.socket.getsockname()[1]))
             client.set_invalidation_handler(lambda: invalidated.append(True))
             try:
-                client.start('pl_test')
+                client.start('pl_test', 'fp +&中文')
                 wait_for(lambda: len(connections) == 1)
                 wait_for(lambda: invalidated == [True])
                 self.assertEqual(client.status(), RealtimeStatus.INVALIDATED)
                 self.assertIsNone(client._thread)
                 # 失效后再次 start 应真正重建连接，而不是因线程残留静默返回。
-                client.start('pl_test')
+                client.start('pl_test', 'fp +&中文')
                 wait_for(lambda: len(connections) == 2)
                 self.assertEqual(client.status(), RealtimeStatus.CONNECTED)
                 self.assertEqual(len(invalidated), 1)
@@ -120,7 +120,7 @@ class RealtimeTests(unittest.TestCase):
             thread.start()
             client = WebSocketConnection('http://127.0.0.1:' + str(server.socket.getsockname()[1]))
             try:
-                client.start('pl_test')
+                client.start('pl_test', 'fp +&中文')
                 wait_for(lambda: len(connections) == 1)
                 connections[0].close(code=1012)
                 wait_for(lambda: len(connections) == 2)
@@ -145,6 +145,7 @@ class RealtimeTests(unittest.TestCase):
         session.begin('login', '测试')
         wait_for(lambda: session.poll() is not None)
         self.assertFalse(session.invalidated())
+        realtime.start.assert_called_once_with('pl_test', 'fp')
         session.close()
 
     def test_failed_handshake_prevents_login_and_retry_preserves_identity(self):

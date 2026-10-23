@@ -153,7 +153,7 @@ class MultiplayerSession:
         self._save(replace(self._record, player_id=data['playerId']) if self._record
                    else IdentityRecord(data['playerId']))
         if self._realtime is not None:
-            self._realtime.start(self._record.player_id)
+            self._realtime.start(self._record.player_id, self._fingerprint)
         # 重新鉴权成功（含实时连接重建）后，失效状态不再成立。
         self._invalidated.clear()
         self._username = username
