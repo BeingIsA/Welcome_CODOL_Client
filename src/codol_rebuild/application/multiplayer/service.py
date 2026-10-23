@@ -15,12 +15,10 @@ class MultiplayerSession:
         self._gateway, self._store = gateway, store
         self._server, self._fingerprint = server, fingerprint
         self._record = None
-        self._username = None
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='codol-http')
         self._pending = None
         self._closed = False
         self._realtime = realtime
-        self._invalidated = threading.Event()
         # 最近已知房间修订号；None 表示未知，冲突时经详情自愈。
         self._revision = None
         # 设置同步与主流程互不阻塞，但共用单工作线程保证串行。
@@ -28,17 +26,6 @@ class MultiplayerSession:
         self._list_pending = None
         self._list_cancel = threading.Event()
         self._list_request = None
-        if realtime is not None:
-            realtime.set_invalidation_handler(self._on_realtime_invalidated)
-
-    def _on_realtime_invalidated(self):
-        """实时身份被服务端拒绝：作废内存登录态等待重新鉴权；磁盘身份文件不动。"""
-        self._invalidated.set()
-        self._username = None
-
-    def invalidated(self) -> bool:
-        """实时身份是否已被拒绝且尚未重新鉴权成功。"""
-        return self._invalidated.is_set()
 
     def begin(self, operation: str, username: str, *, max_players: int = 4,
               password: str | None = None, settings: dict | None = None) -> bool:
@@ -118,7 +105,8 @@ class MultiplayerSession:
         try:
             if cancelled.is_set():
                 return Completion('list')
-            self._login(username)
+            if self._record is None:
+                raise MultiplayerError('NO_IDENTITY', '尚未完成启动登录')
             cursor, seen, rooms = None, set(), {}
             deadline = time.monotonic() + 20
             for _ in range(100):
@@ -146,17 +134,12 @@ class MultiplayerSession:
     def _login(self, username):
         if self._record is None:
             self._record = self._store.load(self._server)
-        if self._username == username:
-            return
         data = self._gateway.login(self._fingerprint, username,
                                    self._record.player_id if self._record else None)
         self._save(replace(self._record, player_id=data['playerId']) if self._record
                    else IdentityRecord(data['playerId']))
         if self._realtime is not None:
             self._realtime.start(self._record.player_id, self._fingerprint)
-        # 重新鉴权成功（含实时连接重建）后，失效状态不再成立。
-        self._invalidated.clear()
-        self._username = username
 
     def _recover_create(self):
         if not self._record.uncertain_create:
@@ -191,7 +174,10 @@ class MultiplayerSession:
 
     def _execute(self, operation, username, max_players, password, settings=None):
         try:
-            self._login(username)
+            if operation == 'login':
+                self._login(username)
+            elif self._record is None:
+                raise MultiplayerError('NO_IDENTITY', '尚未完成启动登录')
             if operation == 'login':
                 self._leave()  # 重启后清理上次未正常退出的房间。
                 data = {'playerId': self._record.player_id, 'displayName': username}
@@ -220,7 +206,8 @@ class MultiplayerSession:
     def _execute_settings(self, username, settings):
         """异步补交房内设置变更；冲突时拉取详情重试一次。"""
         try:
-            self._login(username)
+            if self._record is None:
+                raise MultiplayerError('NO_IDENTITY', '尚未完成启动登录')
             if settings is None or not isinstance(settings, dict) or not settings:
                 raise MultiplayerError('INVALID_SETTINGS', '设置数据无效')
             room_id = self._record.room_id if self._record else None

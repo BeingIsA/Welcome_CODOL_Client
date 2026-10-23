@@ -85,6 +85,7 @@ class MultiplayerTests(unittest.TestCase):
         self.fail('列表查询未完成')
 
     def test_list_collects_pages_deduplicates_without_leaving_current_room(self):
+        self.assertIsNone(self.result('login').error)
         from test_room_list import room
         self.assertIsNone(self.result('create').error)
         calls = []
@@ -104,6 +105,7 @@ class MultiplayerTests(unittest.TestCase):
         self.assertEqual(len(self.gateway.rooms), 1)
 
     def test_refresh_and_cancel_discard_old_batch_without_queue_growth(self):
+        self.assertIsNone(self.result('login').error)
         from test_room_list import room
         entered, release = threading.Event(), threading.Event()
         calls = []
@@ -129,6 +131,7 @@ class MultiplayerTests(unittest.TestCase):
         self.assertEqual(self.wait_list().operation, 'list_cancelled')
 
     def test_list_rejects_cyclic_cursor_and_reports_network_error(self):
+        self.assertIsNone(self.result('login').error)
         self.gateway.list_rooms = lambda *_: {'rooms': [], 'nextCursor': 'same'}
         self.session.begin_list('玩家')
         self.assertEqual(self.wait_list().error.code, 'INVALID_RESPONSE')
@@ -190,6 +193,7 @@ class MultiplayerTests(unittest.TestCase):
         self.assertEqual(len(self.gateway.calls), 1)
 
     def test_lost_create_response_recovers_before_next_create(self):
+        self.assertIsNone(self.result('login').error)
         self.gateway.fail_create = True
         self.assertTrue(self.result('create').error.uncertain)
         self.assertTrue(self.store.load('http://localhost:8080').uncertain_create)
@@ -199,6 +203,7 @@ class MultiplayerTests(unittest.TestCase):
         self.assertEqual(len(self.gateway.rooms), 1)
 
     def test_failed_leave_keeps_identity_and_room_until_retry(self):
+        self.assertIsNone(self.result('login').error)
         created = self.result('create')
         self.gateway.fail_leave = True
         self.assertIsNotNone(self.result('leave').error)
@@ -233,10 +238,38 @@ class MultiplayerTests(unittest.TestCase):
             with self.subTest(address=address), self.assertRaises(ValueError):
                 normalize_server(address)
 
+    def test_business_operations_and_name_changes_never_login(self):
+        self.assertIsNone(self.result('login').error)
+        for operation in ('create', 'settings', 'leave'):
+            self.assertTrue(self.session.begin(operation, '新昵称', settings={'mode': 'sd'}))
+            self.assertIsNone(self.consume().error)
+        self.session.begin_list('另一个昵称')
+        self.assertIsNone(self.wait_list().error)
+        self.assertEqual([c for c in self.gateway.calls if c[0] == 'login'],
+                         [('login', None, '测试玩家')])
+
+    def test_business_operations_without_identity_do_not_login(self):
+        for operation in ('create', 'leave', 'settings'):
+            self.assertEqual(self.result(operation).error.code, 'NO_IDENTITY')
+        self.session.begin_list('测试玩家')
+        self.assertEqual(self.wait_list().error.code, 'NO_IDENTITY')
+        self.assertEqual(self.gateway.calls, [])
+
+    def test_server_rejection_does_not_trigger_login(self):
+        self.assertIsNone(self.result('login').error)
+        def rejected(*args):
+            raise MultiplayerError('UNAUTHENTICATED', '服务端拒绝')
+        self.gateway.list_rooms = rejected
+        for _ in range(2):
+            self.session.begin_list('新昵称')
+            self.assertEqual(self.wait_list().error.code, 'UNAUTHENTICATED')
+        self.assertEqual([c[0] for c in self.gateway.calls], ['login'])
+
 class SettingsSyncTests(MultiplayerTests):
     """房内设置同步：异步补交、修订号冲突自愈与离房重置。"""
 
     def test_create_carries_settings_and_revision(self):
+        self.assertIsNone(self.result('login').error)
         settings = {'mode': 'td', 'map': 'mp_crash', 'modeTimeLimit': 10.5}
         result = self.result('create', max_players=8, password='pw', settings=settings)
         self.assertIsNone(result.error)
@@ -244,6 +277,7 @@ class SettingsSyncTests(MultiplayerTests):
         self.assertEqual(create_call[4], settings)
 
     def test_settings_sync_uses_known_revision(self):
+        self.assertIsNone(self.result('login').error)
         self.result('create', max_players=4)
         result = self.result('settings', settings={'mode': 'sd'})
         self.assertIsNone(result.error)
@@ -256,6 +290,7 @@ class SettingsSyncTests(MultiplayerTests):
 
     def test_identical_settings_requests_each_increment(self):
         """创建为零；连续同值设置请求仍分别提交并递增。"""
+        self.assertIsNone(self.result('login').error)
         settings = {'mode': 'td'}
         created = self.result('create', settings=settings)
         self.assertEqual(created.data['revision'], 0)
@@ -266,6 +301,7 @@ class SettingsSyncTests(MultiplayerTests):
         self.assertEqual([c[2] for c in self.gateway.calls if c[0] == 'update_settings'], [0, 1, 2])
 
     def test_settings_conflict_refetches_detail_and_retries(self):
+        self.assertIsNone(self.result('login').error)
         self.result('create', max_players=4)
         # 模拟他处已推进修订号：记忆修订号落后于服务端。
         self.gateway.rooms['rm_1']['revision'] = 5
@@ -276,10 +312,12 @@ class SettingsSyncTests(MultiplayerTests):
         self.assertEqual(room['revision'], 6)
 
     def test_settings_without_room_reports_error(self):
+        self.assertIsNone(self.result('login').error)
         result = self.result('settings', settings={'mode': 'sd'})
         self.assertEqual(result.error.code, 'NO_ROOM')
 
     def test_leave_resets_revision(self):
+        self.assertIsNone(self.result('login').error)
         self.result('create', max_players=4)
         self.result('settings', settings={'mode': 'sd'})
         self.result('leave')
@@ -290,6 +328,7 @@ class SettingsSyncTests(MultiplayerTests):
         self.assertEqual(result.data['revision'], 1)
 
     def test_settings_does_not_block_create(self):
+        self.assertIsNone(self.result('login').error)
         self.assertTrue(self.session.begin('settings', '测试玩家', settings={'mode': 'sd'}))
         # 设置同步进行中，主流程仍可提交。
         self.assertTrue(self.session.begin('login', '测试玩家'))

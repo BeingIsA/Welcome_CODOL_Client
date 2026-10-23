@@ -84,23 +84,20 @@ class RealtimeTests(unittest.TestCase):
                     pass
             except ConnectionClosed:
                 pass
-        invalidated = []
         with serve(handler, '127.0.0.1', 0) as server:
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
             client = WebSocketConnection('http://127.0.0.1:' + str(server.socket.getsockname()[1]))
-            client.set_invalidation_handler(lambda: invalidated.append(True))
             try:
                 client.start('pl_test', 'fp +&中文')
                 wait_for(lambda: len(connections) == 1)
-                wait_for(lambda: invalidated == [True])
+                wait_for(lambda: client.status() == RealtimeStatus.INVALIDATED)
                 self.assertEqual(client.status(), RealtimeStatus.INVALIDATED)
                 self.assertIsNone(client._thread)
                 # 失效后再次 start 应真正重建连接，而不是因线程残留静默返回。
                 client.start('pl_test', 'fp +&中文')
                 wait_for(lambda: len(connections) == 2)
                 self.assertEqual(client.status(), RealtimeStatus.CONNECTED)
-                self.assertEqual(len(invalidated), 1)
             finally:
                 client.close()
             server.shutdown()
@@ -129,24 +126,6 @@ class RealtimeTests(unittest.TestCase):
                 client.close()
             server.shutdown()
             thread.join(3)
-
-    def test_session_invalidated_flag_cleared_by_relogin(self):
-        gateway, store, realtime = Mock(), Mock(), Mock()
-        store.load.return_value = None
-        gateway.login.return_value = {'playerId': 'pl_test'}
-        realtime.start.side_effect = MultiplayerError('WS_CONNECT_FAILED', '失败')
-        session = MultiplayerSession(gateway, store, 'http://localhost', 'fp', realtime)
-        realtime.set_invalidation_handler.assert_called_once_with(session._on_realtime_invalidated)
-        # 实时身份被拒：作废内存登录态，等待重新鉴权。
-        session._on_realtime_invalidated()
-        self.assertTrue(session.invalidated())
-        # 重新鉴权成功后失效状态清除（WS 失败路径不清理）。
-        realtime.start.side_effect = None
-        session.begin('login', '测试')
-        wait_for(lambda: session.poll() is not None)
-        self.assertFalse(session.invalidated())
-        realtime.start.assert_called_once_with('pl_test', 'fp')
-        session.close()
 
     def test_failed_handshake_prevents_login_and_retry_preserves_identity(self):
         gateway, store, realtime = Mock(), Mock(), Mock()

@@ -388,19 +388,7 @@ class MultiplayerBridge:
         self.pending = None
         self.discard_results = True
 
-    def _invalidate_login(self):
-        """实时身份被服务端拒绝：清除原生登录标志，弹出统一提示并重新鉴权。"""
-        self.login_done = False
-        if self.room_list is not None:
-            self.room_list.cancel()
-        self.login_started = False
-        self._drop_pending()
-        self._word(LOGIN, 0)
-        self._failure('login', '缺少文件')
-
     def _poll(self):
-        if self.login_done and self.port.invalidated():
-            self._invalidate_login()
         if self.room_list is not None:
             self.room_list.poll()
             if (self.login_done and self.pending is None and not self._settings_outstanding
@@ -419,8 +407,8 @@ class MultiplayerBridge:
                 if self.pending is not None:
                     self._drop_pending()
                 self._failure('login', display_message(result.error))
-                # 不自动反复重登；用户再次操作时随请求重新鉴权。
-                self.login_started = False
+                # 启动登录失败只投递错误，不在后续帧自动重试。
+                self.login_started = True
                 return
             identity = hashlib.sha256(result.data['playerId'].encode('utf-8')).digest()[:8]
             if identity == bytes(8):

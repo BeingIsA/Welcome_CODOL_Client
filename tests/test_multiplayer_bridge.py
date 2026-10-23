@@ -54,9 +54,6 @@ class SettingsChannelPort:
         self.main = False
         self.submitted = []
 
-    def invalidated(self):
-        return False
-
     def begin(self, operation, username, **kwargs):
         if operation != 'settings':
             self.main = True
@@ -318,7 +315,6 @@ class MultiplayerBridgeTests(unittest.TestCase):
 
     def setup_bridge(self):
         process, port = Memory(), Mock()
-        port.invalidated.return_value = False
         value = bridge.MultiplayerBridge(process, port, Mock())
         value.state = 0x20000000
         process.write(value.state, bytes(4096))
@@ -377,30 +373,13 @@ class MultiplayerBridgeTests(unittest.TestCase):
         value._poll()
         value.record.assert_called_with({'multiplayer': 'leave', 'success': False, 'error': '房间已满'})
 
-    def test_invalidated_session_resets_login_and_discards_late_results(self):
+    def test_completed_login_does_not_request_reauthentication(self):
         value, process, port, room, session = self.setup_bridge()
-        value.pending = ('create', room, session)
-        port.invalidated.return_value = True
-        port.begin.return_value = True
+        value.login_started, value.login_done = True, True
         port.poll.return_value = None
-        with mock.patch.object(bridge, 'username', return_value='测试'):
+        for _ in range(3):
             value._poll()
-        self.assertFalse(value.login_done)
-        self.assertTrue(value.login_started)
-        self.assertIsNone(value.pending)
-        self.assertTrue(value.discard_results)
-        self.assertEqual(bridge.u32(process.read, value.state+bridge.LOGIN), 0)
-        self.assertEqual(process.read(value.state+bridge.MESSAGE, 64).split(b'\0')[0], '缺少文件'.encode('utf-8'))
-        # 丢弃窗口内迟到的创建结果不再投递原生回调。
-        port.poll.return_value = Completion('create', data={'roomId': 'rm_test'})
-        value._poll()
-        value.record.assert_called_with({'multiplayer_discarded': 'create', 'success': True})
-        # 重新鉴权成功后关闭丢弃窗口并恢复登录标志。
-        port.poll.return_value = Completion('login', data={'playerId': 'pl_test'})
-        value._poll()
-        self.assertTrue(value.login_done)
-        self.assertFalse(value.discard_results)
-        self.assertEqual(bridge.u32(process.read, value.state+bridge.LOGIN), 1)
+        port.begin.assert_not_called()
 
     def test_login_permission_failure_shows_popup_without_retry(self):
         value, process, port, room, session = self.setup_bridge()
@@ -409,6 +388,10 @@ class MultiplayerBridgeTests(unittest.TestCase):
         port.poll.return_value = Completion('login', error=MultiplayerError('BANNED', '身份已封禁'))
         with mock.patch.object(bridge, 'username', return_value='测试'):
             value._poll()
-        self.assertFalse(value.login_started)
+        self.assertTrue(value.login_started)
         self.assertEqual(process.read(value.state+bridge.MESSAGE, 64).split(b'\0')[0], '缺少文件'.encode('utf-8'))
         self.assertEqual(bridge.u32(process.read, value.state+bridge.ACTION), 4)
+        port.poll.return_value = None
+        value._poll()
+        value._poll()
+        port.begin.assert_called_once()

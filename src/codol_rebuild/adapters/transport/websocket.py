@@ -22,11 +22,6 @@ class WebSocketConnection:
         self._player_id = None
         self._machine_code = None
         self._status = RealtimeStatus.CLOSED
-        self._invalidated_handler = None
-
-    def set_invalidation_handler(self, handler) -> None:
-        """注册身份失效回调；由会话在启动前调用，实现须线程安全。"""
-        self._invalidated_handler = handler
 
     def status(self) -> RealtimeStatus:
         """返回连接状态；身份被拒为 INVALIDATED，主动关闭后为 CLOSED。"""
@@ -59,17 +54,12 @@ class WebSocketConnection:
         self._thread.start()
 
     def _invalidate(self):
-        """身份被服务端拒绝：清理线程痕迹使重启能真正重建，并通知应用层。"""
+        """身份被服务端拒绝：清理线程痕迹使重启能真正重建，不触发重新登录。"""
         LOGGER.warning('实时连接身份被拒绝，停止重连')
         self._thread = None
         self._player_id = None
         self._machine_code = None
         self._status = RealtimeStatus.INVALIDATED
-        if self._invalidated_handler is not None:
-            try:
-                self._invalidated_handler()
-            except Exception:
-                LOGGER.exception('实时身份失效回调执行失败')
 
     def _run(self, connection):
         delay = 1

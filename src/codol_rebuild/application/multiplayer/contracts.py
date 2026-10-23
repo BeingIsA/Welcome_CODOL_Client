@@ -1,7 +1,7 @@
 """联机端口与数据契约；不包含 HTTP、原生内存或文件实现。"""
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, Protocol
+from typing import Protocol
 
 
 class MultiplayerError(Exception):
@@ -89,10 +89,6 @@ class RealtimeConnection(Protocol):
         """停止重连并释放连接及后台线程。"""
         ...
 
-    def set_invalidation_handler(self, handler: Callable[[], None]) -> None:
-        """注册身份失效回调；连接被服务端以身份理由拒绝时在后台线程调用一次。"""
-        ...
-
     def status(self) -> RealtimeStatus:
         """返回当前连接状态；未启动或已关闭为 CLOSED。"""
         ...
@@ -123,10 +119,6 @@ class MultiplayerPort(Protocol):
 
     def cancel_list(self) -> None:
         """取消列表发布，并在当前分页请求结束后停止继续查询。"""
-        ...
-
-    def invalidated(self) -> bool:
-        """实时身份是否已被服务端拒绝且尚未重新鉴权成功。"""
         ...
 
     def close(self) -> None:
