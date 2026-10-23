@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 from websockets.exceptions import ConnectionClosed, InvalidHandshake, InvalidStatus
 from websockets.sync.client import connect
 
-from codol_rebuild.application.multiplayer.contracts import MultiplayerError, RealtimeStatus
+from codol_rebuild.application.room.contracts import RoomError, RealtimeStatus
 from codol_rebuild.adapters.transport.http import normalize_server
 
 LOGGER = logging.getLogger(__name__)
@@ -37,15 +37,15 @@ class WebSocketConnection:
     def start(self, player_id: str, fingerprint: str) -> None:
         """首次握手携带登录机器码；玩家与机器码不变时复用连接及重连任务。"""
         if self._stop.is_set():
-            raise MultiplayerError('WS_CLOSED', '实时通道已关闭')
+            raise RoomError('WS_CLOSED', '实时通道已关闭')
         if self._thread is not None:
             if self._player_id != player_id or self._machine_code != fingerprint:
-                raise MultiplayerError('WS_IDENTITY_CHANGED', '实时通道身份不一致')
+                raise RoomError('WS_IDENTITY_CHANGED', '实时通道身份不一致')
             return
         try:
             connection = self._connect(player_id, fingerprint)
         except (OSError, TimeoutError, InvalidHandshake) as error:
-            raise MultiplayerError('WS_CONNECT_FAILED', '实时连接失败，请检查服务端后重试') from error
+            raise RoomError('WS_CONNECT_FAILED', '实时连接失败，请检查服务端后重试') from error
         self._player_id = player_id
         self._machine_code = fingerprint
         self._status = RealtimeStatus.CONNECTED

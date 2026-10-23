@@ -4,7 +4,7 @@ import json
 import unittest
 from unittest.mock import Mock
 from codol_rebuild.adapters.transport.http import HttpGateway
-from codol_rebuild.application.multiplayer.contracts import MultiplayerError
+from codol_rebuild.application.room.contracts import RoomError
 
 
 class Response(BytesIO):
@@ -32,7 +32,7 @@ class HttpGatewayTests(unittest.TestCase):
                        {'members': [data['members'][0]]*2}, {'settings': {'map': 1, 'mode': 'td'}}):
             with self.subTest(change=change):
                 self.gateway._opener.open.return_value = Response({'apiVersion': '1', 'data': {**data, **change}})
-                with self.assertRaises(MultiplayerError) as error:
+                with self.assertRaises(RoomError) as error:
                     self.gateway.join('pl_saved', 'rm_target', '玩家', None)
                 self.assertTrue(error.exception.uncertain)
 
@@ -40,13 +40,13 @@ class HttpGatewayTests(unittest.TestCase):
         for code in ('INVALID_ROOM_PASSWORD', 'ROOM_FULL', 'ROOM_CLOSED', 'ALREADY_IN_OTHER_ROOM'):
             self.gateway._opener.open.reset_mock()
             self.gateway._opener.open.return_value = Response({'error': {'code': code, 'message': code}}, 409)
-            with self.assertRaises(MultiplayerError) as error:
+            with self.assertRaises(RoomError) as error:
                 self.gateway.join('pl_saved', 'rm_target', '玩家', None)
             self.assertEqual(error.exception.code, code)
             self.assertFalse(error.exception.uncertain)
             self.gateway._opener.open.assert_called_once()
         self.gateway._opener.open.side_effect = TimeoutError('timeout')
-        with self.assertRaises(MultiplayerError) as error:
+        with self.assertRaises(RoomError) as error:
             self.gateway.join('pl_saved', 'rm_target', '玩家', None)
         self.assertTrue(error.exception.uncertain)
 
@@ -64,7 +64,7 @@ class HttpGatewayTests(unittest.TestCase):
             broken = {**room(), key: value}
             self.gateway._opener.open.return_value = Response({'apiVersion': '1', 'data': {
                 'rooms': [broken], 'nextCursor': None}})
-            with self.subTest(key=key, value=value), self.assertRaises(MultiplayerError):
+            with self.subTest(key=key, value=value), self.assertRaises(RoomError):
                 self.gateway.list_rooms('pl_saved', None)
 
     def setUp(self):
@@ -85,7 +85,7 @@ class HttpGatewayTests(unittest.TestCase):
 
     def test_ban_is_not_replaced_with_network_error(self):
         self.gateway._opener.open.return_value = Response({'error': {'code': 'BANNED', 'message': '已封禁'}}, 403)
-        with self.assertRaises(MultiplayerError) as caught:
+        with self.assertRaises(RoomError) as caught:
             self.gateway.login('fp-test', '玩家', 'pl_saved')
         self.assertEqual(caught.exception.code, 'BANNED')
         self.assertFalse(caught.exception.uncertain)
@@ -93,7 +93,7 @@ class HttpGatewayTests(unittest.TestCase):
 
     def test_timeout_is_uncertain_and_not_retried(self):
         self.gateway._opener.open.side_effect = TimeoutError('timeout')
-        with self.assertRaises(MultiplayerError) as caught:
+        with self.assertRaises(RoomError) as caught:
             self.gateway.create('pl_saved', '玩家', 4, None)
         self.assertTrue(caught.exception.uncertain)
         self.gateway._opener.open.assert_called_once()
@@ -101,7 +101,7 @@ class HttpGatewayTests(unittest.TestCase):
     def test_relogin_cannot_replace_saved_player_id(self):
         self.gateway._opener.open.return_value = Response({'apiVersion': '1', 'data': {
             'playerId': 'pl_other', 'displayName': '玩家', 'firstLogin': True}})
-        with self.assertRaisesRegex(MultiplayerError, '不同身份'):
+        with self.assertRaisesRegex(RoomError, '不同身份'):
             self.gateway.login('fp-test', '玩家', 'pl_saved')
 
     def test_create_carries_settings_and_validates_echo(self):
@@ -119,7 +119,7 @@ class HttpGatewayTests(unittest.TestCase):
             'roomId': 'rm_new', 'ownerPlayerId': 'pl_saved', 'maxPlayers': 4,
             'members': [{'playerId': 'pl_saved', 'displayName': '玩家', 'isOwner': True}],
             'settings': {'mode': 'dm'}}})
-        with self.assertRaises(MultiplayerError) as caught:
+        with self.assertRaises(RoomError) as caught:
             self.gateway.create('pl_saved', '玩家', 4, None, settings)
         self.assertEqual(caught.exception.code, 'INVALID_RESPONSE')
 
@@ -136,7 +136,7 @@ class HttpGatewayTests(unittest.TestCase):
         # 冲突错误码原样透传且非不确定写入。
         self.gateway._opener.open.return_value = Response(
             {'error': {'code': 'REVISION_CONFLICT', 'message': '修订号过期'}}, 409)
-        with self.assertRaises(MultiplayerError) as caught:
+        with self.assertRaises(RoomError) as caught:
             self.gateway.update_settings('pl_saved', 'rm_new', settings, 0)
         self.assertEqual(caught.exception.code, 'REVISION_CONFLICT')
         self.assertFalse(caught.exception.uncertain)
@@ -152,7 +152,7 @@ class HttpGatewayTests(unittest.TestCase):
     def test_wrong_owner_response_is_uncertain(self):
         self.gateway._opener.open.return_value = Response({'apiVersion': '1', 'data': {
             'roomId': 'rm_other', 'ownerPlayerId': 'pl_other', 'maxPlayers': 4, 'members': []}})
-        with self.assertRaises(MultiplayerError) as caught:
+        with self.assertRaises(RoomError) as caught:
             self.gateway.create('pl_saved', '玩家', 4, None)
         self.assertEqual(caught.exception.code, 'INVALID_RESPONSE')
         self.assertTrue(caught.exception.uncertain)

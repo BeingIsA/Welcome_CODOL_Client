@@ -9,7 +9,7 @@ import capstone
 import pefile
 from codol_rebuild.adapters.game.v1649370 import multiplayer_bridge as bridge
 from codol_rebuild.adapters.game.v1649370.room import build_room_adapter
-from codol_rebuild.application.multiplayer.contracts import Completion, MultiplayerError
+from codol_rebuild.application.room.contracts import Completion, RoomError
 
 
 class Memory:
@@ -48,7 +48,7 @@ def write_full_config(memory, room, maximum=6, password=None, mode='', map_name=
 
 
 class SettingsChannelPort:
-    """按 MultiplayerPort 契约模拟：主流程优先，设置结果未消费前 begin 拒绝。"""
+    """按 RoomPort 契约模拟：主流程优先，设置结果未消费前 begin 拒绝。"""
     def __init__(self):
         self.busy = False
         self.main = False
@@ -421,7 +421,7 @@ class MultiplayerBridgeTests(unittest.TestCase):
     def test_failed_leave_preserves_native_room(self):
         value, process, port, room, session = self.setup_bridge()
         value.pending = ('leave', room, session)
-        port.poll.return_value = Completion('leave', error=MultiplayerError('NETWORK_ERROR', '断线'))
+        port.poll.return_value = Completion('leave', error=RoomError('NETWORK_ERROR', '断线'))
         value._poll()
         self.assertEqual(bridge.u32(process.read, value.state+bridge.ACTION), 4)
         self.assertEqual(bridge.u32(process.read, room+0x1C), session)
@@ -454,14 +454,14 @@ class MultiplayerBridgeTests(unittest.TestCase):
     def test_permission_failures_display_missing_file(self):
         value, process, port, room, session = self.setup_bridge()
         value.pending = ('leave', room, session)
-        port.poll.return_value = Completion('leave', error=MultiplayerError('BANNED', '身份已封禁'))
+        port.poll.return_value = Completion('leave', error=RoomError('BANNED', '身份已封禁'))
         value._poll()
         self.assertEqual(process.read(value.state+bridge.MESSAGE, 64).split(b'\0')[0], '缺少文件'.encode('utf-8'))
         self.assertEqual(bridge.u32(process.read, value.state+bridge.ACTION), 4)
         value.record.assert_called_with({'multiplayer': 'leave', 'success': False, 'error': '缺少文件'})
         # 非权限失败仍显示原始错误。
         value.pending = ('leave', room, session)
-        port.poll.return_value = Completion('leave', error=MultiplayerError('ROOM_FULL', '房间已满'))
+        port.poll.return_value = Completion('leave', error=RoomError('ROOM_FULL', '房间已满'))
         value._poll()
         value.record.assert_called_with({'multiplayer': 'leave', 'success': False, 'error': '房间已满'})
 
@@ -477,7 +477,7 @@ class MultiplayerBridgeTests(unittest.TestCase):
         value, process, port, room, session = self.setup_bridge()
         value.login_started, value.login_done = False, False
         port.begin.return_value = True
-        port.poll.return_value = Completion('login', error=MultiplayerError('BANNED', '身份已封禁'))
+        port.poll.return_value = Completion('login', error=RoomError('BANNED', '身份已封禁'))
         with mock.patch.object(bridge, 'username', return_value='测试'):
             value._poll()
         self.assertTrue(value.login_started)

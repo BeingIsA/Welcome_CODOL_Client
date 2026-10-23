@@ -57,7 +57,9 @@ class RoomListFixture {
         setters++;
         if (setters==failAt) return 0;
         int type = Read(value+12), data=Read(value+16);
-        object decoded = type==6 ? (object)Text(data) : data;
+        // 模拟 SetMember 持有子对象；临时值释放后父对象仍可访问其内容。
+        object decoded = (type & 0x8f)==8 ? (object)new Dictionary<string,object>((Dictionary<string,object>)objects[data])
+                         : type==6 ? (object)Text(data) : data;
         ((Dictionary<string,object>)objects[Read(obj+16)])[Text(name)] = decoded;
         return 1;
     }
@@ -76,6 +78,9 @@ class RoomListFixture {
                 throw new Exception("wrong text/index");
             if ((string)rows[i]["password"]!="*" || (int)rows[i]["currentPlayers"]!=2)
                 throw new Exception("wrong display fields");
+            var mode = (Dictionary<string,object>)rows[i]["currentMatchMode"];
+            if ((string)mode["id"] != (string)rows[i]["mode"])
+                throw new Exception("missing or mismatched nested mode");
         }
         dispatched++;
         return 1;
@@ -106,10 +111,13 @@ class RoomListFixture {
                 if (dispatched!=before+1 || objects.Count!=0 || Read(State+8)!=2)
                     throw new Exception("dispatch/cleanup/idempotence failed");
             }
-            Bytes(State,File.ReadAllBytes(args[2])); Write(State,1); failAt=setters+3;
-            int saved=dispatched; run();
-            if (dispatched!=saved || objects.Count!=0 || created!=released || Read(State+8)!=1)
-                throw new Exception("failed conversion leaked or published partial list");
+            // 覆盖普通字段、子对象字段、父子挂接及第二行失败时的清理。
+            foreach (int failure in new int[]{3,12,13,25,26}) {
+                Bytes(State,File.ReadAllBytes(args[2])); Write(State,1); failAt=setters+failure;
+                int saved=dispatched; run();
+                if (dispatched!=saved || objects.Count!=0 || created!=released || Read(State+8)!=1)
+                    throw new Exception("failed conversion leaked or published partial list");
+            }
             GC.KeepAlive(pinned);
             Console.WriteLine("native x86 GFx ABI: rows, empty list, refresh, failure cleanup passed");
             return 0;

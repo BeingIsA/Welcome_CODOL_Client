@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 import re
 import tempfile
-from codol_rebuild.application.multiplayer.contracts import IdentityRecord
+from codol_rebuild.application.room.contracts import IdentityRecord, valid_room_id
 
 
 class JsonIdentityStore:
@@ -30,7 +30,7 @@ class JsonIdentityStore:
                 or type(row.get('uncertain_create', False)) is not bool
                 or type(row.get('uncertain_join', False)) is not bool
                 or (row.get('room_id') is not None and
-                    (not isinstance(row['room_id'], str) or not re.fullmatch(r'rm_[A-Za-z0-9_-]{1,96}', row['room_id'])))):
+                    not valid_room_id(row['room_id']))):
             raise ValueError('保存的服务器身份记录无效')
         return IdentityRecord(row['player_id'], row.get('room_id'), row.get('uncertain_create', False),
                               row.get('uncertain_join', False))

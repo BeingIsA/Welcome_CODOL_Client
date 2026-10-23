@@ -47,6 +47,19 @@ MARKET_ITEMS_AFTER = (
 )
 
 
+# 普通房间没有 playListID：先走原有默认倍率分支，避免提前读取空配置。
+# 只调整 showRoomInfo 的判断顺序；有编号时保留原查询和倍率读取。
+ROOM_DETAIL_OFFSET = 7318633
+ROOM_DETAIL_BEFORE = bytes.fromhex(
+    'f0a2045d6866684661005d69666966fb01620566fc015601466f0280b9016307'
+    'f0a404620766fd01756308f0a504620766fe01756309f0a704620566fc015dff0166ff0114120000'
+)
+ROOM_DETAIL_AFTER = bytes.fromhex(
+    '620566fc015dff0166ff01133900005d6866684661005d69666966fb01620566fc015601466f0280b9016307'
+    'f0a404620766fd01756308f0a504620766fe01756309101400000202'
+)
+
+
 def guarded_method() -> bytes:
     """空赛季短路后的方法体；去掉调试元数据腾出空间，长度与栈上限不变。"""
     # pushfalse; getlocal2; iffalse -> 原 convert_b; pop; 原日期表达式。
@@ -61,7 +74,8 @@ def replacements() -> list:
     """返回本模块登记的资源方法替换，由主电影编排层统一校验与应用。"""
     return [(METHOD_OFFSET, ORIGINAL_METHOD, guarded_method()),
             (QUIT_TIMER_OFFSET, QUIT_TIMER_BEFORE, QUIT_TIMER_AFTER),
-            (MARKET_ITEMS_OFFSET, MARKET_ITEMS_BEFORE, MARKET_ITEMS_AFTER)]
+            (MARKET_ITEMS_OFFSET, MARKET_ITEMS_BEFORE, MARKET_ITEMS_AFTER),
+            (ROOM_DETAIL_OFFSET, ROOM_DETAIL_BEFORE, ROOM_DETAIL_AFTER)]
 
 
 def patch_movie(original: bytes) -> bytes:

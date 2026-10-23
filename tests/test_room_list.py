@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import Mock
 import pefile
 from codol_rebuild.adapters.game.v1649370 import room_list as listing
-from codol_rebuild.application.multiplayer.contracts import Completion, MultiplayerError
+from codol_rebuild.application.room.contracts import Completion, RoomError
 
 
 def room(identity='rm_one', mode='td'):
@@ -50,9 +50,28 @@ class RoomListTests(unittest.TestCase):
         self.assertEqual(fields['currentPlayers'], 2)
         self.assertEqual(fields['currentMaxPlayers'], 12)
         self.assertEqual(fields['enableShoutcast'], 0)
+        self.assertEqual(text(struct.unpack_from('<I', data, listing.MODE_KEY)[0]), 'currentMatchMode')
+        offset = listing.ROWS + len(listing.FIELDS)*36
+        key, _, _, _, kind, value = struct.unpack_from('<IIIIII', data, offset)
+        self.assertEqual((text(key), kind, text(value)), ('id', 6, 'td'))
         empty, ids = listing.encode_rows([first], 'sd', base)
         self.assertEqual(struct.unpack_from('<I', empty, listing.COUNT)[0], 0)
         self.assertEqual(ids, ())
+
+    def test_nested_modes_and_password_flags_stay_with_each_room(self):
+        """不同模式及密码状态不能在连续行或列表筛选后串用。"""
+        base = 0x21000000
+        rooms = [room('rm_spy', 'spy'), room('rm_sd', 'sd')]
+        rooms[1]['hasPassword'] = False
+        data, ids = listing.encode_rows(rooms, '', base)
+        text = lambda ptr: data[ptr-base:].split(b'\0')[0].decode('utf8')
+        self.assertEqual(ids, ('rm_spy', 'rm_sd'))
+        for index, (mode, password) in enumerate((('spy', '*'), ('sd', ''))):
+            row_start = listing.ROWS + index*listing.STRIDE
+            nested = row_start + len(listing.FIELDS)*36
+            self.assertEqual(text(struct.unpack_from('<I', data, nested+20)[0]), mode)
+            password_field = row_start + listing.FIELDS.index('password')*36
+            self.assertEqual(text(struct.unpack_from('<I', data, password_field+20)[0]), password)
 
     def test_oversize_and_embedded_null_are_rejected(self):
         with self.assertRaises(ValueError):
@@ -115,7 +134,7 @@ class RoomListTests(unittest.TestCase):
         bridge.poll()
         self.assertIsNone(bridge.view)
         bridge, memory, port, events = self.make_bridge()
-        port.poll_list.return_value = Completion('list', error=MultiplayerError('NETWORK_ERROR', '断网'))
+        port.poll_list.return_value = Completion('list', error=RoomError('NETWORK_ERROR', '断网'))
         bridge.poll()
         self.assertEqual(memory.read(bridge.state, 4), b'\1\0\0\0')
         self.assertEqual(memory.read(bridge.state+listing.COUNT, 4), bytes(4))

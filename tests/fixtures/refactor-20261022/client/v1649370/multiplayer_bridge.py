@@ -5,7 +5,7 @@ HTTP 不在暂停点等待；帧陷阱只提交或消费已完成结果。字符
 """
 import hashlib
 import struct
-from codol_rebuild.application.multiplayer.contracts import MultiplayerError, MultiplayerPort, PERMISSION_ERROR_CODES
+from codol_rebuild.application.room.contracts import RoomError, RoomPort, PERMISSION_ERROR_CODES
 from codol_rebuild.adapters.game.v1649370.player_name import native_name, LANGUAGE, DIRECT_STRING_MODE
 
 ROOM_POINTER = 0x82E13FC
@@ -20,7 +20,7 @@ SETTINGS_SUBMIT = 0x6300A0
 
 def display_message(error) -> str:
     """权限类失败统一显示为缺少文件，不向用户暴露封禁等权限细节。"""
-    if isinstance(error, MultiplayerError) and error.code in PERMISSION_ERROR_CODES:
+    if isinstance(error, RoomError) and error.code in PERMISSION_ERROR_CODES:
         return '缺少文件'
     return str(error)
 
@@ -229,7 +229,7 @@ def build_tick(entry, state, ready, preview_entry, room_entries, list_publish=No
 
 class MultiplayerBridge:
     """版本适配只拥有原生请求快照，通过联机端口触发业务。"""
-    def __init__(self, process, port: MultiplayerPort, record):
+    def __init__(self, process, port: RoomPort, record):
         self.process, self.port, self.record = process, port, record
         self.state = None
         self.traps = {}

@@ -6,7 +6,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
-from codol_rebuild.application.multiplayer.contracts import MultiplayerError
+from codol_rebuild.application.room.contracts import RoomError, valid_room_id
 
 
 def normalize_server(value: str) -> str:
@@ -24,6 +24,8 @@ def normalize_server(value: str) -> str:
 
 
 def _identifier(value, prefix):
+    if prefix == 'rm' and valid_room_id(value):
+        return value
     if not isinstance(value, str) or not re.fullmatch(prefix + r'_[A-Za-z0-9_-]{1,96}', value):
         raise ValueError('服务端身份或房间标识不符合契约')
     return value
@@ -69,16 +71,16 @@ class HttpGateway:
                     detail = data.get('error', {})
                     if not isinstance(detail, dict):
                         raise ValueError('接口错误响应不符合契约')
-                    raise MultiplayerError(str(detail.get('code', 'HTTP_ERROR')),
+                    raise RoomError(str(detail.get('code', 'HTTP_ERROR')),
                                            str(detail.get('message', '服务端请求失败')),
                                            uncertain=response.status >= 500)
                 if data.get('apiVersion') != '1' or not isinstance(data.get('data'), dict):
                     raise ValueError('接口版本或响应结构不符合契约')
                 return data['data']
-        except MultiplayerError:
+        except RoomError:
             raise
         except (OSError, ValueError, urllib.error.URLError, http.client.HTTPException) as error:
-            raise MultiplayerError('NETWORK_ERROR', '无法完成服务端请求：' + str(error),
+            raise RoomError('NETWORK_ERROR', '无法完成服务端请求：' + str(error),
                                    uncertain=method == 'POST') from error
 
     def login(self, fingerprint, username, player_id):
@@ -93,7 +95,7 @@ class HttpGateway:
             if player_id and data['playerId'] != player_id:
                 raise ValueError('服务端返回了不同身份，拒绝覆盖原身份')
         except ValueError as error:
-            raise MultiplayerError('INVALID_RESPONSE', str(error), uncertain=True) from error
+            raise RoomError('INVALID_RESPONSE', str(error), uncertain=True) from error
         return data
 
     def create(self, player_id, username, max_players, password, settings=None):
@@ -111,7 +113,7 @@ class HttpGateway:
             if settings is not None and data.get('settings') != settings:
                 raise ValueError('房间响应设置与提交值不匹配')
         except ValueError as error:
-            raise MultiplayerError('INVALID_RESPONSE', str(error), uncertain=True) from error
+            raise RoomError('INVALID_RESPONSE', str(error), uncertain=True) from error
         return data
 
     def join(self, player_id, room_id, username, password):
@@ -124,7 +126,7 @@ class HttpGateway:
             if not any(m['playerId'] == player_id for m in data['members']):
                 raise ValueError('加入响应缺少当前玩家')
         except ValueError as error:
-            raise MultiplayerError('INVALID_RESPONSE', str(error), uncertain=True) from error
+            raise RoomError('INVALID_RESPONSE', str(error), uncertain=True) from error
         return data
 
     def update_settings(self, player_id, room_id, settings, expected_revision):
@@ -138,7 +140,7 @@ class HttpGateway:
             if data.get('settings') != _settings_payload(settings):
                 raise ValueError('设置响应与提交值不匹配')
         except ValueError as error:
-            raise MultiplayerError('INVALID_RESPONSE', str(error), uncertain=True) from error
+            raise RoomError('INVALID_RESPONSE', str(error), uncertain=True) from error
         return data
 
     def room_detail(self, player_id, room_id):
@@ -148,14 +150,14 @@ class HttpGateway:
             if data.get('roomId') != room_id or type(data.get('revision')) is not int:
                 raise ValueError('房间详情响应不完整')
         except ValueError as error:
-            raise MultiplayerError('INVALID_RESPONSE', str(error)) from error
+            raise RoomError('INVALID_RESPONSE', str(error)) from error
         return data
 
     def leave(self, player_id, room_id):
         room_id = _identifier(room_id, 'rm')
         data = self._request('POST', f'/api/v1/rooms/{room_id}/leave', {}, player_id)
         if type(data.get('left')) is not bool or type(data.get('roomClosed')) is not bool:
-            raise MultiplayerError('INVALID_RESPONSE', '离房响应字段不完整', uncertain=True)
+            raise RoomError('INVALID_RESPONSE', '离房响应字段不完整', uncertain=True)
         return data
 
     def list_rooms(self, player_id, cursor):
@@ -185,7 +187,7 @@ class HttpGateway:
                         or type(room.get('revision')) is not int or room['revision'] < 0):
                     raise ValueError('房间人数、锁定状态或修订号无效')
         except ValueError as error:
-            raise MultiplayerError('INVALID_RESPONSE', str(error)) from error
+            raise RoomError('INVALID_RESPONSE', str(error)) from error
         return data
 
 def validate_room_snapshot(data, room_id):

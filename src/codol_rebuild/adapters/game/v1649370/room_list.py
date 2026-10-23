@@ -23,10 +23,12 @@ CONTRACT = {
 }
 # 独立发布区：命令、行数、执行状态、GFx 临时对象，以及只读字段描述。
 PUBLISH, COUNT, STATUS, ARRAY, OBJECT, ROWS = 0, 4, 8, 32, 64, 128
+# MODE 是独立 GFx 临时对象；MODE_KEY 保存父对象属性名，逐行构造并释放。
+MODE_KEY, MODE = 12, 96
 CAPACITY = 2 * 1024 * 1024
 FIELDS = ('id', 'index', 'name', 'password', 'currentPlayers', 'currentMaxPlayers',
           'status', 'isPlayList', 'enableShoutcast', 'map', 'mode')
-STRIDE = len(FIELDS) * 36
+STRIDE = (len(FIELDS) + 1) * 36
 
 
 def _u32(read, address):
@@ -57,7 +59,7 @@ def encode_rows(rooms, mode, base):
         raise ValueError('大厅列表超过1000条容量')
     data = bytearray(ROWS + len(selected) * STRIDE)
     struct.pack_into('<I', data, COUNT, len(selected))
-    for offset in (ARRAY, OBJECT):
+    for offset in (ARRAY, OBJECT, MODE):
         struct.pack_into('<II', data, offset, 0xffffffff, 0xffffffff)
     strings = {}
 
@@ -69,11 +71,14 @@ def encode_rows(rooms, mode, base):
             data.extend(value.encode('utf-8') + b'\0')
         return strings[value]
 
+    struct.pack_into('<I', data, MODE_KEY, string('currentMatchMode'))
     for index, room in enumerate(selected):
         values = (room['roomId'], index, room['ownerDisplayName'],
                   '*' if room['hasPassword'] else '', room['playerCount'],
                   room['maxPlayers'], 0, False, False, room['map'], room['mode'])
-        for field, (key, value) in enumerate(zip(FIELDS, values)):
+        # 最后一项属于嵌套模式对象，不能把带点的属性名当成对象结构。
+        descriptors = list(zip(FIELDS, values)) + [('id', room['mode'])]
+        for field, (key, value) in enumerate(descriptors):
             offset = ROWS + index * STRIDE + field * 36
             kind = 6 if isinstance(value, str) else 2 if type(value) is bool else 4
             payload = string(value) if kind == 6 else int(value)
@@ -132,6 +137,15 @@ def build_adapter(entry, state):
     emit('8d4604 50 ff36'); mov_ecx(state+OBJECT); call(0x436750)
     emit('84c0'); branch('0f84', 'cleanup')
     emit('83c624 4f'); branch('0f85', 'field')
+    # 创建真正的 currentMatchMode 对象，按 GFx 所有权规则挂到房间行。
+    push(state+MODE); call(0x72FD70); emit('83c404 84c0'); branch('0f84', 'cleanup')
+    emit('8d4604 50 ff36'); mov_ecx(state+MODE); call(0x436750)
+    emit('84c0'); branch('0f84', 'cleanup')
+    push(state+MODE); emit('ff35'); word(state+MODE_KEY)
+    mov_ecx(state+OBJECT); call(0x436750)
+    emit('84c0'); branch('0f84', 'cleanup')
+    mov_ecx(state+MODE); call(0x436660)
+    emit('83c624')
     # ObjectInterface::PushBack(arrayHandle, &object)，callee 清理两个实参。
     mov_ecx(state+ARRAY+8); emit('8b09 8b11')
     push(state+OBJECT); emit('ff35'); word(state+ARRAY+16); emit('ff523c')
@@ -143,6 +157,7 @@ def build_adapter(entry, state):
     emit('bf'); word(15); call(0x730570); emit('83c410')
     emit('c705'); word(state+STATUS); word(2)
     label('cleanup')
+    mov_ecx(state+MODE); call(0x436660)
     mov_ecx(state+OBJECT); call(0x436660)
     mov_ecx(state+ARRAY); call(0x436660)
     traps[entry+len(code)] = 'room_list_published'; emit('cc')

@@ -34,3 +34,7 @@
   再无人消费，通道被首个 future 永久占住，后续改动全被丢成 busy。改动只在
   运行时处理函数（`_submit_settings`、`_poll` 的设置分支），未触及任何原生
   代码生成器，故 install-trace 黄金轨迹无需重冻结。
+
+- 2026-10-23：经批准加入普通房间详情 playListID 缺省保护，同步 ui_navigation.py 快照；默认倍率及下游显示逻辑不变。
+
+- 2026-10-23：应用层 multiplayer 更名为 room，MultiplayerSession/Port/Error 更名为 RoomSession/Port/Error；同步桥接快照中的导入和类型引用，原生生成逻辑不变。

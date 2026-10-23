@@ -30,13 +30,13 @@ def run(args):
             log['prepared_only']=True
             return log
         if getattr(args, 'server_url', None):
-            from codol_rebuild.application.multiplayer.service import MultiplayerSession
+            from codol_rebuild.application.room.service import RoomSession
             from codol_rebuild.adapters.transport.http import HttpGateway
             from codol_rebuild.adapters.transport.websocket import WebSocketConnection
             from codol_rebuild.adapters.persistence.server_identity import JsonIdentityStore
             from codol_rebuild.platform.machine_identity import fingerprint
             gateway = HttpGateway(args.server_url, args.server_timeout)
-            multiplayer = MultiplayerSession(gateway, JsonIdentityStore(args.server_identity),
+            multiplayer = RoomSession(gateway, JsonIdentityStore(args.server_identity),
                                              gateway.server, fingerprint(),
                                              realtime=WebSocketConnection(gateway.server, args.server_timeout))
             record({'multiplayer_server': gateway.server})

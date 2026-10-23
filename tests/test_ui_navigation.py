@@ -63,6 +63,25 @@ class NavigationTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             evaluate_date(nav.ORIGINAL_METHOD, 101, None, 10)
 
+    def test_room_without_playlist_skips_lookup_and_keeps_default(self):
+        """核对真实方法分支：缺少编号直达默认倍率，有编号保留原读取路径。"""
+        start = nav.ROOM_DETAIL_OFFSET
+        before = self.original[start:start+72]
+        after = self.patched[start:start+72]
+        self.assertEqual(before, nav.ROOM_DETAIL_BEFORE)
+        self.assertEqual(len(nav.ROOM_DETAIL_AFTER), 72)
+        # 把原先读取之后的 undefined 比较前移，ifeq 跳到原默认赋值。
+        self.assertEqual(after[:11], before[57:68])
+        self.assertEqual(after[11], 0x13)
+        target = 15 + int.from_bytes(after[12:15], 'little', signed=True)
+        self.assertEqual(target, 72)
+        self.assertEqual(after[15:66], before[3:54])
+        # 有编号读取完后跳过默认赋值；默认代码和后续显示代码未修改。
+        self.assertEqual(after[66], 0x10)
+        target = 70 + int.from_bytes(after[67:70], 'little', signed=True)
+        self.assertEqual(target, 90)
+        self.assertEqual(self.patched[start+72:start+325], self.original[start+72:start+325])
+
     def test_nonnull_matches_original_at_boundaries(self):
         for first, last in ((10, 20), (0, 0), (20, 10), (-100, 100)):
             season = {'startTimeStamp': first, 'endTimeStamp': last}
