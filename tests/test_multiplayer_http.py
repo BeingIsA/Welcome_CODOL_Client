@@ -15,6 +15,41 @@ class Response(BytesIO):
 
 
 class HttpGatewayTests(unittest.TestCase):
+    def test_join_request_snapshot_and_uncertain_response(self):
+        data = {'roomId': 'rm_target', 'ownerPlayerId': 'pl_owner', 'revision': 2,
+                'maxPlayers': 4, 'playerCount': 2, 'settings': {'map': 'mp_crash', 'mode': 'td'},
+                'members': [{'playerId': 'pl_owner', 'displayName': '房主', 'isOwner': True},
+                            {'playerId': 'pl_saved', 'displayName': '玩家', 'isOwner': False}]}
+        self.gateway._opener.open.return_value = Response({'apiVersion': '1', 'data': data})
+        self.assertEqual(self.gateway.join('pl_saved', 'rm_target', '玩家', '密码'), data)
+        request = self.gateway._opener.open.call_args.args[0]
+        self.assertEqual(request.full_url, 'http://127.0.0.1:8080/api/v1/rooms/rm_target/join')
+        self.assertEqual(request.get_method(), 'POST')
+        self.assertEqual(request.get_header('X-player-id'), 'pl_saved')
+        self.assertEqual(json.loads(request.data), {'displayName': '玩家', 'password': '密码'})
+        for change in ({'roomId': 'rm_other'}, {'revision': True}, {'playerCount': 1},
+                       {'ownerPlayerId': 'pl_absent'}, {'members': []},
+                       {'members': [data['members'][0]]*2}, {'settings': {'map': 1, 'mode': 'td'}}):
+            with self.subTest(change=change):
+                self.gateway._opener.open.return_value = Response({'apiVersion': '1', 'data': {**data, **change}})
+                with self.assertRaises(MultiplayerError) as error:
+                    self.gateway.join('pl_saved', 'rm_target', '玩家', None)
+                self.assertTrue(error.exception.uncertain)
+
+    def test_join_rejection_and_timeout_are_not_retried(self):
+        for code in ('INVALID_ROOM_PASSWORD', 'ROOM_FULL', 'ROOM_CLOSED', 'ALREADY_IN_OTHER_ROOM'):
+            self.gateway._opener.open.reset_mock()
+            self.gateway._opener.open.return_value = Response({'error': {'code': code, 'message': code}}, 409)
+            with self.assertRaises(MultiplayerError) as error:
+                self.gateway.join('pl_saved', 'rm_target', '玩家', None)
+            self.assertEqual(error.exception.code, code)
+            self.assertFalse(error.exception.uncertain)
+            self.gateway._opener.open.assert_called_once()
+        self.gateway._opener.open.side_effect = TimeoutError('timeout')
+        with self.assertRaises(MultiplayerError) as error:
+            self.gateway.join('pl_saved', 'rm_target', '玩家', None)
+        self.assertTrue(error.exception.uncertain)
+
     def test_list_contract_and_cursor_encoding(self):
         from test_room_list import room
         data = {'rooms': [room()], 'nextCursor': None}

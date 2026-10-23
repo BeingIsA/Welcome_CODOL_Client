@@ -75,6 +75,51 @@ class Gateway:
 
 
 class MultiplayerTests(unittest.TestCase):
+    def test_join_saves_target_and_blocks_guest_settings(self):
+        self.result('login')
+        from unittest.mock import Mock
+        data = {'roomId': 'rm_target', 'ownerPlayerId': 'pl_owner', 'revision': 3,
+                'members': [{'playerId': 'pl_test'}]}
+        self.gateway.join = Mock(return_value=data)
+        result = self.result('join', room_id='rm_target', password='secret')
+        self.assertEqual(result.data, data)
+        self.gateway.join.assert_called_once_with('pl_test', 'rm_target', '测试玩家', 'secret')
+        self.assertEqual(self.store.load('http://localhost:8080').room_id, 'rm_target')
+        self.assertEqual(self.result('settings', settings={'mode': 'td'}).error.code, 'FORBIDDEN')
+        self.assertEqual(self.result('join', room_id='rm_other').error.code, 'ALREADY_IN_OTHER_ROOM')
+        self.gateway.join.assert_called_once()
+        self.assertIsNone(self.result('leave').error)
+        self.assertIsNone(self.store.load('http://localhost:8080').room_id)
+
+    def test_join_failure_restores_record_without_retry(self):
+        self.result('login')
+        from unittest.mock import Mock
+        self.gateway.join = Mock(side_effect=MultiplayerError('INVALID_ROOM_PASSWORD', '密码错误'))
+        self.assertEqual(self.result('join', room_id='rm_target').error.code, 'INVALID_ROOM_PASSWORD')
+        self.assertIsNone(self.store.load('http://localhost:8080').room_id)
+        self.gateway.join.assert_called_once()
+
+    def test_join_lost_response_confirms_membership_and_retains_unknown_target(self):
+        self.result('login')
+        from unittest.mock import Mock
+        self.gateway.join = Mock(side_effect=MultiplayerError('NETWORK_ERROR', '超时', uncertain=True))
+        self.gateway.room_detail = Mock(return_value={
+            'roomId': 'rm_target', 'ownerPlayerId': 'pl_owner', 'revision': 3,
+            'members': [{'playerId': 'pl_test'}]})
+        self.assertIsNone(self.result('join', room_id='rm_target').error)
+        self.gateway.join.assert_called_once()
+        self.result('leave')
+        self.gateway.room_detail.return_value = {'roomId': 'rm_target', 'members': []}
+        self.assertTrue(self.result('join', room_id='rm_target').error.uncertain)
+        self.assertEqual(self.store.load('http://localhost:8080').room_id, 'rm_target')
+        self.assertTrue(self.store.load('http://localhost:8080').uncertain_join)
+        self.assertEqual(self.result('leave').error.code, 'RECOVERY_PENDING')
+        # 服务端最终可见成员后才确认离房，避免先离房后迟到加入形成幽灵成员。
+        self.gateway.room_detail.return_value = {'roomId': 'rm_target', 'members': [{'playerId': 'pl_test'}]}
+        self.session.close()
+        self.assertIn(('leave', 'rm_target'), self.gateway.calls)
+        self.assertIsNone(self.store.load('http://localhost:8080').room_id)
+
     def wait_list(self):
         """仅等待独立测试工作线程，不接触游戏或外部服务器。"""
         for _ in range(300):

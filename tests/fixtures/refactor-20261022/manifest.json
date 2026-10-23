@@ -29,7 +29,7 @@
   },
   {
     "path": "client/v1649370/multiplayer_bridge.py",
-    "sha256": "364281c5f8ac0556bd06806b5caa1a32ea2f6624aa712a8d1a37f3c817f4a595"
+    "sha256": "cdbb8695eff6d6ca870a65d876dfc5bd99d1a004e806e4033c8341a26a546d41"
   },
   {
     "path": "client/v1649370/observation_points.py",
@@ -65,7 +65,7 @@
   },
   {
     "path": "client/v1649370/room.py",
-    "sha256": "6fa3211f1a5cf260781f6e69f8e8d7ca413bfd6f71322b1fc97fa16c956db15a"
+    "sha256": "6a65d9ff83e9d34ffbbb9594f6a2b78dabf989d0e29100373a5256ac7edcc6bd"
   },
   {
     "path": "client/v1649370/room_name.py",

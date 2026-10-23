@@ -28,10 +28,12 @@ class JsonIdentityStore:
         if (not isinstance(row, dict) or not isinstance(row.get('player_id'), str)
                 or not re.fullmatch(r'pl_[A-Za-z0-9_-]{1,96}', row['player_id'])
                 or type(row.get('uncertain_create', False)) is not bool
+                or type(row.get('uncertain_join', False)) is not bool
                 or (row.get('room_id') is not None and
                     (not isinstance(row['room_id'], str) or not re.fullmatch(r'rm_[A-Za-z0-9_-]{1,96}', row['room_id'])))):
             raise ValueError('保存的服务器身份记录无效')
-        return IdentityRecord(row['player_id'], row.get('room_id'), row.get('uncertain_create', False))
+        return IdentityRecord(row['player_id'], row.get('room_id'), row.get('uncertain_create', False),
+                              row.get('uncertain_join', False))
 
     def save(self, server, record):
         data = self._read()

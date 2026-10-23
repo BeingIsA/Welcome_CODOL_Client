@@ -21,6 +21,7 @@ class MultiplayerSession:
         self._realtime = realtime
         # 最近已知房间修订号；None 表示未知，冲突时经详情自愈。
         self._revision = None
+        self._is_owner = None
         # 设置同步与主流程互不阻塞，但共用单工作线程保证串行。
         self._settings_pending = None
         self._list_pending = None
@@ -28,7 +29,8 @@ class MultiplayerSession:
         self._list_request = None
 
     def begin(self, operation: str, username: str, *, max_players: int = 4,
-              password: str | None = None, settings: dict | None = None) -> bool:
+              password: str | None = None, settings: dict | None = None,
+              room_id: str | None = None) -> bool:
         """提交单个用例，重复点击不会重复发送请求。
 
         设置同步与主流程（登录/创建/退出）互不阻塞：原生改设置在本地
@@ -44,10 +46,10 @@ class MultiplayerSession:
             return True
         if self._pending is not None:
             return False
-        if operation not in ('login', 'create', 'leave'):
+        if operation not in ('login', 'create', 'join', 'leave'):
             raise ValueError('未知联机用例')
         self._pending = self._executor.submit(self._execute, operation, username,
-                                              max_players, password, settings)
+                                              max_players, password, settings, room_id)
         return True
 
     def poll(self) -> Completion | None:
@@ -164,15 +166,55 @@ class MultiplayerSession:
         self._recover_create()
         if self._record.room_id:
             try:
+                if self._record.uncertain_join:
+                    detail = self._gateway.room_detail(self._record.player_id, self._record.room_id)
+                    members = detail.get('members')
+                    if (detail.get('roomId') != self._record.room_id or not isinstance(members, list)
+                            or not any(isinstance(m, dict) and m.get('playerId') == self._record.player_id
+                                       for m in members)):
+                        # 查询无成员不能证明在途 POST 未执行，保留记录供下次恢复。
+                        raise MultiplayerError('RECOVERY_PENDING', '上次入房结果尚未确认，请稍后重试', uncertain=True)
                 self._gateway.leave(self._record.player_id, self._record.room_id)
             except MultiplayerError as error:
                 if error.code not in ('ROOM_NOT_FOUND', 'ROOM_CLOSED'):
                     raise
-            self._save(replace(self._record, room_id=None))
+            self._save(replace(self._record, room_id=None, uncertain_join=False))
         self._revision = None
+        self._is_owner = None
         return {'left': True}
 
-    def _execute(self, operation, username, max_players, password, settings=None):
+    def _join(self, room_id, username, password):
+        """记录目标后提交加入；响应丢失时查询成员确认，未确认保留退出恢复记录。"""
+        import re
+        if not isinstance(room_id, str) or not re.fullmatch(r'rm_[A-Za-z0-9_-]{1,96}', room_id):
+            raise MultiplayerError('INVALID_ROOM_ID', '请选择有效房间')
+        if self._record.room_id and self._record.room_id != room_id:
+            raise MultiplayerError('ALREADY_IN_OTHER_ROOM', '请先退出当前房间')
+        if self._record.uncertain_create:
+            raise MultiplayerError('RECOVERY_REQUIRED', '请先清理上次未确认的房间')
+        previous = self._record
+        self._save(replace(previous, room_id=room_id, uncertain_join=True))
+        try:
+            data = self._gateway.join(previous.player_id, room_id, username, password)
+        except MultiplayerError as error:
+            if not error.uncertain:
+                self._save(previous)
+                raise
+            try:
+                data = self._gateway.room_detail(previous.player_id, room_id)
+            except MultiplayerError:
+                raise error
+            if (data.get('roomId') != room_id or not isinstance(data.get('members'), list)
+                    or not any(isinstance(m, dict) and m.get('playerId') == previous.player_id
+                               for m in data['members'])):
+                # 请求仍可能在服务端执行，不能因一次查询无成员就删除恢复记录。
+                raise error
+        self._save(replace(self._record, uncertain_join=False))
+        self._revision = data.get('revision')
+        self._is_owner = data.get('ownerPlayerId') == previous.player_id
+        return data
+
+    def _execute(self, operation, username, max_players, password, settings=None, room_id=None):
         try:
             if operation == 'login':
                 self._login(username)
@@ -183,6 +225,8 @@ class MultiplayerSession:
                 data = {'playerId': self._record.player_id, 'displayName': username}
             elif operation == 'leave':
                 data = self._leave()
+            elif operation == 'join':
+                data = self._join(room_id, username, password)
             else:
                 if type(max_players) is not int or not 1 <= max_players <= 255:
                     raise MultiplayerError('INVALID_MAX_PLAYERS', '房间人数无效')
@@ -197,6 +241,7 @@ class MultiplayerSession:
                     raise
                 self._save(replace(self._record, room_id=data['roomId'], uncertain_create=False))
                 self._revision = data.get('revision')
+                self._is_owner = True
             return Completion(operation, data=data)
         except MultiplayerError as error:
             return Completion(operation, error=error)
@@ -208,6 +253,8 @@ class MultiplayerSession:
         try:
             if self._record is None:
                 raise MultiplayerError('NO_IDENTITY', '尚未完成启动登录')
+            if self._is_owner is False:
+                raise MultiplayerError('FORBIDDEN', '只有房主可以修改房间设置')
             if settings is None or not isinstance(settings, dict) or not settings:
                 raise MultiplayerError('INVALID_SETTINGS', '设置数据无效')
             room_id = self._record.room_id if self._record else None

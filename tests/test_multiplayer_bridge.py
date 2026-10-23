@@ -75,6 +75,98 @@ class SettingsChannelPort:
 
 
 class MultiplayerBridgeTests(unittest.TestCase):
+    def test_join_hook_is_installed_against_fixed_image(self):
+        from test_refactor_equivalence import MemoryProcess
+        from codol_rebuild.adapters.game.v1649370.room import JOIN_INPUT
+        process = MemoryProcess()
+        adapter = bridge.MultiplayerBridge(process, Mock(), Mock())
+        adapter.allocate()
+        room_plan = build_room_adapter(0x30000000, 0x31000000, 0x32000000, deferred=True,
+                                       identity_address=adapter.state+bridge.IDENTITY)
+        adapter.install_tick(0x32000000, 0x33000000, room_plan)
+        patch = next(capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32).disasm(
+            process.read(JOIN_INPUT, 5), JOIN_INPUT))
+        self.assertEqual(adapter.traps[int(patch.op_str, 16)], 'join_input')
+        self.assertEqual(adapter.ownership, 0x31000000)
+
+    def join_fixture(self):
+        """准备独立内存，模拟两个服务端成员而不访问游戏进程。"""
+        memory = Memory()
+        room, session, state = 0x22000000, 0x23000000, 0x24000000
+        memory.write(state, bytes(4096))
+        memory.word(bridge.ROOM_POINTER, room)
+        memory.word(room+0x1C, 0)
+        memory.word(bridge.LANGUAGE, 0x25000000)
+        memory.word(bridge.DIRECT_STRING_MODE, 1)
+        port = Mock()
+        port.begin.return_value = True
+        adapter = bridge.MultiplayerBridge(memory, port, Mock())
+        adapter.state = state
+        adapter.join_scratch = 0x26000000
+        adapter.player_id = 'pl_me'
+        adapter.login_done = True
+        adapter.pending = ('join', room, 0)
+        settings = {key: (0.0 if form == '<f' else 0)
+                    for key, (offset, form) in bridge.SETTING_SCALARS.items()}
+        settings.update(mode='td', map='mp_crash')
+        data = {'roomId': 'rm_target', 'ownerPlayerId': 'pl_owner', 'ownerDisplayName': '房主',
+                'revision': 1, 'maxPlayers': 4, 'playerCount': 2, 'settings': settings,
+                'members': [{'playerId': 'pl_owner', 'displayName': '房主', 'isOwner': True},
+                            {'playerId': 'pl_me', 'displayName': '队友', 'isOwner': False}]}
+        return memory, adapter, data, room, session
+
+    def test_join_snapshot_keeps_local_identity_and_remote_owner(self):
+        import hashlib
+        memory, adapter, data, room, session = self.join_fixture()
+        adapter._prepare_join_snapshot(data)
+        memory.word(room+0x1C, session)
+        memory.word(session+0x25C8, room)
+        memory.write(session, b'\x01')
+        adapter.pending = ('join', room, session)
+        adapter._initialize_join_room()
+        adapter._publish_join_snapshot()
+        self.assertEqual(memory.read(room+0xE368, 8), hashlib.sha256(b'pl_me').digest()[:8])
+        self.assertEqual(memory.read(session+0x20, 8), hashlib.sha256(b'pl_owner').digest()[:8])
+        self.assertEqual(memory.read(room+0x338, 8), memory.read(session+0x20, 8))
+        self.assertEqual(memory.read(room+0x278, 2), b'\0\x01')
+        self.assertEqual(bridge.u32(memory.read, room+0x105D8), 2)
+        self.assertFalse(adapter.is_owner)
+        adapter._submit_settings(room+0x105F0)
+        adapter.port.begin.assert_not_called()
+
+    def test_join_snapshot_rejects_capacity_and_nonfinite_settings_before_writes(self):
+        memory, adapter, data, room, session = self.join_fixture()
+        for broken in ({**data, 'members': data['members']*10},
+                       {**data, 'settings': {**data['settings'], 'modeTimeLimit': float('nan')}}):
+            before = dict(memory.data)
+            with self.assertRaises(ValueError):
+                adapter._prepare_join_snapshot(broken)
+            self.assertEqual(memory.data, before)
+
+    def test_join_input_copies_string_identifier_and_password(self):
+        memory, adapter, data, room, session = self.join_fixture()
+        adapter.pending = None
+        frame = 0x27000000
+        memory.word(frame+4, frame+64)
+        memory.word(frame+28, frame+128)
+        memory.write(frame+64, b'rm_target\0')
+        memory.write(frame+128, '密码'.encode()+b'\0')
+        with mock.patch.object(bridge, 'username', return_value='队友'):
+            adapter._request_join(frame)
+            adapter._request_join(frame)
+        adapter.port.begin.assert_called_once_with('join', '队友', room_id='rm_target', password='密码')
+
+    def test_cancelled_join_cleans_remote_membership_without_native_callback(self):
+        memory, adapter, data, room, session = self.join_fixture()
+        adapter.login_done = adapter.login_started = True
+        adapter.join_cancelled = True
+        adapter.port.poll.return_value = Completion('join', data=data)
+        with mock.patch.object(bridge, 'username', return_value='队友'):
+            adapter._poll()
+        self.assertIsNone(adapter.pending)
+        self.assertEqual(bridge.u32(memory.read, adapter.state+bridge.ACTION), 0)
+        adapter.port.begin.assert_called_once_with('leave', '队友')
+
     def test_offline_generators_remain_byte_identical_to_baseline(self):
         from codol_rebuild.adapters.game.v1649370.menu_preview import build_menu_preview_helper
         root = Path(__file__).resolve().parent/'fixtures/refactor-20261020/client/v1649370'

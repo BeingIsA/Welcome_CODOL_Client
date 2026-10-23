@@ -114,6 +114,19 @@ class HttpGateway:
             raise MultiplayerError('INVALID_RESPONSE', str(error), uncertain=True) from error
         return data
 
+    def join(self, player_id, room_id, username, password):
+        """只提交一次加入；响应损坏时保留可能已经入房的语义。"""
+        room_id = _identifier(room_id, 'rm')
+        data = self._request('POST', f'/api/v1/rooms/{room_id}/join',
+                             {'displayName': username, 'password': password}, player_id)
+        try:
+            validate_room_snapshot(data, room_id)
+            if not any(m['playerId'] == player_id for m in data['members']):
+                raise ValueError('加入响应缺少当前玩家')
+        except ValueError as error:
+            raise MultiplayerError('INVALID_RESPONSE', str(error), uncertain=True) from error
+        return data
+
     def update_settings(self, player_id, room_id, settings, expected_revision):
         room_id = _identifier(room_id, 'rm')
         data = self._request('PATCH', f'/api/v1/rooms/{room_id}/settings',
@@ -174,6 +187,37 @@ class HttpGateway:
         except ValueError as error:
             raise MultiplayerError('INVALID_RESPONSE', str(error)) from error
         return data
+
+def validate_room_snapshot(data, room_id):
+    """校验入房快照，避免把不完整成员或错误房间发布给原生界面。"""
+    if data.get('roomId') != room_id:
+        raise ValueError('房间响应标识不匹配')
+    owner = _identifier(data.get('ownerPlayerId'), 'pl')
+    if (type(data.get('revision')) is not int or data['revision'] < 0
+            or type(data.get('maxPlayers')) is not int or not 1 <= data['maxPlayers'] <= 255
+            or type(data.get('playerCount')) is not int):
+        raise ValueError('房间人数或修订号无效')
+    members = data.get('members')
+    if not isinstance(members, list) or not 1 <= len(members) <= data['maxPlayers']:
+        raise ValueError('房间成员列表无效')
+    ids = set()
+    for member in members:
+        if not isinstance(member, dict):
+            raise ValueError('房间成员无效')
+        identity = _identifier(member.get('playerId'), 'pl')
+        if (identity in ids or type(member.get('isOwner')) is not bool
+                or member['isOwner'] != (identity == owner)
+                or not isinstance(member.get('displayName'), str)
+                or '\0' in member['displayName'] or len(member['displayName']) > 128):
+            raise ValueError('房间成员身份或昵称无效')
+        ids.add(identity)
+    if owner not in ids or data['playerCount'] != len(members):
+        raise ValueError('房间成员数或房主不匹配')
+    settings = _settings_payload(data.get('settings'))
+    for key in ('map', 'mode'):
+        if not isinstance(settings.get(key), str) or '\0' in settings[key]:
+            raise ValueError('房间地图或模式无效')
+
 
 def _settings_payload(settings):
     """校验设置快照外形并原样返回；键集与服务端契约一致。"""

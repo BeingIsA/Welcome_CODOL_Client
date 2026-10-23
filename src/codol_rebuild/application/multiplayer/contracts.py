@@ -18,6 +18,7 @@ class IdentityRecord:
     player_id: str
     room_id: str | None = None
     uncertain_create: bool = False
+    uncertain_join: bool = False
 
 
 @dataclass(frozen=True)
@@ -41,6 +42,11 @@ class IdentityStore(Protocol):
 
 class Gateway(Protocol):
     """玩家业务通信端口；所有方法在后台串行执行。"""
+    def join(self, player_id: str, room_id: str, username: str,
+             password: str | None) -> dict:
+        """加入指定房间并返回服务端权威成员与设置快照。"""
+        ...
+
     def login(self, fingerprint: str, username: str, player_id: str | None) -> dict:
         """获取或复用身份。"""
         ...
@@ -101,8 +107,9 @@ PERMISSION_ERROR_CODES = frozenset({'BANNED', 'FORBIDDEN', 'UNAUTHENTICATED'})
 class MultiplayerPort(Protocol):
     """原生桥使用的异步用例接口；调用方不得直接访问工作线程状态。"""
     def begin(self, operation: str, username: str, *, max_players: int = 4,
-              password: str | None = None, settings: dict | None = None) -> bool:
-        """发起登录、创建、退出或同步设置；有未消费操作时返回 False。"""
+              password: str | None = None, settings: dict | None = None,
+              room_id: str | None = None) -> bool:
+        """发起登录、创建、加入、退出或同步设置；有未消费操作时返回 False。"""
         ...
 
     def poll(self) -> Completion | None:

@@ -82,20 +82,20 @@ class RoomListFixture {
     }
     static int Main(string[] args) {
         try {
-            Map(0x430000,0x10000); Map(0x720000,0x20000); Map(0x20000000,0x10000);
+            Map(0x28000000,0x10000); Map(0x20000000,0x10000);
             Map(State,0x200000); Map(0x22000000,0x10000);
             Write(0x22000000,0x22000100); Write(0x2200013c,0x22000200);
             // cdecl 函数转发原始实参；thiscall 包装器显式传递 ECX 并按原 ABI 清栈。
-            Callback(0x72fdd0, new One(delegate(int p){return Create(p,true);}),
+            Callback(0x2800fdd0, new One(delegate(int p){return Create(p,true);}),
                      new byte[]{0xff,0x74,0x24,4}, new byte[]{0x83,0xc4,4,0xc3});
-            Callback(0x72fd70, new One(delegate(int p){return Create(p,false);}),
+            Callback(0x2800fd70, new One(delegate(int p){return Create(p,false);}),
                      new byte[]{0xff,0x74,0x24,4}, new byte[]{0x83,0xc4,4,0xc3});
-            Callback(0x436660, new One(Release), new byte[]{0x51}, new byte[]{0x83,0xc4,4,0xc3});
+            Callback(0x28006660, new One(Release), new byte[]{0x51}, new byte[]{0x83,0xc4,4,0xc3});
             byte[] three = {0xff,0x74,0x24,8,0xff,0x74,0x24,8,0x51};
             byte[] ret8 = {0x83,0xc4,12,0xc2,8,0};
-            Callback(0x436750,new Three(Set),three,ret8);
+            Callback(0x28006750,new Three(Set),three,ret8);
             Callback(0x22000200,new Three(Push),three,ret8);
-            Callback(0x730570,new Four(Dispatch),
+            Callback(0x28000570,new Four(Dispatch),
                      new byte[]{0xff,0x74,0x24,16,0xff,0x74,0x24,16,0xff,0x74,0x24,16,0xff,0x74,0x24,16},
                      new byte[]{0x83,0xc4,16,0xc3});
             Bytes(0x20000000,File.ReadAllBytes(args[0]));

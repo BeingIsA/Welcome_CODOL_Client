@@ -222,5 +222,92 @@ def build_room_adapter(entry: int, state: int, ready: int, *, deferred=False, id
     entries = ('create','valid','identity','leave','member_init','player_id','member_refresh','avatar_identity')
     if deferred:
         entries += ('create_complete', 'leave_complete')
-    return {'code':bytes(code),'patches':patches,'traps':traps,
+    return {'code':bytes(code),'patches':patches,'traps':traps, 'ownership': state,
             'entries':{k:entry+labels[k] for k in entries}}
+
+
+# AS_JoinRoom 普通房间分支：数字转换前仍持有原始 id 和密码。
+JOIN_INPUT = 0x5D3216
+JOIN_CONTRACT = {
+    JOIN_INPUT: bytes.fromhex('e8fbc06600'),
+    0x623770: bytes.fromhex('5333db568bf1'),
+    0x7E7910: bytes.fromhex('33d233c0b95046370e'),
+    0xB75B10: bytes.fromhex('558bec538b5d'),
+}
+MEMBER_CAPACITY = (0x105D8 - 0xE368) // 0x1D0
+
+
+def validate_join_contract(read):
+    """加入入口、成员构造及字符串赋值 ABI 不符时拒绝安装。"""
+    for address, expected in JOIN_CONTRACT.items():
+        if read(address, len(expected)) != expected:
+            raise ValueError(f'加入房间 ABI 不匹配：{address:#x}')
+
+
+def build_join_adapter(entry, state, scratch):
+    """生成加入专用主线程桩；成员数据由暂停点发布，通知沿原生监听器。"""
+    code, labels, refs, traps = bytearray(), {}, [], {}
+    def emit(value): code.extend(bytes.fromhex(value))
+    def word(value): code.extend(struct.pack('<I', value))
+    def label(name): labels[name] = len(code)
+    def branch(op, name):
+        emit(op); refs.append((len(code), name)); word(0)
+    def call(address):
+        emit('e8'); word((address-entry-len(code)-4) & 0xffffffff)
+    def trap(name):
+        traps[entry+len(code)] = name; emit('cc')
+
+    label('input')
+    trap('join_input')
+    # 在线非本适配路径继续原数字转换；适配路径由处理器跳到 AS 公共清理。
+    emit('e9'); word((0xC3F316-entry-len(code)-4) & 0xffffffff)
+    label('join_complete')
+    emit('9c60 8b1d'); word(state+8)  # EBX=room，保持调用者寄存器。
+    call(0x7E7910)
+    emit('85c0'); branch('0f84', 'allocation_failed')
+    emit('89431c 8998c8250000 a3'); word(state+12)
+    trap('join_allocated')
+    # 字符串使用原生引用计数赋值函数，不能把 Python 分配的裸串冒充原生字符串。
+    for offset, source in ((0, 0), (8, 256), (0x10, 512)):
+        emit('68'); word(scratch+source)
+        emit('8d8b'); word(0x105F0+offset)
+        call(0xB75B10)
+    emit('8dbb'); word(0xE368)
+    emit('be'); word(MEMBER_CAPACITY)
+    label('init_member')
+    emit('8bcf'); call(0x623770)
+    emit('81c7'); word(0x1D0)
+    emit('4e'); branch('0f85', 'init_member')
+    emit('53'); call(0x62AF10)  # 只对第一个（本机）槽填本地角色资料。
+    trap('join_snapshot')
+    # 与 634E79 的入房成功通知一致，成员/设置已完整发布后才通知 UI。
+    emit('8b7304')
+    label('notify_join')
+    emit('85f6'); branch('0f84', 'notify_settings_start')
+    emit('8b0e 8b01 8b4004 8b7604 6a00 6a01 ffd0')
+    branch('e9', 'notify_join')
+    label('notify_settings_start'); emit('8b7304')
+    label('notify_settings')
+    emit('85f6'); branch('0f84', 'refresh')
+    emit('8b0e 8b01 8b4048 8b7604 6a00 8d93'); word(0x105F0)
+    emit('52 ffd0'); branch('e9', 'notify_settings')
+    label('refresh')
+    emit('6a01 8bcb'); call(0x6305F0)
+    emit('619d c3')
+    label('allocation_failed'); trap('join_allocation_failed')
+    branch('e8', 'join_failed'); emit('619d c3')
+
+    label('join_failed')
+    emit('9c60 8b1d'); word(state+8)
+    emit('8b7304')
+    label('notify_failure')
+    emit('85f6'); branch('0f84', 'failed_done')
+    emit('8b0e 8b01 8b4004 8b7604 6a03 6a00 ffd0')
+    branch('e9', 'notify_failure')
+    label('failed_done'); emit('619d c3')
+    for offset, target in refs:
+        struct.pack_into('<i', code, offset, labels[target]-offset-4)
+    return {'code': bytes(code), 'traps': traps,
+            'entries': {name: entry+labels[name] for name in ('join_complete', 'join_failed')},
+            'patches': [{'va': JOIN_INPUT, 'before': JOIN_CONTRACT[JOIN_INPUT],
+                         'after': b'\xe8'+struct.pack('<I', (entry-JOIN_INPUT-5) & 0xffffffff)}]}
