@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 workspaces/
 resources/
+!src/codol_rebuild/resources/
 data/
 *.zone
 .idea/
