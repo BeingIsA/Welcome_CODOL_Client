@@ -59,6 +59,19 @@ class InitializationTests(unittest.TestCase):
             self.assertFalse(reopened['new_account'])
             self.assertEqual(reopened['initialization'], created['initialization'])
             self.assertEqual(reopened['profiles'], created['profiles'])
+            from codol_rebuild.adapters.game.profile_format.fields import Fields
+            fields = Fields(schemas['public'])
+            self.assertEqual(fields.read(created['profiles']['public'], 'loadoutVersion'), 3)
+            old = bytearray(created['profiles']['public'])
+            fields.write(old, 'loadoutVersion', 0)
+            old_profiles = {**created['profiles'], 'public': bytes(old)}
+            revision = repo.save('local', reopened['revision'], old_profiles, codec.identities,
+                                 initialization=created['initialization'])
+            migrated = AccountSession(repo, codec).initialize()
+            self.assertEqual(migrated['revision'], revision+1)
+            self.assertEqual(migrated['profiles'], created['profiles'])
+            self.assertEqual(migrated['initialization'], created['initialization'])
+            self.assertEqual(AccountSession(repo, codec).initialize()['revision'], migrated['revision'])
 
     def test_gp_cp_skus_require_both_currency_and_native_sale(self):
         from codol_rebuild.adapters.game.v1649370.profile import gp_cp_market_items
@@ -230,6 +243,8 @@ class InitializationTests(unittest.TestCase):
                 repo.save('new', 0, blobs, identities, initialization={**state, 'gp': 0})
             self.assertEqual(repo.load('new', identities)['initialization'], state)
             class Codec:
+                def migrate(self, profiles):
+                    return dict(profiles)
                 def validate_snapshot(self, value):
                     pass
             codec = Codec()

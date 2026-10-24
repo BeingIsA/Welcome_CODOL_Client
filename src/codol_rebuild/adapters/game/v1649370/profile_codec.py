@@ -104,8 +104,18 @@ class AccountCodec:
                 secure_fields.write(blobs['secure'],'unlockFlagsNew.'+row[1],policy['unlock_threshold'])
         for path,value in [('userIDLow',saved['uid']&0xffffffff),('userIDHigh',saved['uid']>>32)]:
             secure_fields.write(blobs['secure'],path, value if value<2**31 else value-2**32)
-        blobs={k:bytes(v) for k,v in blobs.items()}
+        blobs=self.migrate({k:bytes(v) for k,v in blobs.items()})
         return blobs, report
+
+    def migrate(self, profiles):
+        """补齐本版本配装格式标记；只修复漏写的零值，不重建配装或授权。"""
+        self.validate_snapshot(profiles)
+        fields = Fields(self.schemas['public'])
+        if fields.read(profiles['public'], 'loadoutVersion') != 0:
+            return dict(profiles)
+        public = bytearray(profiles['public'])
+        fields.write(public, 'loadoutVersion', 3)
+        return {**profiles, 'public': bytes(public)}
 
     def validate_snapshot(self, blobs):
         for kind,identity in self.identities.items():

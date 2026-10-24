@@ -7,6 +7,12 @@ ORIGINAL_METHOD = bytes.fromhex(
     'f032d0d06607d166116812f0335d136613d0661246140066105d1566156616ab5d174a'
     '170046180229f03547')
 
+# LobbyTeamMember.showMiniClientTag：只将 visible 的输入改为 false。
+# 等长替换 getlocal1 为 pushfalse，保留成员 DLC 数据及所有准入判断。
+MINI_TAG_OFFSET = 6649182
+MINI_TAG_BEFORE = bytes.fromhex('f10bf067d030ef01540067f069d0661ad1613bf06a47')
+MINI_TAG_AFTER = bytes.fromhex('f10bf067d030ef01540067f069d0661a27613bf06a47')
+
 
 def replacements() -> list:
     """在主题控制器初始化时选择原版 SpaceStation（索引5）。
@@ -16,4 +22,5 @@ def replacements() -> list:
     """
     replacement = (ORIGINAL_METHOD[:13] + b'\x24\x05' + b'\x02' * 6
                    + ORIGINAL_METHOD[21:])
-    return [(METHOD_OFFSET, ORIGINAL_METHOD, replacement)]
+    return [(METHOD_OFFSET, ORIGINAL_METHOD, replacement),
+            (MINI_TAG_OFFSET, MINI_TAG_BEFORE, MINI_TAG_AFTER)]

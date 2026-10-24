@@ -38,6 +38,11 @@ def bootstrap(repository: AccountStore, codec: ProfileCodec, name='local'):
         if not saved['profiles']:
             raise ValueError('Account initialization exists without profiles')
         codec.validate_snapshot(saved['profiles'])
+        profiles = codec.migrate(saved['profiles'])
+        if profiles != saved['profiles']:
+            revision = repository.save(name, saved['revision'], profiles, codec.identities,
+                                       initialization=state)
+            saved = {**saved, 'profiles': profiles, 'revision': revision}
         return {**saved, 'new_account': False, 'unlock_report': {'preserved': True}}
     new_account = not bool(saved['profiles'])
     data = codec.initialization_data(new_account)

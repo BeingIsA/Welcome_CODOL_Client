@@ -125,6 +125,9 @@ class RechargeTests(unittest.TestCase):
 
     def test_twenty_clicks_durable_reload_and_sqlite_conflict_rollback(self):
         class Codec:
+            def migrate(self, profiles):
+                """充值用例的格式替身不需要迁移档案。"""
+                return dict(profiles)
             identities = {"public": {}, "secure": {}}
             def validate_snapshot(self, blobs):
                 return 570
