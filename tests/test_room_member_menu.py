@@ -153,7 +153,7 @@ class MenuTests(unittest.TestCase):
 
     def test_native_query_and_click_map_identity_once_and_preserve_fallback(self):
         process=MemoryProcess();port=Mock();state=['rm_a',True,'pl_me',['pl_me','pl_other']]
-        bridge=menu.RoomMemberMenu(process,port,lambda:tuple(state),Mock());traps,publisher=bridge.install()
+        bridge=menu.RoomMemberMenu(process,port,lambda:tuple(state),Mock(),Mock());traps=bridge.install()
         frame=process.allocate();params=process.allocate();args=process.allocate();result=process.allocate();text=process.allocate()
         identity=str(int.from_bytes(hashlib.sha256(b'pl_other').digest()[:8],'little'))
         process.write(text,identity.encode()+b'\0')
@@ -178,7 +178,7 @@ class MenuTests(unittest.TestCase):
         gateway.kick('pl_me','rm_a','pl_other')
         gateway._request.assert_called_once_with('POST','/api/v1/rooms/rm_a/kick',{'targetPlayerId':'pl_other'},'pl_me')
 
-    def test_service_delegates_permissions_without_readback_and_ignores_late_results(self):
+    def test_service_delegates_permissions_without_readback_and_delivers_results(self):
         gateway=Mock();session=RoomSession(gateway,Mock(),'http://localhost','test')
         session._record=IdentityRecord('pl_me','rm_a');session._is_owner=True
         data={'roomId':'rm_a','members':[{'playerId':'pl_me'}]}
@@ -199,7 +199,7 @@ class MenuTests(unittest.TestCase):
             gateway.kick.side_effect=None;gateway.kick.return_value=data
             self.assertIsNone(session._execute_kick('rm_a','pl_other').error)
             self.assertTrue(session.begin_kick('rm_a','pl_other'));session._kick_pending.result(timeout=3)
-            session._room_generation+=1
-            self.assertEqual(session.poll_kick().operation,'kick_cancelled')
+            session._record=IdentityRecord('pl_me')
+            self.assertEqual(session.poll_kick().operation,'kick')
         finally:
             session._record=None;session.close()

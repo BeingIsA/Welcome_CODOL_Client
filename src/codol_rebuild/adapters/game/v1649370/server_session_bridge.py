@@ -139,6 +139,8 @@ def username(read):
 def validate_contract(read):
     """新增调用边的固定字节验证；不依赖旧版本地址。"""
     for address, expected in {
+        # 被动离房依赖原生监听器已经调用成功通知，固定版本必须保持此映射。
+        0xDDCF78: struct.pack('<I', 0x7CB7A0),
         0x7CB7A0: bytes.fromhex('558bec83e4f883ec24'),
         0x730280: bytes.fromhex('558bec83ec4ca198bb770c'),
         0x5CF5E6: bytes.fromhex('8b4d085083c118'),
@@ -193,8 +195,8 @@ def build_tick(entry, state, ready, preview_entry, room_entries, list_publish=No
     emit('c705'); word(state+36); word(0)
     if 'settings_apply' in room_entries:
         trap('realtime')
-        if 'member_menu' in room_entries:
-            emit('83e4f0'); call(room_entries['member_menu']); emit('8be5')
+        if 'notifications' in room_entries:
+            emit('83e4f0'); call(room_entries['notifications']); emit('8be5')
         if 'members_apply' in room_entries:
             emit('833d'); word(state+52); emit('00')
             branch('0f84', 'members_done')
@@ -213,7 +215,8 @@ def build_tick(entry, state, ready, preview_entry, room_entries, list_publish=No
     if list_publish is not None:
         emit('83e4f0'); call(list_publish); emit('8be5')
     emit('a1'); word(state+ACTION)
-    actions = [(1, 'created'), (2, 'create_failed'), (3, 'left'), (4, 'leave_failed')]
+    actions = [(1, 'created'), (2, 'create_failed'), (3, 'left'), (4, 'leave_failed'),
+               (7, 'departed')]
     if 'join_complete' in room_entries:
         actions += [(5, 'joined'), (6, 'join_failed')]
     for value, target in actions:
@@ -236,6 +239,10 @@ def build_tick(entry, state, ready, preview_entry, room_entries, list_publish=No
     label('left')
     emit('83e4f0 83ec0c ff35'); word(state+LEAVE_ARG); call(room_entries['leave_complete'])
     emit('83c404 83ec0c 6a00 b9'); word(0xE69CB0); call(0x7CB7A0)
+    branch('e9', 'completed')
+    label('departed')
+    # 被动离房没有等待中的任务；原生 listener+0x4C 已投递成功通知，不能重复投递。
+    emit('83e4f0 83ec0c 6a00'); call(room_entries['leave_complete'])
     branch('e9', 'completed')
     label('leave_failed')
     # 仅完成离房任务的失败响应，不能调用会清空界面的成功通知。
@@ -278,6 +285,8 @@ class ServerSessionBridge:
         self.applying_members = False
         self.member_profiles = {}
         self.member_menu = None
+        self.notifications = None
+        self.departure_message = None
 
     def allocate(self):
         """在已暂停的初始化边分配独立通信页。"""
@@ -323,12 +332,14 @@ class ServerSessionBridge:
         room_plan = {**room_plan, 'entries': {**room_plan['entries'], **join_plan['entries'],
                                             'members_apply': self.members_apply}}
         from codol_rebuild.adapters.game.v1649370.room_member_menu import RoomMemberMenu
+        from codol_rebuild.adapters.game.v1649370.notifications import NativeNotifications
+        self.notifications = NativeNotifications(self.process)
+        room_plan['entries']['notifications'] = self.notifications.install()
         self.member_menu = RoomMemberMenu(self.process, self.port,
             lambda: (self.current_room_id, self.is_owner, self.player_id,
                      [m['playerId'] for m in self.join_snapshot[1]] if self.join_snapshot else []),
-            self.record)
-        menu_traps, menu_publish = self.member_menu.install()
-        room_plan['entries']['member_menu'] = menu_publish
+            self.record, self.notifications.message)
+        menu_traps = self.member_menu.install()
         plan = build_tick(entry, self.state, ready, preview_entry, room_plan['entries'], publisher)
         if len(plan['code']) > 4096:
             raise ValueError('联机帧桥超出代码页')
@@ -441,17 +452,22 @@ class ServerSessionBridge:
                     action = u32(self.process.read, self.state+ACTION)
                     if action == 1 and not self._valid_room(room, session):
                         raise ValueError('服务端建房成功，但原生创建未完成')
-                    if action == 3 and u32(self.process.read, room+0x1C) != 0:
+                    if action in (3, 7) and u32(self.process.read, room+0x1C) != 0:
                         raise ValueError('服务端离房成功，但原生房间未清理')
-                    if action == 3:
+                    if action in (3, 7):
                         self.current_room_id = None
+                        if action == 7:
+                            self.is_owner = False
                         self.member_profiles = {}
                         self.join_snapshot = None
                         self.applying_members = False
                         self._word(52, 0)
+                        if self.departure_message is not None:
+                            self.notifications.message(self.departure_message)
+                            self.departure_message = None
                     if action == 5 and not self._valid_room(room, session):
                         raise ValueError('服务端入房成功，但原生房间未完成')
-                    self.record({'multiplayer_native_completed': operation, 'success': action in (1, 3, 5)})
+                    self.record({'multiplayer_native_completed': operation, 'success': action in (1, 3, 5, 7)})
                 self.pending = None
                 self._word(ACTION, 0)
                 # 重新鉴权或设置补交仍在等待时保持轮询，两者都由 _poll 清零；
@@ -681,9 +697,32 @@ class ServerSessionBridge:
             return
         handlers = {'room_settings_updated': self._apply_room_settings,
                     'room_members_updated': self._apply_room_members}
+        if event.operation in ('room_kicked', 'room_closed'):
+            self._apply_room_departure(event.operation, event.data)
+            return
         handler = handlers.get(event.operation)
         if handler is not None:
             handler(event.data)
+
+    def _apply_room_departure(self, event_type, payload):
+        """在前端主线程复用离房清理和成功通知，不进入用户离房请求入口。"""
+        if payload is None or payload['roomId'] != self.current_room_id:
+            return
+        room = u32(self.process.read, ROOM_POINTER)
+        session = u32(self.process.read, room+0x1C) if room >= 0x10000 else 0
+        if not self._valid_room(room, session):
+            raise ValueError('被动离房时原生房间引用失效')
+        self.pending = ('room_departure', room, session)
+        self.departure_message = ('你已被移出房间。' if event_type == 'room_kicked'
+                                  else '管理员已关闭房间。')
+        self._word(ROOM, room)
+        self._word(SESSION, session)
+        self._word(LEAVE_ARG, 0)
+        # 丢弃已经排队但尚未应用的旧房间展示，防止离房前再触发自动设置提交。
+        self._word(52, 0)
+        self._word(SETTINGS_READY_OFFSET, 0)
+        self._word(ACTION, 7)
+        self._word(POLL, 1)
 
     def _apply_room_members(self, payload):
         """应用层已取回完整快照；主线程只更新当前有效房间的展示副本。"""

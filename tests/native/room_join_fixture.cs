@@ -74,7 +74,15 @@ class RoomJoinFixture {
             Write(State+36,5); Function(0x20002000)();
             if(Read(State+0x120)!=2 || Read(State+0x110)!=4)
                 throw new Exception("idle tick repeated notification");
-            Console.WriteLine("native join and settings callback ABI passed"); return 0;
+            // 被动离房执行一次清理入口，不再次直接调用 UI 成功通知。
+            Count(0x28006000,0x124,0);
+            Count(0x2800b7a0,0x128,4);
+            Write(State,1); Write(State+4,7); Write(State+36,5);
+            Function(0x20002000)();
+            // preview 与 leave_complete 在本夹具共用同一计数入口。
+            if(Read(State+0x124)!=2 || Read(State+0x128)!=0)
+                throw new Exception("passive departure duplicated the native completion callback");
+            Console.WriteLine("native join, settings and passive departure ABI passed"); return 0;
         } catch(Exception error) {Console.WriteLine(error); return 1;}
     }
 }

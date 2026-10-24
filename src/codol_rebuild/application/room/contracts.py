@@ -127,7 +127,7 @@ PERMISSION_ERROR_CODES = frozenset({'BANNED', 'FORBIDDEN', 'UNAUTHENTICATED'})
 class RoomPort(Protocol):
     """原生桥使用的异步用例接口；调用方不得直接访问工作线程状态。"""
     def poll_event(self) -> Completion | None:
-        """消费当前房间设置推送；不查询快照，也不比较修订号。"""
+        """消费当前房间的设置、成员更新及被踢/关闭完成事件。"""
         ...
 
     def begin(self, operation: str, username: str, *, max_players: int = 4,
@@ -157,7 +157,7 @@ class RoomPort(Protocol):
         ...
 
     def poll_kick(self) -> Completion | None:
-        """消费踢人完成结果；离房后丢弃旧房间的结果。"""
+        """非阻塞消费一次踢人完成结果。"""
         ...
 
     def close(self) -> None:

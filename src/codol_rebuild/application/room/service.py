@@ -1,5 +1,6 @@
 """房间用例编排：后台串行请求、身份保存和不确定写入恢复。"""
 import threading
+import logging
 import time
 from copy import deepcopy
 from concurrent.futures import ThreadPoolExecutor
@@ -27,16 +28,13 @@ class RoomSession:
         self._list_cancel = threading.Event()
         self._list_request = None
         self._members_pending = None
-        self._room_generation = 0
-        self._members_generation = 0
         self._kick_pending = None
-        self._kick_generation = 0
+        self._departure_pending = None
 
     def begin_kick(self, room_id, target_player_id):
         """串行提交踢人；不在客户端提前移除成员，也不自动重试写请求。"""
-        if self._closed or self._pending is not None or self._kick_pending is not None:
+        if self._closed or self._pending is not None or self._kick_pending is not None or self._departure_pending is not None:
             return False
-        self._kick_generation = self._room_generation
         self._kick_pending = self._executor.submit(self._execute_kick, room_id, target_player_id)
         return True
 
@@ -53,12 +51,11 @@ class RoomSession:
             return Completion('kick', error=RoomError('INVALID_RESPONSE', '踢人响应无效：'+str(error)))
 
     def poll_kick(self):
-        """仅交付当前房间代次的完成结果。"""
+        """非阻塞消费一次踢人完成结果。"""
         if self._kick_pending is None or not self._kick_pending.done():
             return None
         pending, self._kick_pending = self._kick_pending, None
-        result = pending.result()
-        return result if self._kick_generation == self._room_generation else Completion('kick_cancelled')
+        return pending.result()
 
     def begin(self, operation: str, username: str, *, max_players: int = 4,
               password: str | None = None, settings: dict | None = None,
@@ -68,7 +65,7 @@ class RoomSession:
         设置同步与主流程（登录/创建/退出）互不阻塞：原生改设置在本地
         立即生效，这里只做异步补交，失败不影响房间状态。
         """
-        if self._closed:
+        if self._closed or self._departure_pending is not None:
             return False
         if operation == 'settings':
             if self._settings_pending is not None:
@@ -80,8 +77,6 @@ class RoomSession:
             return False
         if operation not in ('login', 'create', 'join', 'leave'):
             raise ValueError('未知联机用例')
-        if operation in ('create', 'join', 'leave'):
-            self._room_generation += 1
         self._pending = self._executor.submit(self._execute, operation, username,
                                               max_players, password, settings, room_id, deepcopy(profile))
         return True
@@ -103,17 +98,25 @@ class RoomSession:
         self._record = record
         self._store.save(self._server, record)
 
+    def _clear_local_room_record(self):
+        """清除自建的服务端房间记录；不发送请求，也不操作原生房间或界面。"""
+        self._save(replace(self._record, room_id=None, uncertain_join=False,
+                           uncertain_create=False))
+
     def poll_event(self) -> Completion | None:
         """统一消费实时消息，按类型交给对应业务处理函数。"""
         if self._closed or self._realtime is None or self._pending is not None:
             return None
+        if self._departure_pending is not None:
+            if not self._departure_pending.done():
+                return None
+            pending_departure, self._departure_pending = self._departure_pending, None
+            return pending_departure.result()
         if self._members_pending is not None:
             if not self._members_pending.done():
                 return None
             pending, self._members_pending = self._members_pending, None
             result = pending.result()
-            if self._members_generation != self._room_generation:
-                return None
             if result.error is not None:
                 return result
             if (result.data is not None and self._record is not None
@@ -125,13 +128,31 @@ class RoomSession:
             return None
         handlers = {'room_settings_updated': self._handle_room_settings_updated,
                     'room_members_updated': self._handle_room_members_updated}
+        if event['type'] in ('room_kicked', 'room_closed'):
+            return self._handle_room_departure(event['type'], event['payload'])
         handler = handlers.get(event['type'])
         return handler(event['payload']) if handler is not None else None
+
+    def _handle_room_departure(self, event_type, payload):
+        """服务端已结束本人的房间归属；只清理本地记录，不再次发送离房命令。"""
+        if self._record is None or not self._record.room_id or self._record.room_id != payload.get('roomId'):
+            return None
+        self._departure_pending = self._executor.submit(
+            self._complete_room_departure, event_type, payload['roomId'])
+        return None
+
+    def _complete_room_departure(self, event_type, room_id):
+        """串行更新身份记录，持久化失败也不能保留已失效的房间展示。"""
+        self._is_owner = None
+        try:
+            self._clear_local_room_record()
+        except (OSError, ValueError):
+            logging.getLogger(__name__).exception('被动离房记录保存失败')
+        return Completion(event_type, data={'roomId': room_id})
 
     def _handle_room_members_updated(self, payload):
         """成员通知只触发后台权威快照查询，迟到通知不能直接改写本地成员。"""
         if self._record is not None and self._record.room_id == payload.get('roomId'):
-            self._members_generation = self._room_generation
             self._members_pending = self._executor.submit(self._refresh_members, self._record)
         return None
 
@@ -265,7 +286,7 @@ class RoomSession:
             except RoomError as error:
                 if error.code not in ('ROOM_NOT_FOUND', 'ROOM_CLOSED'):
                     raise
-            self._save(replace(self._record, room_id=None, uncertain_join=False))
+            self._clear_local_room_record()
         self._is_owner = None
         return {'left': True}
 

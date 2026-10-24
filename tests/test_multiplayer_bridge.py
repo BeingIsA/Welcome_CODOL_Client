@@ -96,6 +96,46 @@ class SettingsChannelPort:
 
 
 class MultiplayerBridgeTests(unittest.TestCase):
+    def test_departure_message_is_queued_only_after_native_cleanup(self):
+        adapter, memory, port, room, session = self.setup_bridge()
+        adapter.current_room_id = 'rm_current'
+        adapter.notifications = Mock()
+        adapter._apply_room_departure('room_closed', {'roomId': 'rm_current'})
+        with self.assertRaisesRegex(ValueError, '原生房间未清理'):
+            self._fire(adapter, memory, 'completed', 0x50000030)
+        adapter.notifications.message.assert_not_called()
+        memory.word(room+0x1C, 0)
+        self._fire(adapter, memory, 'completed', 0x50000030)
+        adapter.notifications.message.assert_called_once_with('管理员已关闭房间。')
+        self.assertIsNone(adapter.current_room_id)
+        self.assertFalse(adapter.is_owner)
+        self.assertIsNone(adapter.departure_message)
+        self._fire(adapter, memory, 'completed', 0x50000030)
+        adapter.notifications.message.assert_called_once()
+        port.begin.assert_not_called()
+
+    def test_passive_departure_reuses_cleanup_without_submitting_http(self):
+        for event_type, message in (('room_kicked', '你已被移出房间。'),
+                                    ('room_closed', '管理员已关闭房间。')):
+            with self.subTest(event_type=event_type):
+                memory, adapter, data, room, session = self.join_fixture()
+                adapter.pending = None
+                adapter.current_room_id = data['roomId']
+                memory.word(room+0x1C, session)
+                memory.word(session+0x25C8, room)
+                memory.write(session, b'\x01')
+                adapter.notifications = Mock()
+                adapter._apply_room_departure(event_type, {'roomId': 'rm_other'})
+                self.assertIsNone(adapter.pending)
+                adapter._apply_room_departure(event_type, data)
+                self.assertEqual(adapter.pending, ('room_departure', room, session))
+                self.assertEqual(adapter.departure_message, message)
+                self.assertEqual(bridge.u32(memory.read, adapter.state+bridge.ACTION), 7)
+                self.assertEqual(bridge.u32(memory.read, adapter.state+bridge.POLL), 1)
+                self.assertEqual(bridge.u32(memory.read, adapter.state+bridge.SETTINGS_READY_OFFSET), 0)
+                adapter.port.begin.assert_not_called()
+                adapter.notifications.message.assert_not_called()
+
     def test_join_hook_is_installed_against_fixed_image(self):
         from test_refactor_equivalence import MemoryProcess
         from codol_rebuild.adapters.game.v1649370.room import JOIN_INPUT

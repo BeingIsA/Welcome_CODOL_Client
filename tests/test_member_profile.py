@@ -100,7 +100,7 @@ class MemberProfileTests(unittest.TestCase):
         finally:
             session.close()
 
-    def test_old_membership_refresh_is_discarded(self):
+    def test_other_room_membership_refresh_is_discarded(self):
         from codol_rebuild.application.room.contracts import Completion, IdentityRecord
         from codol_rebuild.application.room.service import RoomSession
         session = RoomSession(Mock(), Mock(), 'http://localhost', 'fingerprint', Mock())
@@ -108,8 +108,7 @@ class MemberProfileTests(unittest.TestCase):
             session._record = IdentityRecord('pl_a', 'rm_test')
             session._members_pending = Future()
             session._members_pending.set_result(Completion('room_members_updated', {'roomId': 'rm_test'}))
-            session._members_generation = 1
-            session._room_generation = 2
+            session._record = IdentityRecord('pl_a', 'rm_other')
             self.assertIsNone(session.poll_event())
         finally:
             session.close()

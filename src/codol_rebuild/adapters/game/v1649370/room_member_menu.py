@@ -76,8 +76,9 @@ def _string_value(read, value):
 
 class RoomMemberMenu:
     """只在暂停的原生主线程读取参数；通过显式回调取得房间状态。"""
-    def __init__(self, process, port, state, record):
+    def __init__(self, process, port, state, record, notify):
         self.process, self.port, self.state, self.record = process, port, state, record
+        self.notify = notify
         self.busy = False
         self.plans = {}
 
@@ -101,20 +102,7 @@ class RoomMemberMenu:
             self.process.write(slot, struct.pack('<I', entry))
             self.plans[name] = (entry+5, entry+10)
             traps[entry+4] = name
-        if self.process.read(0x730920, 6) != bytes.fromhex('558bec83e4f8'):
-            raise ValueError('原生通知 ABI 不匹配')
-        publisher = self.process.allocate(4096)
-        # 通知消费在前端帧执行，调用原生 cppShowNotification 包装函数。
-        code = bytearray.fromhex('9c60 8bec 833d')
-        code.extend(struct.pack('<I', self.buffer)); code.extend(bytes.fromhex('00 7420 c705'))
-        code.extend(struct.pack('<II', self.buffer, 0))
-        code.extend(bytes.fromhex('83e4f0 b9')); code.extend(struct.pack('<I', self.buffer+128))
-        code.append(0xe8); code.extend(struct.pack('<I', (0x730920-publisher-len(code)-4)&0xffffffff))
-        code.extend(bytes.fromhex('8be5 619d c3'))
-        # 短跳转指向统一恢复路径。
-        code[12] = len(code)-5-13
-        self.process.write(publisher, bytes(code)); self.process.executable(publisher, 4096)
-        return traps, publisher
+        return traps
 
     def _target(self, display_id):
         """将原生显示 ID 转换为服务端玩家 ID。"""
@@ -124,12 +112,6 @@ class RoomMemberMenu:
             if identity == display_id:
                 return room, player
         return None
-
-    def message(self, text):
-        """排队一次原生通知，不在网络工作线程调用 UI。"""
-        raw = text.encode('utf-8')[:1000].decode('utf-8', errors='ignore').encode('utf-8')+b'\0'
-        self.process.write(self.buffer+128, raw)
-        self.process.write(self.buffer, struct.pack('<I', 1))
 
     def handle(self, phase, ctx):
         """查询只读；点击仅提交一次异步命令，普通原生调用保留。"""
@@ -170,9 +152,9 @@ class RoomMemberMenu:
                     raise ValueError('无法解析踢人目标的玩家 ID')
                 self.busy = self.port.begin_kick(*selected)
                 if not self.busy:
-                    self.message('当前有请求正在处理，请稍后重试')
+                    self.notify('当前有请求正在处理，请稍后重试')
         except (ValueError, OSError) as error:
-            self.message(str(error))
+            self.notify(str(error))
             target = handled
         struct.pack_into('<I', ctx, 184, target)
 
@@ -184,10 +166,8 @@ class RoomMemberMenu:
         if result is None:
             return None
         self.busy = False
-        if result.operation == 'kick_cancelled':
-            return None
         self.record({'room_kick': result.error is None})
         if result.error:
-            self.message(str(result.error))
+            self.notify(str(result.error))
             return None
         return result.data
