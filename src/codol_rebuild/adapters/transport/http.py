@@ -39,6 +39,11 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 class HttpGateway:
     """不重试写请求；连接与响应异常显式标记结果不确定。"""
+    def kick(self, player_id, room_id, target_player_id):
+        """调用玩家房主接口，不使用管理端接口。"""
+        return self._request('POST', '/api/v1/rooms/'+_identifier(room_id, 'rm')+'/kick',
+                             {'targetPlayerId': _identifier(target_player_id, 'pl')}, player_id)
+
     def __init__(self, server, timeout=5.0):
         self.server = normalize_server(server)
         if not 0.1 <= timeout <= 30:

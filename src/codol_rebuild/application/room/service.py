@@ -29,6 +29,36 @@ class RoomSession:
         self._members_pending = None
         self._room_generation = 0
         self._members_generation = 0
+        self._kick_pending = None
+        self._kick_generation = 0
+
+    def begin_kick(self, room_id, target_player_id):
+        """串行提交踢人；不在客户端提前移除成员，也不自动重试写请求。"""
+        if self._closed or self._pending is not None or self._kick_pending is not None:
+            return False
+        self._kick_generation = self._room_generation
+        self._kick_pending = self._executor.submit(self._execute_kick, room_id, target_player_id)
+        return True
+
+    def _execute_kick(self, room_id, target_player_id):
+        """提交菜单命令并加载返回成员资料，权限由服务端判断。"""
+        try:
+            record = self._record
+            data = self._gateway.kick(record.player_id, room_id, target_player_id)
+            self._load_profiles(data, record.player_id)
+            return Completion('kick', data=data)
+        except RoomError as error:
+            return Completion('kick', error=error)
+        except (KeyError, TypeError, ValueError) as error:
+            return Completion('kick', error=RoomError('INVALID_RESPONSE', '踢人响应无效：'+str(error)))
+
+    def poll_kick(self):
+        """仅交付当前房间代次的完成结果。"""
+        if self._kick_pending is None or not self._kick_pending.done():
+            return None
+        pending, self._kick_pending = self._kick_pending, None
+        result = pending.result()
+        return result if self._kick_generation == self._room_generation else Completion('kick_cancelled')
 
     def begin(self, operation: str, username: str, *, max_players: int = 4,
               password: str | None = None, settings: dict | None = None,

@@ -51,6 +51,9 @@ class IdentityStore(Protocol):
 
 class Gateway(Protocol):
     """玩家业务通信端口；所有方法在后台串行执行。"""
+    def kick(self, player_id: str, room_id: str, target_player_id: str) -> dict:
+        """以房主身份踢出目标，返回服务端确认的房间快照。"""
+        ...
     def join(self, player_id: str, room_id: str, username: str,
              password: str | None, profile: dict | None = None) -> dict:
         """加入指定房间并返回服务端权威成员与设置快照。"""
@@ -147,6 +150,14 @@ class RoomPort(Protocol):
 
     def cancel_list(self) -> None:
         """取消列表发布，并在当前分页请求结束后停止继续查询。"""
+        ...
+
+    def begin_kick(self, room_id: str, target_player_id: str) -> bool:
+        """提交当前房间踢人命令；重复请求或主流程忙碌时拒绝。"""
+        ...
+
+    def poll_kick(self) -> Completion | None:
+        """消费踢人完成结果；离房后丢弃旧房间的结果。"""
         ...
 
     def close(self) -> None:

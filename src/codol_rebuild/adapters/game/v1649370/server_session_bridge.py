@@ -193,6 +193,8 @@ def build_tick(entry, state, ready, preview_entry, room_entries, list_publish=No
     emit('c705'); word(state+36); word(0)
     if 'settings_apply' in room_entries:
         trap('realtime')
+        if 'member_menu' in room_entries:
+            emit('83e4f0'); call(room_entries['member_menu']); emit('8be5')
         if 'members_apply' in room_entries:
             emit('833d'); word(state+52); emit('00')
             branch('0f84', 'members_done')
@@ -275,6 +277,7 @@ class ServerSessionBridge:
         self.members_apply = None
         self.applying_members = False
         self.member_profiles = {}
+        self.member_menu = None
 
     def allocate(self):
         """在已暂停的初始化边分配独立通信页。"""
@@ -319,12 +322,20 @@ class ServerSessionBridge:
             checked_write(self.process, patch['va'], patch['after'])
         room_plan = {**room_plan, 'entries': {**room_plan['entries'], **join_plan['entries'],
                                             'members_apply': self.members_apply}}
+        from codol_rebuild.adapters.game.v1649370.room_member_menu import RoomMemberMenu
+        self.member_menu = RoomMemberMenu(self.process, self.port,
+            lambda: (self.current_room_id, self.is_owner, self.player_id,
+                     [m['playerId'] for m in self.join_snapshot[1]] if self.join_snapshot else []),
+            self.record)
+        menu_traps, menu_publish = self.member_menu.install()
+        room_plan['entries']['member_menu'] = menu_publish
         plan = build_tick(entry, self.state, ready, preview_entry, room_plan['entries'], publisher)
         if len(plan['code']) > 4096:
             raise ValueError('联机帧桥超出代码页')
         checked_write(self.process, entry, plan['code'])
         self.process.executable(entry, 4096)
         self.traps = {**room_plan['traps'], **plan['traps'], **self.room_list.traps, **join_plan['traps']}
+        self.traps.update(menu_traps)
         self.profile_query = member_profile.ProfileQueryBridge(
             self.process, lambda: {hashlib.sha256(key.encode('utf-8')).digest()[:8]: value
                                    for key, value in self.member_profiles.items()})
@@ -374,6 +385,10 @@ class ServerSessionBridge:
         thread, ctx = self.process.context(event.tid)
         try:
             phase = self.traps[address]
+            if phase in ('menu_query', 'menu_kick'):
+                self.member_menu.handle(phase, ctx)
+                self.process.set_context(thread, ctx)
+                return
             frame = struct.unpack_from('<I', ctx, 196)[0]
             if phase in ('profile_query', 'profile_initialized'):
                 self.profile_query.handle(phase, ctx)
@@ -654,6 +669,10 @@ class ServerSessionBridge:
         """主线程统一消费应用层事件，按类型分发原生回显。"""
         if self.pending is not None or self.join_cleanup:
             return
+        if self.member_menu is not None:
+            snapshot = self.member_menu.poll()
+            if snapshot is not None and snapshot['roomId'] == self.current_room_id:
+                self._apply_room_members(snapshot)
         event = self.port.poll_event()
         if event is None:
             return
