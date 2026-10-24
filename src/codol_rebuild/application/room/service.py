@@ -1,6 +1,7 @@
 """房间用例编排：后台串行请求、身份保存和不确定写入恢复。"""
 import threading
 import time
+from copy import deepcopy
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from codol_rebuild.application.room.contracts import (
@@ -25,10 +26,13 @@ class RoomSession:
         self._list_pending = None
         self._list_cancel = threading.Event()
         self._list_request = None
+        self._members_pending = None
+        self._room_generation = 0
+        self._members_generation = 0
 
     def begin(self, operation: str, username: str, *, max_players: int = 4,
               password: str | None = None, settings: dict | None = None,
-              room_id: str | None = None) -> bool:
+              room_id: str | None = None, profile: dict | None = None) -> bool:
         """提交单个用例，重复点击不会重复发送请求。
 
         设置同步与主流程（登录/创建/退出）互不阻塞：原生改设置在本地
@@ -46,8 +50,10 @@ class RoomSession:
             return False
         if operation not in ('login', 'create', 'join', 'leave'):
             raise ValueError('未知联机用例')
+        if operation in ('create', 'join', 'leave'):
+            self._room_generation += 1
         self._pending = self._executor.submit(self._execute, operation, username,
-                                              max_players, password, settings, room_id)
+                                              max_players, password, settings, room_id, deepcopy(profile))
         return True
 
     def poll(self) -> Completion | None:
@@ -71,12 +77,49 @@ class RoomSession:
         """统一消费实时消息，按类型交给对应业务处理函数。"""
         if self._closed or self._realtime is None or self._pending is not None:
             return None
+        if self._members_pending is not None:
+            if not self._members_pending.done():
+                return None
+            pending, self._members_pending = self._members_pending, None
+            result = pending.result()
+            if self._members_generation != self._room_generation:
+                return None
+            if result.error is not None:
+                return result
+            if (result.data is not None and self._record is not None
+                    and result.data['roomId'] == self._record.room_id):
+                return result
+            return None
         event = self._realtime.poll_event()
         if event is None:
             return None
-        handlers = {'room_settings_updated': self._handle_room_settings_updated}
+        handlers = {'room_settings_updated': self._handle_room_settings_updated,
+                    'room_members_updated': self._handle_room_members_updated}
         handler = handlers.get(event['type'])
         return handler(event['payload']) if handler is not None else None
+
+    def _handle_room_members_updated(self, payload):
+        """成员通知只触发后台权威快照查询，迟到通知不能直接改写本地成员。"""
+        if self._record is not None and self._record.room_id == payload.get('roomId'):
+            self._members_generation = self._room_generation
+            self._members_pending = self._executor.submit(self._refresh_members, self._record)
+        return None
+
+    def _refresh_members(self, record):
+        """在业务工作线程读取成员与档案，原生适配只消费完成结果。"""
+        try:
+            data = self._gateway.room_detail(record.player_id, record.room_id)
+            self._load_profiles(data, record.player_id)
+            return Completion('room_members_updated', data=data)
+        except RoomError as error:
+            return Completion('room_members_updated', error=error)
+
+    def _load_profiles(self, data, player_id):
+        """按成员读取完整资料；原生缺失资料不能用其他玩家的数据代替。"""
+        for member in data.get('members', []):
+            if member.get('profileAvailable'):
+                member['profile'] = self._gateway.member_profile(
+                    player_id, data['roomId'], member['playerId'])
 
     def _handle_room_settings_updated(self, payload) -> Completion | None:
         """交付当前房间设置，离房后或其他房间的设置不再回显。"""
@@ -197,7 +240,7 @@ class RoomSession:
         self._is_owner = None
         return {'left': True}
 
-    def _join(self, room_id, username, password):
+    def _join(self, room_id, username, password, profile=None):
         """记录目标后提交加入；响应丢失时查询成员确认，未确认保留退出恢复记录。"""
         if not valid_room_id(room_id):
             raise RoomError('INVALID_ROOM_ID', '请选择有效房间')
@@ -208,7 +251,8 @@ class RoomSession:
         previous = self._record
         self._save(replace(previous, room_id=room_id, uncertain_join=True))
         try:
-            data = self._gateway.join(previous.player_id, room_id, username, password)
+            data = self._gateway.join(previous.player_id, room_id, username, password,
+                                      **({'profile': profile} if profile is not None else {}))
         except RoomError as error:
             if not error.uncertain:
                 self._save(previous)
@@ -226,7 +270,7 @@ class RoomSession:
         self._is_owner = data.get('ownerPlayerId') == previous.player_id
         return data
 
-    def _execute(self, operation, username, max_players, password, settings=None, room_id=None):
+    def _execute(self, operation, username, max_players, password, settings=None, room_id=None, profile=None):
         try:
             if operation == 'login':
                 self._login(username)
@@ -238,7 +282,7 @@ class RoomSession:
             elif operation == 'leave':
                 data = self._leave()
             elif operation == 'join':
-                data = self._join(room_id, username, password)
+                data = self._join(room_id, username, password, profile)
             else:
                 if type(max_players) is not int or not 1 <= max_players <= 255:
                     raise RoomError('INVALID_MAX_PLAYERS', '房间人数无效')
@@ -246,13 +290,16 @@ class RoomSession:
                 self._save(replace(self._record, uncertain_create=True))
                 try:
                     data = self._gateway.create(self._record.player_id, username,
-                                                max_players, password, settings)
+                                                max_players, password, settings,
+                                                **({'profile': profile} if profile is not None else {}))
                 except RoomError as error:
                     if not error.uncertain:
                         self._save(replace(self._record, uncertain_create=False))
                     raise
                 self._save(replace(self._record, room_id=data['roomId'], uncertain_create=False))
                 self._is_owner = True
+            if operation in ('create', 'join'):
+                self._load_profiles(data, self._record.player_id)
             return Completion(operation, data=data)
         except RoomError as error:
             return Completion(operation, error=error)

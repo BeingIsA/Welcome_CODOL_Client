@@ -52,7 +52,7 @@ class IdentityStore(Protocol):
 class Gateway(Protocol):
     """玩家业务通信端口；所有方法在后台串行执行。"""
     def join(self, player_id: str, room_id: str, username: str,
-             password: str | None) -> dict:
+             password: str | None, profile: dict | None = None) -> dict:
         """加入指定房间并返回服务端权威成员与设置快照。"""
         ...
 
@@ -61,8 +61,13 @@ class Gateway(Protocol):
         ...
 
     def create(self, player_id: str, username: str, max_players: int,
-               password: str | None, settings: dict | None = None) -> dict:
+               password: str | None, settings: dict | None = None,
+               profile: dict | None = None) -> dict:
         """创建房间并返回成员快照；settings 为可选的对局设置快照。"""
+        ...
+
+    def member_profile(self, player_id: str, room_id: str, member_id: str) -> dict | None:
+        """读取同房成员入房时提交的完整档案，缺少快照时返回 None。"""
         ...
 
     def update_settings(self, player_id: str, room_id: str, settings: dict) -> dict:
@@ -124,7 +129,7 @@ class RoomPort(Protocol):
 
     def begin(self, operation: str, username: str, *, max_players: int = 4,
               password: str | None = None, settings: dict | None = None,
-              room_id: str | None = None) -> bool:
+              room_id: str | None = None, profile: dict | None = None) -> bool:
         """发起登录、创建、加入、退出或同步设置；有未消费操作时返回 False。"""
         ...
 

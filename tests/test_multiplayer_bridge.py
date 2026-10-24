@@ -24,6 +24,27 @@ class Memory:
         self.write(address, struct.pack('<I', value))
 
 
+def prepare_profile(memory, adapter):
+    """为房间请求提供合法的固定版本双档案及已采集展示包。"""
+    from codol_rebuild.adapters.game.v1649370 import member_profile, layout
+    adapter.profile_buffer = 0x28000000
+    memory.write(adapter.profile_buffer, bytes(0x140))
+    for address, identity in ((member_profile.PUBLIC, layout.PUBLIC_IDENTITY),
+                              (member_profile.SECURE, layout.SECURE_IDENTITY)):
+        memory.write(address+0x90, struct.pack('<II', identity['version'], identity['checksum'])
+                     +bytes(layout.BUFFER_CAPACITY-8))
+
+
+def created_snapshot():
+    """创建完成替身使用完整服务端契约。"""
+    settings = {key: 0 for key in bridge.SETTING_SCALARS}
+    settings.update(mode='td', map='mp_crash')
+    return {'roomId': 'rm_test', 'ownerPlayerId': 'pl_me', 'ownerDisplayName': '测试玩家',
+            'maxPlayers': 4, 'playerCount': 1, 'settings': settings,
+            'members': [{'playerId': 'pl_me', 'displayName': '测试玩家', 'isOwner': True,
+                         'team': 'tf141', 'readyState': '准备中'}]}
+
+
 def write_full_config(memory, room, maximum=6, password=None, mode='', map_name='',
                       scalars=None):
     """构造一份完整的 0x70 原生房间配置（含字符串与标量）。"""
@@ -67,7 +88,7 @@ class SettingsChannelPort:
     def poll(self):
         if self.main:
             self.main = False
-            return Completion('create', data={'roomId': 'rm_test'})
+            return Completion('create', data=created_snapshot())
         if not self.busy:
             return None
         self.busy = False
@@ -86,7 +107,11 @@ class MultiplayerBridgeTests(unittest.TestCase):
         adapter.install_tick(0x32000000, 0x33000000, room_plan)
         patch = next(capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32).disasm(
             process.read(JOIN_INPUT, 5), JOIN_INPUT))
-        self.assertEqual(adapter.traps[int(patch.op_str, 16)], 'join_input')
+        target = int(patch.op_str, 16)
+        self.assertEqual(adapter.traps[target+5], 'join_input')
+        capture_call = next(capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32).disasm(
+            process.read(target, 5), target))
+        self.assertEqual(int(capture_call.op_str, 16), adapter.profile_capture)
         self.assertEqual(adapter.ownership, 0x31000000)
 
     def join_fixture(self):
@@ -101,6 +126,7 @@ class MultiplayerBridgeTests(unittest.TestCase):
         port = Mock()
         port.begin.return_value = True
         adapter = bridge.ServerSessionBridge(memory, port, Mock())
+        prepare_profile(memory, adapter)
         adapter.state = state
         adapter.join_scratch = 0x26000000
         adapter.player_id = 'pl_me'
@@ -174,6 +200,26 @@ class MultiplayerBridgeTests(unittest.TestCase):
         adapter._apply_room_settings(data)
         self.assertEqual(memory.data, before)
 
+    def test_member_snapshot_uses_server_team_ready_and_owner(self):
+        """本机排首槽不影响服务端阵营；回显不会产生用户设置命令。"""
+        memory, adapter, data, room, session = self.join_fixture()
+        data['members'][0].update(team='tf141', readyState='准备中')
+        data['members'][1].update(team='scar', readyState='准备中')
+        adapter._prepare_join_snapshot(data)
+        memory.word(room+0x1C, session)
+        memory.word(session+0x25C8, room)
+        memory.write(session, b'\x01')
+        adapter.pending = ('join', room, session)
+        adapter._publish_join_snapshot()
+        local, owner = room+0xE368, room+0xE368+0x1D0
+        self.assertEqual(bridge.u32(memory.read, local+0x88), 1)
+        self.assertEqual(bridge.u32(memory.read, owner+0x88), 2)
+        self.assertEqual(memory.read(local+0x90, 1), b'\0')
+        self.assertEqual(memory.read(owner+0x90, 1), b'\0')
+        self.assertEqual(memory.read(local+0x92, 1), b'\0')
+        self.assertEqual(memory.read(owner+0x92, 1), b'\x01')
+        adapter.port.begin.assert_not_called()
+
     def test_realtime_dispatch_routes_settings_and_ignores_other_events(self):
         memory, adapter, data, room, session = self.join_fixture()
         adapter.pending = None
@@ -210,7 +256,8 @@ class MultiplayerBridgeTests(unittest.TestCase):
         with mock.patch.object(bridge, 'username', return_value='队友'):
             adapter._request_join(frame)
             adapter._request_join(frame)
-        adapter.port.begin.assert_called_once_with('join', '队友', room_id='rm_target', password='密码')
+        adapter.port.begin.assert_called_once_with('join', '队友', room_id='rm_target', password='密码',
+            profile=bridge.member_profile.capture_snapshot(memory.read, adapter.profile_buffer))
 
     def test_cancelled_join_cleans_remote_membership_without_native_callback(self):
         memory, adapter, data, room, session = self.join_fixture()
@@ -462,11 +509,16 @@ class MultiplayerBridgeTests(unittest.TestCase):
                 for trap in plan['traps']:
                     self.assertIn(trap, starts)
                     self.assertEqual(plan['code'][trap-base], 0xcc)
-            self.assertEqual(set(room['traps'].values()), {'create', 'leave'})
+            self.assertEqual(set(room['traps'].values()), {'create', 'leave', 'member_initialized'})
 
     def setup_bridge(self):
         process, port = Memory(), Mock()
         value = bridge.ServerSessionBridge(process, port, Mock())
+        prepare_profile(process, value)
+        value.player_id = 'pl_me'
+        value.join_scratch = 0x29000000
+        process.word(bridge.LANGUAGE, 0x25000000)
+        process.word(bridge.DIRECT_STRING_MODE, 1)
         value.state = 0x20000000
         process.write(value.state, bytes(4096))
         value.login_started = value.login_done = True

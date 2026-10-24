@@ -43,7 +43,8 @@ def validate_room_contract(read):
             raise ValueError(f'本地房间 ABI 不匹配：{address:#x}')
 
 
-def build_room_adapter(entry: int, state: int, ready: int, *, deferred=False, identity_address=None) -> dict:
+def build_room_adapter(entry: int, state: int, ready: int, *, deferred=False, identity_address=None,
+                       profile_capture=None) -> dict:
     """生成代码与补丁计划；state 为独立的12字节所有权/发布重入记录。"""
     for address in (entry, state, ready):
         if type(address) is not int or not 0x10000 <= address <= 0xffffe000:
@@ -87,6 +88,8 @@ def build_room_adapter(entry: int, state: int, ready: int, *, deferred=False, id
     emit('3b7b1c'); branch('0f85', 'create_original')
     emit('399fc8250000'); branch('0f85', 'create_original')
     if deferred:
+        if profile_capture is not None:
+            native('e8', profile_capture)
         traps[entry+len(code)] = 'create'
         emit('cc 619d b001 c3')  # 原生任务保持等待，完成由主线程帧回调投递。
         label('create_complete'); emit('9c60')
@@ -138,6 +141,9 @@ def build_room_adapter(entry: int, state: int, ready: int, *, deferred=False, id
     owned('member_done')
     # owned 留 EAX=session。成员、会话房主和会话成员使用相同64位标识。
     emit('8b5020 899168e30000 8b5024 89916ce30000')
+    if deferred:
+        traps[entry+len(code)] = 'member_initialized'
+        emit('cc')
     label('member_done'); emit('619d c20400')
 
     label('player_id')
@@ -249,7 +255,7 @@ def validate_join_contract(read):
             raise ValueError(f'加入房间 ABI 不匹配：{address:#x}')
 
 
-def build_join_adapter(entry, state, scratch):
+def build_join_adapter(entry, state, scratch, profile_capture=None):
     """生成加入专用主线程桩；成员数据由暂停点发布，通知沿原生监听器。"""
     code, labels, refs, traps = bytearray(), {}, [], {}
     def emit(value): code.extend(bytes.fromhex(value))
@@ -263,6 +269,8 @@ def build_join_adapter(entry, state, scratch):
         traps[entry+len(code)] = name; emit('cc')
 
     label('input')
+    if profile_capture is not None:
+        call(profile_capture)
     trap('join_input')
     # 在线非本适配路径继续原数字转换；适配路径由处理器跳到 AS 公共清理。
     emit('e9'); word((0xC3F316-entry-len(code)-4) & 0xffffffff)

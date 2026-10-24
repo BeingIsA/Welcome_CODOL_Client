@@ -144,7 +144,8 @@ class GameSessionBridge:
                 self.multiplayer.allocate()
             room = build_room_adapter(room_entry, room_state, profile_data + 72,
                                       deferred=self.multiplayer is not None,
-                                      identity_address=self.multiplayer.state+24 if self.multiplayer else None)
+                                      identity_address=self.multiplayer.state+24 if self.multiplayer else None,
+                                      profile_capture=self.multiplayer.profile_capture if self.multiplayer else None)
             if len(room['code']) > 4096:
                 raise ValueError('Local room adapter exceeds allocation')
             self.process.write(room_entry, room['code'])

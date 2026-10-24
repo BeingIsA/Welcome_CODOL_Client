@@ -10,6 +10,7 @@ from codol_rebuild.adapters.game.v1649370.player_name import native_name, LANGUA
 from codol_rebuild.adapters.game.v1649370.room import (
     JOIN_ERROR_OFFSET, SETTINGS_READY_OFFSET, SETTINGS_ROOM_OFFSET,
 )
+from codol_rebuild.adapters.game.v1649370 import member_profile
 
 ROOM_POINTER = 0x82E13FC
 POLL, ACTION, ROOM, SESSION, LEAVE_ARG, LOGIN, IDENTITY = 0, 4, 8, 12, 16, 20, 24
@@ -192,6 +193,13 @@ def build_tick(entry, state, ready, preview_entry, room_entries, list_publish=No
     emit('c705'); word(state+36); word(0)
     if 'settings_apply' in room_entries:
         trap('realtime')
+        if 'members_apply' in room_entries:
+            emit('833d'); word(state+52); emit('00')
+            branch('0f84', 'members_done')
+            emit('c705'); word(state+52); word(0)
+            emit('83e4f0'); call(room_entries['members_apply']); emit('8be5')
+            trap('members_applied')
+            label('members_done')
         emit('833d'); word(state+SETTINGS_READY_OFFSET); emit('00')
         branch('0f84', 'poll_command')
         emit('c705'); word(state+SETTINGS_READY_OFFSET); word(0)
@@ -261,6 +269,12 @@ class ServerSessionBridge:
         self.player_id = None
         self.is_owner = True
         self.current_room_id = None
+        self.profile_capture = None
+        self.profile_buffer = None
+        self.members_buffer = None
+        self.members_apply = None
+        self.applying_members = False
+        self.member_profiles = {}
 
     def allocate(self):
         """在已暂停的初始化边分配独立通信页。"""
@@ -270,6 +284,21 @@ class ServerSessionBridge:
         struct.pack_into('<I', data, POLL, 1)
         struct.pack_into('<IIII', data, UNDEFINED, 0xffffffff, 0xffffffff, 0, 1)
         checked_write(self.process, self.state, bytes(data))
+        for address, expected in member_profile.CAPTURE_CONTRACT.items():
+            if self.process.read(address, len(expected)) != expected:
+                raise ValueError(f'玩家资料采集 ABI 不匹配：{address:#x}')
+        self.profile_buffer = self.process.allocate(4096)
+        self.profile_capture = self.process.allocate(4096)
+        checked_write(self.process, self.profile_capture,
+                      member_profile.build_capture(self.profile_capture, self.profile_buffer))
+        self.process.executable(self.profile_capture, 4096)
+        if self.process.read(0x7CBAB0, 6) != bytes.fromhex('558bec83e4f8'):
+            raise ValueError('玩家装备接收 ABI 不匹配')
+        self.members_buffer = self.process.allocate(4096)
+        self.members_apply = self.process.allocate(4096)
+        checked_write(self.process, self.members_apply,
+                      member_profile.build_member_publish(self.members_apply, self.members_buffer))
+        self.process.executable(self.members_apply, 4096)
 
     def install_tick(self, ready, preview_entry, room_plan):
         """安装主线程完成调度；返回替换原预览 CALL 的新入口。"""
@@ -283,18 +312,23 @@ class ServerSessionBridge:
         self.ownership = room_plan['ownership']
         self.join_scratch = self.process.allocate(4096)
         join_entry = self.process.allocate(4096)
-        join_plan = build_join_adapter(join_entry, self.state, self.join_scratch)
+        join_plan = build_join_adapter(join_entry, self.state, self.join_scratch, self.profile_capture)
         checked_write(self.process, join_entry, join_plan['code'])
         self.process.executable(join_entry, 4096)
         for patch in join_plan['patches']:
             checked_write(self.process, patch['va'], patch['after'])
-        room_plan = {**room_plan, 'entries': {**room_plan['entries'], **join_plan['entries']}}
+        room_plan = {**room_plan, 'entries': {**room_plan['entries'], **join_plan['entries'],
+                                            'members_apply': self.members_apply}}
         plan = build_tick(entry, self.state, ready, preview_entry, room_plan['entries'], publisher)
         if len(plan['code']) > 4096:
             raise ValueError('联机帧桥超出代码页')
         checked_write(self.process, entry, plan['code'])
         self.process.executable(entry, 4096)
         self.traps = {**room_plan['traps'], **plan['traps'], **self.room_list.traps, **join_plan['traps']}
+        self.profile_query = member_profile.ProfileQueryBridge(
+            self.process, lambda: {hashlib.sha256(key.encode('utf-8')).digest()[:8]: value
+                                   for key, value in self.member_profiles.items()})
+        self.traps.update(self.profile_query.install())
         return entry
 
     def install_settings_detours(self):
@@ -341,6 +375,10 @@ class ServerSessionBridge:
         try:
             phase = self.traps[address]
             frame = struct.unpack_from('<I', ctx, 196)[0]
+            if phase in ('profile_query', 'profile_initialized'):
+                self.profile_query.handle(phase, ctx)
+                self.process.set_context(thread, ctx)
+                return
             if phase == 'join_input':
                 self._request_join(frame)
                 # 被替换 CALL 的返回地址及 strtoull 的三个实参均由此清除。
@@ -356,6 +394,11 @@ class ServerSessionBridge:
                 self._initialize_join_room()
             elif phase == 'join_snapshot':
                 self._publish_join_snapshot()
+            elif phase == 'member_initialized':
+                if self.pending and self.pending[0] == 'create' and self.join_snapshot:
+                    self._publish_join_snapshot()
+            elif phase == 'members_applied':
+                self.applying_members = False
             elif phase == 'join_allocation_failed':
                 self._failure('join', '原生房间会话不可用，请重试')
                 self.join_cleanup = self.port.begin('leave', username(self.process.read))
@@ -387,6 +430,10 @@ class ServerSessionBridge:
                         raise ValueError('服务端离房成功，但原生房间未清理')
                     if action == 3:
                         self.current_room_id = None
+                        self.member_profiles = {}
+                        self.join_snapshot = None
+                        self.applying_members = False
+                        self._word(52, 0)
                     if action == 5 and not self._valid_room(room, session):
                         raise ValueError('服务端入房成功，但原生房间未完成')
                     self.record({'multiplayer_native_completed': operation, 'success': action in (1, 3, 5)})
@@ -422,22 +469,28 @@ class ServerSessionBridge:
             password = native_string(read, u32(read, frame+28)) or None
             if self.room_list is not None:
                 self.room_list.cancel()
-            if not self.port.begin('join', username(read), room_id=room_id, password=password):
+            profile = member_profile.capture_snapshot(read, self.profile_buffer)
+            if not self.port.begin('join', username(read), room_id=room_id, password=password,
+                                   profile=profile):
                 raise ValueError('已有服务端请求正在处理，请稍后重试')
         except (ValueError, OSError) as error:
             self._failure('join', str(error))
 
-    def _prepare_join_snapshot(self, data):
+    def _prepare_join_snapshot(self, data, joining=True):
         """先校验整个快照与原生容量，再允许主线程创建会话。"""
         import math
         from codol_rebuild.adapters.game.v1649370.room import MEMBER_CAPACITY
         read = self.process.read
         room = self.pending[1]
-        if u32(read, ROOM_POINTER) != room or u32(read, room+0x1C):
+        if u32(read, ROOM_POINTER) != room or (joining and u32(read, room+0x1C)):
             raise ValueError('等待入房期间房间对象已改变')
         members = data['members']
         if not 1 <= len(members) <= MEMBER_CAPACITY:
             raise ValueError(f'当前原生客户端最多支持 {MEMBER_CAPACITY} 个成员')
+        for member in members:
+            if (member.get('team', 'tf141') not in ('tf141', 'scar', 'spectator')
+                    or member.get('readyState', '准备中') not in ('准备中', '已准备')):
+                raise ValueError('成员阵营或准备状态无效')
         if not any(m['playerId'] == self.player_id for m in members):
             raise ValueError('入房快照缺少本机玩家')
         # 本机槽排第一，以复用原生档案与头像身份映射；房主由独立 owner ID 决定。
@@ -473,6 +526,11 @@ class ServerSessionBridge:
                 raise ValueError('成员昵称超出原生显示容量')
             names.append(raw.ljust(64, b'\0'))
         self.join_snapshot = (data, members, ids, names, scalars)
+        profiles = {}
+        for member in members:
+            if member.get('profile') is not None:
+                profiles[member['playerId']] = member_profile.decode_snapshot(member['profile'])
+        self.member_profiles = profiles
         checked_write(self.process, self.join_scratch, bytes(strings))
 
     def _initialize_join_room(self):
@@ -492,20 +550,43 @@ class ServerSessionBridge:
         owner_index = next(i for i, m in enumerate(members) if m['playerId'] == data['ownerPlayerId'])
         self.is_owner = data['ownerPlayerId'] == self.player_id
         # 原生 session 的成员摘要为 0x60 字节；房间 UI 的成员记录为 0x1D0 字节。
-        checked_write(self.process, session+0x10, bytes(0x30+len(members)*0x60))
+        if self.pending[0] != 'members':
+            checked_write(self.process, session+0x10, bytes(0x30+len(members)*0x60))
         checked_write(self.process, session+0x18, struct.pack('<I', len(members)))
         checked_write(self.process, session+0x20, ids[owner_index])
         checked_write(self.process, room+0x338, ids[owner_index])
         for index, (identity, name) in enumerate(zip(ids, names)):
             checked_write(self.process, room+0xE368+index*0x1D0, identity+name)
             checked_write(self.process, session+0x40+index*0x60, identity+name)
+            member = members[index]
+            native_team = {'tf141': 2, 'scar': 1, 'spectator': 6}[member.get('team', 'tf141')]
+            address = room+0xE368+index*0x1D0
+            checked_write(self.process, address+0x88, struct.pack('<I', native_team))
+            checked_write(self.process, address+0x90, bytes([member.get('readyState') == '已准备']))
+            checked_write(self.process, address+0x92, bytes([member['playerId'] == data['ownerPlayerId']]))
         checked_write(self.process, room+0x105D8,
                       struct.pack('<IIII', len(members), len(members), 0, data['maxPlayers']-len(members)))
-        checked_write(self.process, room+0x278, bytes([int(self.is_owner), 1, 0]))
-        checked_write(self.process, room+0x27C, bytes(4))
-        checked_write(self.process, room+0x281, bytes(7))
-        checked_write(self.process, room+0x38711, b'\x01')
-        self.record({'multiplayer': 'join', 'success': True, 'roomId': data['roomId'],
+        checked_write(self.process, room+0x278, bytes([int(self.is_owner)]))
+        if self.pending[0] != 'members':
+            checked_write(self.process, room+0x279, bytes([1, 0]))
+            checked_write(self.process, room+0x27C, bytes(4))
+            checked_write(self.process, room+0x281, bytes(7))
+            checked_write(self.process, room+0x38711, b'\x01')
+        # 只在明确的服务端回显期间抑制成员刷新派生的设置提交。
+        self.applying_members = True
+        packets = []
+        for member, identity in zip(members, ids):
+            profile = self.member_profiles.get(member['playerId'])
+            if (profile is not None and member['playerId'] != self.player_id
+                    and member.get('team') in ('tf141', 'scar')):
+                packet = bytearray(profile[member['team']])
+                packet[:8] = identity
+                packets.append(bytes(packet))
+        if self.members_buffer is not None:
+            checked_write(self.process, self.members_buffer,
+                          struct.pack('<IIII', room, len(packets), 0, 0)+b''.join(packets))
+            self._word(52, 1)
+        self.record({'multiplayer': self.pending[0], 'success': True, 'roomId': data['roomId'],
                      'members': len(members)})
 
     def _request(self, operation, frame):
@@ -532,7 +613,8 @@ class ServerSessionBridge:
                 maximum, password, settings = room_options(read, room)
                 submitted = self.port.begin(operation, username(read),
                                             max_players=maximum, password=password,
-                                            settings=settings)
+                                            settings=settings,
+                                            profile=member_profile.capture_snapshot(read, self.profile_buffer))
             else:
                 submitted = self.port.begin(operation, username(read))
             if not submitted:
@@ -543,7 +625,7 @@ class ServerSessionBridge:
     def _submit_settings(self, config):
         """逐次提交设置，不按内容去重；原生提交继续执行，失败只记录。"""
         try:
-            if not self.is_owner:
+            if not self.is_owner or self.applying_members:
                 return
             settings = read_settings(self.process.read, config)
             if self.pending is not None:
@@ -571,10 +653,29 @@ class ServerSessionBridge:
         event = self.port.poll_event()
         if event is None:
             return
-        handlers = {'room_settings_updated': self._apply_room_settings}
+        if event.error is not None:
+            self.record({'multiplayer_event': event.operation, 'error': str(event.error)})
+            return
+        handlers = {'room_settings_updated': self._apply_room_settings,
+                    'room_members_updated': self._apply_room_members}
         handler = handlers.get(event.operation)
         if handler is not None:
             handler(event.data)
+
+    def _apply_room_members(self, payload):
+        """应用层已取回完整快照；主线程只更新当前有效房间的展示副本。"""
+        if payload is None or payload['roomId'] != self.current_room_id:
+            return
+        room = u32(self.process.read, ROOM_POINTER)
+        session = u32(self.process.read, room+0x1C) if room >= 0x10000 else 0
+        if not self._valid_room(room, session):
+            return
+        self.pending = ('members', room, session)
+        try:
+            self._prepare_join_snapshot(payload, joining=False)
+            self._publish_join_snapshot()
+        finally:
+            self.pending = None
 
     def _apply_room_settings(self, payload):
         """仅准备原生设置回显，不取消息、不提交业务请求。"""
@@ -683,6 +784,7 @@ class ServerSessionBridge:
         else:
             self.is_owner = result.operation == 'create'
             if result.operation == 'create':
+                self._prepare_join_snapshot(result.data, joining=False)
                 self.current_room_id = result.data['roomId']
             self._word(ACTION, 1 if result.operation == 'create' else 3)
             self.record({'multiplayer': result.operation, 'success': True,

@@ -98,10 +98,12 @@ class HttpGateway:
             raise RoomError('INVALID_RESPONSE', str(error), uncertain=True) from error
         return data
 
-    def create(self, player_id, username, max_players, password, settings=None):
+    def create(self, player_id, username, max_players, password, settings=None, profile=None):
         payload = {'displayName': username, 'maxPlayers': max_players, 'password': password}
         if settings is not None:
             payload['settings'] = _settings_payload(settings)
+        if profile is not None:
+            payload['profile'] = profile
         data = self._request('POST', '/api/v1/rooms', payload, player_id)
         try:
             _identifier(data.get('roomId'), 'rm')
@@ -116,11 +118,12 @@ class HttpGateway:
             raise RoomError('INVALID_RESPONSE', str(error), uncertain=True) from error
         return data
 
-    def join(self, player_id, room_id, username, password):
+    def join(self, player_id, room_id, username, password, profile=None):
         """只提交一次加入；响应损坏时保留可能已经入房的语义。"""
         room_id = _identifier(room_id, 'rm')
         data = self._request('POST', f'/api/v1/rooms/{room_id}/join',
-                             {'displayName': username, 'password': password}, player_id)
+                             {'displayName': username, 'password': password,
+                              **({'profile': profile} if profile is not None else {})}, player_id)
         try:
             validate_room_snapshot(data, room_id)
             if not any(m['playerId'] == player_id for m in data['members']):
@@ -149,6 +152,17 @@ class HttpGateway:
         except ValueError as error:
             raise RoomError('INVALID_RESPONSE', str(error)) from error
         return data
+
+    def member_profile(self, player_id, room_id, member_id):
+        """读取同房玩家的完整档案；只解码传输外形，不访问原生进程。"""
+        room_id = _identifier(room_id, 'rm')
+        member_id = _identifier(member_id, 'pl')
+        data = self._request('GET', f'/api/v1/rooms/{room_id}/members/{member_id}/profile',
+                             player_id=player_id)
+        if (data.get('roomId') != room_id or data.get('playerId') != member_id
+                or 'profile' not in data):
+            raise RoomError('INVALID_RESPONSE', '成员档案响应身份不匹配')
+        return data['profile']
 
     def leave(self, player_id, room_id):
         room_id = _identifier(room_id, 'rm')
