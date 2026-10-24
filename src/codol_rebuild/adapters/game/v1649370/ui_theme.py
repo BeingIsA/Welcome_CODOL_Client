@@ -13,6 +13,12 @@ MINI_TAG_OFFSET = 6649182
 MINI_TAG_BEFORE = bytes.fromhex('f10bf067d030ef01540067f069d0661ad1613bf06a47')
 MINI_TAG_AFTER = bytes.fromhex('f10bf067d030ef01540067f069d0661a27613bf06a47')
 
+# checkDLCMembers：等长移除独立的 showMsg 表达式（含参数及返回值 pop）。
+# 保留短路条件的全部跳转落点、提醒标志和成员计数，避免改变分支栈状态。
+MINI_WARNING_OFFSET = 5101244 + 166
+MINI_WARNING_BEFORE = bytes.fromhex('5dfe025dc80266c80266d9035dff0266ff0266800346fe020229')
+MINI_WARNING_AFTER = b'\x02' * len(MINI_WARNING_BEFORE)
+
 
 def replacements() -> list:
     """在主题控制器初始化时选择原版 SpaceStation（索引5）。
@@ -23,4 +29,5 @@ def replacements() -> list:
     replacement = (ORIGINAL_METHOD[:13] + b'\x24\x05' + b'\x02' * 6
                    + ORIGINAL_METHOD[21:])
     return [(METHOD_OFFSET, ORIGINAL_METHOD, replacement),
-            (MINI_TAG_OFFSET, MINI_TAG_BEFORE, MINI_TAG_AFTER)]
+            (MINI_TAG_OFFSET, MINI_TAG_BEFORE, MINI_TAG_AFTER),
+            (MINI_WARNING_OFFSET, MINI_WARNING_BEFORE, MINI_WARNING_AFTER)]

@@ -561,6 +561,10 @@ class ServerSessionBridge:
             member = members[index]
             native_team = {'tf141': 2, 'scar': 1, 'spectator': 6}[member.get('team', 'tf141')]
             address = room+0xE368+index*0x1D0
+            profile = self.member_profiles.get(member['playerId'])
+            if profile is not None:
+                for offset, raw in member_profile.member_summary(profile):
+                    checked_write(self.process, address+offset, raw)
             checked_write(self.process, address+0x88, struct.pack('<I', native_team))
             checked_write(self.process, address+0x90, bytes([member.get('readyState') == '已准备']))
             checked_write(self.process, address+0x92, bytes([member['playerId'] == data['ownerPlayerId']]))

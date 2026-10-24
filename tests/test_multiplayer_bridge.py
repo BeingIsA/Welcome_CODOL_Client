@@ -205,6 +205,17 @@ class MultiplayerBridgeTests(unittest.TestCase):
         memory, adapter, data, room, session = self.join_fixture()
         data['members'][0].update(team='tf141', readyState='准备中')
         data['members'][1].update(team='scar', readyState='准备中')
+        import base64
+        from test_member_profile import sample_profile
+        for index, member in enumerate(data['members']):
+            payload = sample_profile()
+            secure = bytearray(base64.b64decode(payload['secure']))
+            public = bytearray(base64.b64decode(payload['public']))
+            struct.pack_into('<ii', secure, 4879, index+3, 60+index)
+            for offset, value in zip((3854, 3846, 3842, 3850, 15527), range(101+index*10, 106+index*10)):
+                struct.pack_into('<i', public, offset, value)
+            payload.update(secure=base64.b64encode(secure).decode(), public=base64.b64encode(public).decode())
+            member['profile'] = payload
         adapter._prepare_join_snapshot(data)
         memory.word(room+0x1C, session)
         memory.word(session+0x25C8, room)
@@ -218,6 +229,10 @@ class MultiplayerBridgeTests(unittest.TestCase):
         self.assertEqual(memory.read(owner+0x90, 1), b'\0')
         self.assertEqual(memory.read(local+0x92, 1), b'\0')
         self.assertEqual(memory.read(owner+0x92, 1), b'\x01')
+        self.assertEqual(memory.read(local+0x98, 2), bytes((60, 4)))
+        self.assertEqual(memory.read(owner+0x98, 2), bytes((59, 3)))
+        self.assertEqual(memory.read(local+0xB2, 10), struct.pack('<5H', *range(111, 116)))
+        self.assertEqual(memory.read(owner+0xB2, 10), struct.pack('<5H', *range(101, 106)))
         adapter.port.begin.assert_not_called()
 
     def test_realtime_dispatch_routes_settings_and_ignores_other_events(self):

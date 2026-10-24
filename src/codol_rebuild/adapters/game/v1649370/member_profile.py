@@ -19,6 +19,26 @@ QUERY_SITE = 0x68D52A
 QUERY_BEFORE = bytes.fromhex('a1209de500')
 CONTAINER_SIZE = 0x22290
 
+# 固定版本 DDL 字节偏移；回归测试用原生捕获的 schema 校验。
+# 6236F0 的五个 getter 顺序对应房间成员 +B2 起的五个 uint16。
+CARD_FIELDS = (('cardTitle', 3854), ('cardIcon', 3846),
+               ('cardBackground', 3842), ('cardNameplate', 3850),
+               ('cardFrame', 15527))
+RANK_OFFSET = 4883
+PRESTIGE_OFFSET = 4879
+
+
+def member_summary(snapshot):
+    """将已校验的档案转换为房间悬停摘要，只返回待写入的值字段。"""
+    rank = struct.unpack_from('<i', snapshot['secure'], RANK_OFFSET)[0]
+    prestige = struct.unpack_from('<i', snapshot['secure'], PRESTIGE_OFFSET)[0]
+    # 与原生 50C390 相同：存档等级减一，负值回到零。
+    level_index = max(0, rank - 1)
+    cards = [struct.unpack_from('<i', snapshot['public'], offset)[0]
+             for _, offset in CARD_FIELDS]
+    return ((0x98, struct.pack('<BB', level_index & 0xff, prestige & 0xff)),
+            (0xB2, struct.pack('<5H', *(value & 0xffff for value in cards))))
+
 
 def build_query(entry, container, identity):
     """只接管远端资料来源，完成后回到原生转换及 cppShowClanMemberInfo 通知。"""

@@ -1,5 +1,6 @@
 """玩家资料格式与原生调用计划回归；静态测试不替代双客户端实机验收。"""
 import base64
+import json
 from pathlib import Path
 import struct
 import unittest
@@ -22,6 +23,25 @@ def sample_profile():
 
 
 class MemberProfileTests(unittest.TestCase):
+    def test_hover_summary_matches_captured_ddl_and_native_member_layout(self):
+        """用真实 schema 写入不同名片值，检查原生成员摘要需要的顺序。"""
+        from codol_rebuild.adapters.game.profile_format.fields import Fields
+        root = Path(__file__).parent/'fixtures/local-profile-capture'
+        public = Fields(json.loads((root/'playerdata/playerdata-schema.json').read_text(encoding='utf-8')))
+        secure = Fields(json.loads((root/'playersecuredata/playerdata-schema.json').read_text(encoding='utf-8')))
+        snapshot = {key: bytearray(value) for key, value in profile.decode_snapshot(sample_profile()).items()}
+        for (name, offset), value in zip(profile.CARD_FIELDS, (101, 202, 303, 404, 505)):
+            self.assertEqual(public.resolve(name), (0, 0, offset))
+            public.write(snapshot['public'], name, value)
+        self.assertEqual(secure.resolve('rank'), (0, 0, profile.RANK_OFFSET))
+        self.assertEqual(secure.resolve('prestige'), (0, 0, profile.PRESTIGE_OFFSET))
+        secure.write(snapshot['secure'], 'rank', 70)
+        secure.write(snapshot['secure'], 'prestige', 4)
+        self.assertEqual(profile.member_summary(snapshot),
+                         ((0x98, b'\x45\x04'), (0xB2, struct.pack('<5H', 101, 202, 303, 404, 505))))
+        secure.write(snapshot['secure'], 'rank', 0)
+        self.assertEqual(profile.member_summary(snapshot)[0][1], b'\0\x04')
+
     def test_query_uses_private_container_and_original_notification(self):
         from test_refactor_equivalence import MemoryProcess
         process = MemoryProcess()
