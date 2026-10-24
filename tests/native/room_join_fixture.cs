@@ -41,6 +41,7 @@ class RoomJoinFixture {
             listener.AddRange(new byte[]{0xc2,8,0}); Bytes(Room+0x30300,listener.ToArray());
             Count(Room+0x30400,0x104,8); Count(0x28003770,0x100,0);
             Count(0x2800af10,0x10c,4); Count(0x28005b10,0x11c,4); Count(0x280005f0,0x108,4);
+            Count(0x28000480,0x120,0);
             Bytes(0x28007910,new byte[]{0xb8,0,0,0,0x24,0xc3});
             Run success=Function(int.Parse(args[1])), failure=Function(int.Parse(args[2]));
             success();
@@ -49,13 +50,31 @@ class RoomJoinFixture {
             if(Read(State+0x100)!=19 || Read(State+0x104)!=1 || Read(State+0x108)!=1 || Read(State+0x10c)!=1
                || Read(State+0x110)!=1 || Read(State+0x114)!=1 || Read(State+0x118)!=0 || Read(State+0x11c)!=3)
                 throw new Exception("success callback ABI mismatch");
-            failure();
-            if(Read(State+0x110)!=2 || Read(State+0x114)!=0 || Read(State+0x118)!=3)
+            Write(State+40,5); failure();
+            if(Read(State+0x110)!=2 || Read(State+0x114)!=0 || Read(State+0x118)!=5)
+                throw new Exception("password failure callback ABI mismatch");
+            Write(State+40,3); failure();
+            if(Read(State+0x110)!=3 || Read(State+0x114)!=0 || Read(State+0x118)!=3)
                 throw new Exception("failure callback ABI mismatch");
             Bytes(0x28007910,new byte[]{0x33,0xc0,0xc3}); success();
-            if(Read(State+0x110)!=3 || Read(State+0x104)!=1 || Read(State+0x100)!=19)
+            if(Read(State+0x110)!=4 || Read(State+0x104)!=1 || Read(State+0x100)!=19)
                 throw new Exception("allocation failure must not initialize or publish members");
-            Console.WriteLine("native join success/failure/allocation failure ABI passed"); return 0;
+            Write(State+48,Room);
+            Function(int.Parse(args[3]))();
+            if(Read(State+0x120)!=1 || Read(State+0x11c)!=5 || Read(State+0x110)!=4
+               || Read(State+0x104)!=1 || Read(State+0x108)!=1 || Read(State+0x100)!=19)
+                throw new Exception("settings must notify without joining or refreshing members");
+            // POLL=0 的空闲帧仍应用一次设置，随后清除就绪位，不重复通知。
+            Bytes(0x20002000,File.ReadAllBytes(args[4]));
+            Bytes(0x28006000,new byte[]{0xc3});
+            Write(State,0); Write(State+52,1); Write(State+44,1); Write(State+36,5);
+            Function(0x20002000)();
+            if(Read(State+0x120)!=2 || Read(State+44)!=0 || Read(State+0x11c)!=7)
+                throw new Exception("idle tick must deliver settings exactly once");
+            Write(State+36,5); Function(0x20002000)();
+            if(Read(State+0x120)!=2 || Read(State+0x110)!=4)
+                throw new Exception("idle tick repeated notification");
+            Console.WriteLine("native join and settings callback ABI passed"); return 0;
         } catch(Exception error) {Console.WriteLine(error); return 1;}
     }
 }

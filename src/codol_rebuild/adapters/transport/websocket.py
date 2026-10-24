@@ -1,5 +1,7 @@
 """玩家实时通道：后台接收、协议保活与有上限退避重连，不处理游戏界面事件。"""
 import logging
+import json
+import queue
 import threading
 from urllib.parse import urlencode
 
@@ -22,6 +24,14 @@ class WebSocketConnection:
         self._player_id = None
         self._machine_code = None
         self._status = RealtimeStatus.CLOSED
+        self._events = queue.Queue(maxsize=256)
+
+    def poll_event(self) -> dict | None:
+        """非阻塞取出一条下行消息；内容语义由应用层解释。"""
+        try:
+            return self._events.get_nowait()
+        except queue.Empty:
+            return None
 
     def status(self) -> RealtimeStatus:
         """返回连接状态；身份被拒为 INVALIDATED，主动关闭后为 CLOSED。"""
@@ -65,13 +75,19 @@ class WebSocketConnection:
         delay = 1
         while not self._stop.is_set():
             try:
-                # 持续消费消息，避免队列积压；事件到原生界面的映射不在本期范围内。
+                # 只解码并交接消息，不在网络线程访问游戏对象。
                 while not self._stop.is_set():
                     try:
-                        connection.recv(timeout=.25)
+                        message = json.loads(connection.recv(timeout=.25))
                     except TimeoutError:
                         continue
                     delay = 1
+                    while not self._stop.is_set():
+                        try:
+                            self._events.put(message, timeout=.25)
+                            break
+                        except queue.Full:
+                            continue
             except ConnectionClosed as error:
                 if error.rcvd is not None and error.rcvd.code == 4401:
                     self._invalidate()

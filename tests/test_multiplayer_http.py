@@ -16,7 +16,7 @@ class Response(BytesIO):
 
 class HttpGatewayTests(unittest.TestCase):
     def test_join_request_snapshot_and_uncertain_response(self):
-        data = {'roomId': 'rm_target', 'ownerPlayerId': 'pl_owner', 'revision': 2,
+        data = {'roomId': 'rm_target', 'ownerPlayerId': 'pl_owner', 
                 'maxPlayers': 4, 'playerCount': 2, 'settings': {'map': 'mp_crash', 'mode': 'td'},
                 'members': [{'playerId': 'pl_owner', 'displayName': '房主', 'isOwner': True},
                             {'playerId': 'pl_saved', 'displayName': '玩家', 'isOwner': False}]}
@@ -27,7 +27,7 @@ class HttpGatewayTests(unittest.TestCase):
         self.assertEqual(request.get_method(), 'POST')
         self.assertEqual(request.get_header('X-player-id'), 'pl_saved')
         self.assertEqual(json.loads(request.data), {'displayName': '玩家', 'password': '密码'})
-        for change in ({'roomId': 'rm_other'}, {'revision': True}, {'playerCount': 1},
+        for change in ({'roomId': 'rm_other'}, {'playerCount': 1},
                        {'ownerPlayerId': 'pl_absent'}, {'members': []},
                        {'members': [data['members'][0]]*2}, {'settings': {'map': 1, 'mode': 'td'}}):
             with self.subTest(change=change):
@@ -109,9 +109,9 @@ class HttpGatewayTests(unittest.TestCase):
         self.gateway._opener.open.return_value = Response({'apiVersion': '1', 'data': {
             'roomId': 'rm_new', 'ownerPlayerId': 'pl_saved', 'maxPlayers': 4,
             'members': [{'playerId': 'pl_saved', 'displayName': '玩家', 'isOwner': True}],
-            'revision': 0, 'settings': settings}})
+            'settings': settings}})
         created = self.gateway.create('pl_saved', '玩家', 4, None, settings)
-        self.assertEqual(created['revision'], 0)
+        self.assertNotIn('revision', created)
         request = self.gateway._opener.open.call_args.args[0]
         self.assertEqual(json.loads(request.data)['settings'], settings)
         # 回显不一致时视为可疑响应，不静默接受。
@@ -123,29 +123,29 @@ class HttpGatewayTests(unittest.TestCase):
             self.gateway.create('pl_saved', '玩家', 4, None, settings)
         self.assertEqual(caught.exception.code, 'INVALID_RESPONSE')
 
-    def test_update_settings_patches_with_expected_revision(self):
+    def test_update_settings_without_revision(self):
         settings = {'mode': 'sd', 'map': 'mp_crash'}
         self.gateway._opener.open.return_value = Response({'apiVersion': '1', 'data': {
-            'roomId': 'rm_new', 'revision': 1, 'settings': settings, 'members': []}})
-        self.gateway.update_settings('pl_saved', 'rm_new', settings, 0)
+            'roomId': 'rm_new', 'settings': settings, 'members': []}})
+        self.gateway.update_settings('pl_saved', 'rm_new', settings)
         request = self.gateway._opener.open.call_args.args[0]
         self.assertEqual(request.get_method(), 'PATCH')
         self.assertEqual(request.full_url, 'http://127.0.0.1:8080/api/v1/rooms/rm_new/settings')
         self.assertEqual(json.loads(request.data),
-                         {'settings': settings, 'expectedRevision': 0})
+                         {'settings': settings})
         # 冲突错误码原样透传且非不确定写入。
         self.gateway._opener.open.return_value = Response(
             {'error': {'code': 'REVISION_CONFLICT', 'message': '修订号过期'}}, 409)
         with self.assertRaises(RoomError) as caught:
-            self.gateway.update_settings('pl_saved', 'rm_new', settings, 0)
+            self.gateway.update_settings('pl_saved', 'rm_new', settings)
         self.assertEqual(caught.exception.code, 'REVISION_CONFLICT')
         self.assertFalse(caught.exception.uncertain)
 
-    def test_room_detail_reads_revision(self):
+    def test_room_detail_without_revision(self):
         self.gateway._opener.open.return_value = Response({'apiVersion': '1', 'data': {
-            'roomId': 'rm_new', 'revision': 5, 'members': []}})
+            'roomId': 'rm_new', 'members': []}})
         detail = self.gateway.room_detail('pl_saved', 'rm_new')
-        self.assertEqual(detail['revision'], 5)
+        self.assertNotIn('revision', detail)
         request = self.gateway._opener.open.call_args.args[0]
         self.assertEqual(request.full_url, 'http://127.0.0.1:8080/api/v1/rooms/rm_new')
 

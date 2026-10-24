@@ -1,5 +1,6 @@
 """实时连接回归：真实握手、掉线重连、登录门控和退出清理。"""
 import threading
+import json
 import time
 import unittest
 from unittest.mock import Mock
@@ -23,6 +24,68 @@ def wait_for(predicate):
 
 
 class RealtimeTests(unittest.TestCase):
+    def test_application_dispatch_separates_receiving_from_settings_handling(self):
+        from codol_rebuild.application.room.contracts import IdentityRecord
+        realtime = Mock()
+        session = RoomSession(Mock(), Mock(), 'http://localhost', 'fp', realtime)
+        payload = {'roomId': 'rm_test', 'settings': {'mode': 'td'}}
+        try:
+            session._record = IdentityRecord('pl_test', room_id='rm_test')
+            result = session._handle_room_settings_updated(payload)
+            self.assertEqual(result.data, payload)
+            realtime.poll_event.assert_not_called()
+            session._handle_room_settings_updated = Mock(return_value=result)
+            realtime.poll_event.side_effect = [
+                {'type': 'room_settings_updated', 'payload': payload},
+                {'type': 'unhandled', 'payload': {}}, None]
+            self.assertIs(session.poll_event(), result)
+            self.assertIsNone(session.poll_event())
+            self.assertIsNone(session.poll_event())
+            session._handle_room_settings_updated.assert_called_once_with(payload)
+        finally:
+            session._record = None
+            session.close()
+
+    def test_idle_connection_delivers_settings_in_received_order(self):
+        from codol_rebuild.application.room.contracts import IdentityRecord
+        messages = [{'type': 'room_settings_updated', 'payload': {
+            'roomId': 'rm_test', 'revision': revision, 'settings': {'mode': mode}}}
+            for revision, mode in ((7, 'td'), (6, 'dm'))]
+        def handler(connection):
+            for message in messages:
+                connection.send(json.dumps(message))
+            try:
+                for message in connection:
+                    pass
+            except ConnectionClosed:
+                pass
+        with serve(handler, '127.0.0.1', 0) as server:
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            client = WebSocketConnection('http://127.0.0.1:' + str(server.socket.getsockname()[1]))
+            session = RoomSession(Mock(), Mock(), 'http://localhost', 'fp', client)
+            session._record = IdentityRecord('pl_test', room_id='rm_test')
+            try:
+                client.start('pl_test', 'fp')
+                received = []
+                def done():
+                    event = session.poll_event()
+                    if event is not None:
+                        received.append(event.data)
+                    return len(received) == 2
+                wait_for(done)
+                self.assertEqual(received, [m['payload'] for m in messages])
+                session._gateway.room_detail.assert_not_called()
+                session._gateway.update_settings.assert_not_called()
+                session._record = IdentityRecord('pl_test')
+                client._events.put(messages[0])
+                self.assertIsNone(session.poll_event())
+            finally:
+                session._record = None
+                session.close()
+                server.shutdown()
+                thread.join(3)
+
     def test_close_interrupts_reconnect_wait(self):
         from websockets.exceptions import ConnectionClosedOK
         client = WebSocketConnection('http://localhost')

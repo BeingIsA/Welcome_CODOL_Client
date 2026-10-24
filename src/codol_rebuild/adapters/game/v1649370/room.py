@@ -228,11 +228,16 @@ def build_room_adapter(entry: int, state: int, ready: int, *, deferred=False, id
 
 # AS_JoinRoom 普通房间分支：数字转换前仍持有原始 id 和密码。
 JOIN_INPUT = 0x5D3216
+# 联机通信页中的入房失败码；由版本桥在失败通知前写入。
+JOIN_ERROR_OFFSET = 40
+# 设置回显独立于建房、入房、离房任务槽，避免完成通知互相覆盖。
+SETTINGS_READY_OFFSET, SETTINGS_ROOM_OFFSET = 44, 48
 JOIN_CONTRACT = {
     JOIN_INPUT: bytes.fromhex('e8fbc06600'),
     0x623770: bytes.fromhex('5333db568bf1'),
     0x7E7910: bytes.fromhex('33d233c0b95046370e'),
     0xB75B10: bytes.fromhex('558bec538b5d'),
+    0x630480: bytes.fromhex('568b710485f6'),
 }
 MEMBER_CAPACITY = (0x105D8 - 0xE368) // 0x1D0
 
@@ -302,12 +307,22 @@ def build_join_adapter(entry, state, scratch):
     emit('8b7304')
     label('notify_failure')
     emit('85f6'); branch('0f84', 'failed_done')
-    emit('8b0e 8b01 8b4004 8b7604 6a03 6a00 ffd0')
+    emit('8b0e 8b01 8b4004 8b7604 ff35'); word(state+JOIN_ERROR_OFFSET)
+    emit('6a00 ffd0')
     branch('e9', 'notify_failure')
     label('failed_done'); emit('619d c3')
+    label('settings_apply')
+    emit('9c60 8b1d'); word(state+SETTINGS_ROOM_OFFSET)
+    # 仅更新模式/地图引用与设置通知；不进入用户提交、入房或成员刷新路径。
+    for offset, source in ((0, 0), (8, 256)):
+        emit('68'); word(scratch+source)
+        emit('8d8b'); word(0x105F0+offset)
+        call(0xB75B10)
+    emit('8bcb'); call(0x630480)
+    emit('619d c3')
     for offset, target in refs:
         struct.pack_into('<i', code, offset, labels[target]-offset-4)
     return {'code': bytes(code), 'traps': traps,
-            'entries': {name: entry+labels[name] for name in ('join_complete', 'join_failed')},
+            'entries': {name: entry+labels[name] for name in ('join_complete', 'join_failed', 'settings_apply')},
             'patches': [{'va': JOIN_INPUT, 'before': JOIN_CONTRACT[JOIN_INPUT],
                          'after': b'\xe8'+struct.pack('<I', (entry-JOIN_INPUT-5) & 0xffffffff)}]}

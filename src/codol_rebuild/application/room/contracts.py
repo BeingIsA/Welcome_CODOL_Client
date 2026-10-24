@@ -65,13 +65,12 @@ class Gateway(Protocol):
         """创建房间并返回成员快照；settings 为可选的对局设置快照。"""
         ...
 
-    def update_settings(self, player_id: str, room_id: str, settings: dict,
-                        expected_revision: int) -> dict:
-        """整表替换房间对局设置；返回包含新修订号的房间详情。"""
+    def update_settings(self, player_id: str, room_id: str, settings: dict) -> dict:
+        """整表替换房间对局设置；不传修订号，返回服务端确认的房间详情。"""
         ...
 
     def room_detail(self, player_id: str, room_id: str) -> dict:
-        """读取房间详情（含修订号与设置），用于冲突恢复。"""
+        """读取房间详情与设置，用于查询及不确定加入的状态确认。"""
         ...
 
     def leave(self, player_id: str, room_id: str) -> dict:
@@ -93,6 +92,10 @@ class RealtimeStatus(Enum):
 
 class RealtimeConnection(Protocol):
     """实时连接生命周期端口；实现负责接收、保活和断线重连。"""
+    def poll_event(self) -> dict | None:
+        """非阻塞消费一条已解码的下行消息。"""
+        ...
+
     def start(self, player_id: str, fingerprint: str) -> None:
         """建立首次连接，失败抛出联机错误；同一身份重复调用不重建连接。
 
@@ -115,6 +118,10 @@ PERMISSION_ERROR_CODES = frozenset({'BANNED', 'FORBIDDEN', 'UNAUTHENTICATED'})
 
 class RoomPort(Protocol):
     """原生桥使用的异步用例接口；调用方不得直接访问工作线程状态。"""
+    def poll_event(self) -> Completion | None:
+        """消费当前房间设置推送；不查询快照，也不比较修订号。"""
+        ...
+
     def begin(self, operation: str, username: str, *, max_players: int = 4,
               password: str | None = None, settings: dict | None = None,
               room_id: str | None = None) -> bool:

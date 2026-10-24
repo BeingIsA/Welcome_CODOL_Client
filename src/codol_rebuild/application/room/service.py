@@ -19,8 +19,6 @@ class RoomSession:
         self._pending = None
         self._closed = False
         self._realtime = realtime
-        # 最近已知房间修订号；None 表示未知，冲突时经详情自愈。
-        self._revision = None
         self._is_owner = None
         # 设置同步与主流程互不阻塞，但共用单工作线程保证串行。
         self._settings_pending = None
@@ -68,6 +66,23 @@ class RoomSession:
         # 即使磁盘写入失败，仍保留远端已生效的内存事实，供退出补偿使用。
         self._record = record
         self._store.save(self._server, record)
+
+    def poll_event(self) -> Completion | None:
+        """统一消费实时消息，按类型交给对应业务处理函数。"""
+        if self._closed or self._realtime is None or self._pending is not None:
+            return None
+        event = self._realtime.poll_event()
+        if event is None:
+            return None
+        handlers = {'room_settings_updated': self._handle_room_settings_updated}
+        handler = handlers.get(event['type'])
+        return handler(event['payload']) if handler is not None else None
+
+    def _handle_room_settings_updated(self, payload) -> Completion | None:
+        """交付当前房间设置，离房后或其他房间的设置不再回显。"""
+        if self._record is None or self._record.room_id != payload['roomId']:
+            return None
+        return Completion('room_settings_updated', data=payload)
 
     def begin_list(self, username: str) -> bool:
         """只保留最新刷新意图；与写用例分开消费，共用串行工作线程。"""
@@ -179,7 +194,6 @@ class RoomSession:
                 if error.code not in ('ROOM_NOT_FOUND', 'ROOM_CLOSED'):
                     raise
             self._save(replace(self._record, room_id=None, uncertain_join=False))
-        self._revision = None
         self._is_owner = None
         return {'left': True}
 
@@ -209,7 +223,6 @@ class RoomSession:
                 # 请求仍可能在服务端执行，不能因一次查询无成员就删除恢复记录。
                 raise error
         self._save(replace(self._record, uncertain_join=False))
-        self._revision = data.get('revision')
         self._is_owner = data.get('ownerPlayerId') == previous.player_id
         return data
 
@@ -239,7 +252,6 @@ class RoomSession:
                         self._save(replace(self._record, uncertain_create=False))
                     raise
                 self._save(replace(self._record, room_id=data['roomId'], uncertain_create=False))
-                self._revision = data.get('revision')
                 self._is_owner = True
             return Completion(operation, data=data)
         except RoomError as error:
@@ -248,7 +260,7 @@ class RoomSession:
             return Completion(operation, error=RoomError('LOCAL_IDENTITY_ERROR', str(error)))
 
     def _execute_settings(self, username, settings):
-        """异步补交房内设置变更；冲突时拉取详情重试一次。"""
+        """异步提交房内设置变更；每次意图只发送一次，不自动重试写入。"""
         try:
             if self._record is None:
                 raise RoomError('NO_IDENTITY', '尚未完成启动登录')
@@ -259,18 +271,8 @@ class RoomSession:
             room_id = self._record.room_id if self._record else None
             if not room_id:
                 raise RoomError('NO_ROOM', '当前不在房间内，设置未同步')
-            expected = self._revision if isinstance(self._revision, int) else 0
-            try:
-                data = self._gateway.update_settings(self._record.player_id, room_id,
-                                                     settings, expected)
-            except RoomError as error:
-                if error.code != 'REVISION_CONFLICT':
-                    raise
-                detail = self._gateway.room_detail(self._record.player_id, room_id)
-                data = self._gateway.update_settings(
-                    self._record.player_id, room_id, settings, detail['revision'])
-            self._revision = data.get('revision')
-            return Completion('settings', data={'revision': self._revision})
+            data = self._gateway.update_settings(self._record.player_id, room_id, settings)
+            return Completion('settings', data=data)
         except RoomError as error:
             return Completion('settings', error=error)
         except (OSError, ValueError) as error:

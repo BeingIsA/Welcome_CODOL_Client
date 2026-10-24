@@ -10,7 +10,7 @@ from codol_rebuild.application.room.contracts import Completion, RoomError
 
 def room(identity='rm_one', mode='td'):
     return dict(roomId=identity, ownerPlayerId='pl_owner', ownerDisplayName='中文房主',
-                playerCount=2, maxPlayers=12, hasPassword=True, revision=3,
+                playerCount=2, maxPlayers=12, hasPassword=True,
                 map='mp_crash', mode=mode)
 
 

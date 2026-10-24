@@ -21,8 +21,8 @@ class GameSessionBridge:
         self.preview_caller_return = 0x5EBFF8
         self.multiplayer = None
         if multiplayer is not None:
-            from codol_rebuild.adapters.game.v1649370.multiplayer_bridge import MultiplayerBridge
-            self.multiplayer = MultiplayerBridge(process, multiplayer, record)
+            from codol_rebuild.adapters.game.v1649370.server_session_bridge import ServerSessionBridge
+            self.multiplayer = ServerSessionBridge(process, multiplayer, record)
 
     def checkpoint(self, force=False):
         self.profiles.save(force=force)

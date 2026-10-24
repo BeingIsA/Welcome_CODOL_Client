@@ -129,14 +129,11 @@ class HttpGateway:
             raise RoomError('INVALID_RESPONSE', str(error), uncertain=True) from error
         return data
 
-    def update_settings(self, player_id, room_id, settings, expected_revision):
+    def update_settings(self, player_id, room_id, settings):
         room_id = _identifier(room_id, 'rm')
         data = self._request('PATCH', f'/api/v1/rooms/{room_id}/settings',
-                             {'settings': _settings_payload(settings),
-                              'expectedRevision': expected_revision}, player_id)
+                             {'settings': _settings_payload(settings)}, player_id)
         try:
-            if type(data.get('revision')) is not int or data.get('revision') < 0:
-                raise ValueError('设置响应修订号无效')
             if data.get('settings') != _settings_payload(settings):
                 raise ValueError('设置响应与提交值不匹配')
         except ValueError as error:
@@ -147,7 +144,7 @@ class HttpGateway:
         room_id = _identifier(room_id, 'rm')
         data = self._request('GET', f'/api/v1/rooms/{room_id}', player_id=player_id)
         try:
-            if data.get('roomId') != room_id or type(data.get('revision')) is not int:
+            if data.get('roomId') != room_id:
                 raise ValueError('房间详情响应不完整')
         except ValueError as error:
             raise RoomError('INVALID_RESPONSE', str(error)) from error
@@ -183,9 +180,8 @@ class HttpGateway:
                 if (type(room.get('maxPlayers')) is not int or not 1 <= room['maxPlayers'] <= 255
                         or type(room.get('playerCount')) is not int
                         or not 0 <= room['playerCount'] <= room['maxPlayers']
-                        or type(room.get('hasPassword')) is not bool
-                        or type(room.get('revision')) is not int or room['revision'] < 0):
-                    raise ValueError('房间人数、锁定状态或修订号无效')
+                        or type(room.get('hasPassword')) is not bool):
+                    raise ValueError('房间人数或锁定状态无效')
         except ValueError as error:
             raise RoomError('INVALID_RESPONSE', str(error)) from error
         return data
@@ -195,10 +191,9 @@ def validate_room_snapshot(data, room_id):
     if data.get('roomId') != room_id:
         raise ValueError('房间响应标识不匹配')
     owner = _identifier(data.get('ownerPlayerId'), 'pl')
-    if (type(data.get('revision')) is not int or data['revision'] < 0
-            or type(data.get('maxPlayers')) is not int or not 1 <= data['maxPlayers'] <= 255
+    if (type(data.get('maxPlayers')) is not int or not 1 <= data['maxPlayers'] <= 255
             or type(data.get('playerCount')) is not int):
-        raise ValueError('房间人数或修订号无效')
+        raise ValueError('房间人数无效')
     members = data.get('members')
     if not isinstance(members, list) or not 1 <= len(members) <= data['maxPlayers']:
         raise ValueError('房间成员列表无效')

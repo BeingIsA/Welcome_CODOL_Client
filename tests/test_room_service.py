@@ -35,23 +35,20 @@ class Gateway:
             raise RoomError('ALREADY_IN_OTHER_ROOM', '已有房间')
         self.serial += 1
         room = {'roomId': 'rm_'+str(self.serial), 'ownerPlayerId': player_id,
-                'revision': 0, 'settings': settings or {}}
+                'settings': settings or {}}
         self.rooms[room['roomId']] = room
         if self.fail_create:
             self.fail_create = False
             raise RoomError('NETWORK_ERROR', '响应丢失', uncertain=True)
         return room
 
-    def update_settings(self, player_id, room_id, settings, expected_revision):
-        self.calls.append(('update_settings', room_id, expected_revision))
+    def update_settings(self, player_id, room_id, settings):
+        self.calls.append(('update_settings', room_id, settings))
         room = self.rooms.get(room_id)
         if room is None:
             raise RoomError('ROOM_NOT_FOUND', '房间不存在')
-        if expected_revision != room['revision'] and not getattr(self, 'allow_retry', True):
-            raise RoomError('REVISION_CONFLICT', '修订号过期')
-        if expected_revision != room['revision']:
-            raise RoomError('REVISION_CONFLICT', '修订号过期')
-        room['revision'] += 1
+        if getattr(self, 'settings_error', None):
+            raise self.settings_error
         room['settings'] = settings
         return dict(room)
 
@@ -78,7 +75,7 @@ class RoomTests(unittest.TestCase):
     def test_join_saves_target_and_blocks_guest_settings(self):
         self.result('login')
         from unittest.mock import Mock
-        data = {'roomId': 'rm_target', 'ownerPlayerId': 'pl_owner', 'revision': 3,
+        data = {'roomId': 'rm_target', 'ownerPlayerId': 'pl_owner', 
                 'members': [{'playerId': 'pl_test'}]}
         self.gateway.join = Mock(return_value=data)
         result = self.result('join', room_id='rm_target', password='secret')
@@ -104,7 +101,7 @@ class RoomTests(unittest.TestCase):
         from unittest.mock import Mock
         self.gateway.join = Mock(side_effect=RoomError('NETWORK_ERROR', '超时', uncertain=True))
         self.gateway.room_detail = Mock(return_value={
-            'roomId': 'rm_target', 'ownerPlayerId': 'pl_owner', 'revision': 3,
+            'roomId': 'rm_target', 'ownerPlayerId': 'pl_owner', 
             'members': [{'playerId': 'pl_test'}]})
         self.assertIsNone(self.result('join', room_id='rm_target').error)
         self.gateway.join.assert_called_once()
@@ -313,7 +310,7 @@ class RoomTests(unittest.TestCase):
 class SettingsSyncTests(RoomTests):
     """房内设置同步：异步补交、修订号冲突自愈与离房重置。"""
 
-    def test_create_carries_settings_and_revision(self):
+    def test_create_carries_settings_without_revision(self):
         self.assertIsNone(self.result('login').error)
         settings = {'mode': 'td', 'map': 'mp_crash', 'modeTimeLimit': 10.5}
         result = self.result('create', max_players=8, password='pw', settings=settings)
@@ -321,56 +318,62 @@ class SettingsSyncTests(RoomTests):
         create_call = next(c for c in self.gateway.calls if c[0] == 'create')
         self.assertEqual(create_call[4], settings)
 
-    def test_settings_sync_uses_known_revision(self):
+    def test_settings_sync_without_revision(self):
         self.assertIsNone(self.result('login').error)
         self.result('create', max_players=4)
         result = self.result('settings', settings={'mode': 'sd'})
         self.assertIsNone(result.error)
         update = next(c for c in self.gateway.calls if c[0] == 'update_settings')
         self.assertEqual(update[1], 'rm_1')
-        self.assertEqual(update[2], 0)
+        self.assertEqual(update[2], {'mode': 'sd'})
         room = self.gateway.rooms['rm_1']
         self.assertEqual(room['settings'], {'mode': 'sd'})
-        self.assertEqual(result.data['revision'], 1)
+        self.assertNotIn('revision', result.data)
 
-    def test_identical_settings_requests_each_increment(self):
-        """创建为零；连续同值设置请求仍分别提交并递增。"""
+    def test_identical_settings_requests_each_submit_once(self):
+        """每次明确的同值设置意图仍分别提交，不依赖修订号。"""
         self.assertIsNone(self.result('login').error)
         settings = {'mode': 'td'}
         created = self.result('create', settings=settings)
-        self.assertEqual(created.data['revision'], 0)
-        for revision in (1, 2, 3):
+        self.assertNotIn('revision', created.data)
+        for _ in range(3):
             result = self.result('settings', settings=settings)
             self.assertIsNone(result.error)
-            self.assertEqual(result.data['revision'], revision)
-        self.assertEqual([c[2] for c in self.gateway.calls if c[0] == 'update_settings'], [0, 1, 2])
+            self.assertEqual(result.data['settings'], settings)
+        self.assertEqual([c[2] for c in self.gateway.calls if c[0] == 'update_settings'],
+                         [settings] * 3)
 
-    def test_settings_conflict_refetches_detail_and_retries(self):
+    def test_settings_errors_never_refetch_or_retry(self):
+        """明确拒绝与不确定写入均向调用方返回，旧冲突码也不触发重试。"""
         self.assertIsNone(self.result('login').error)
         self.result('create', max_players=4)
-        # 模拟他处已推进修订号：记忆修订号落后于服务端。
-        self.gateway.rooms['rm_1']['revision'] = 5
-        result = self.result('settings', settings={'mode': 'sd'})
-        self.assertIsNone(result.error)
-        self.assertIn(('detail', 'rm_1'), self.gateway.calls)
-        room = self.gateway.rooms['rm_1']
-        self.assertEqual(room['revision'], 6)
+        for code, uncertain in (('REVISION_CONFLICT', False), ('FORBIDDEN', False),
+                                ('NETWORK_ERROR', True)):
+            with self.subTest(code=code):
+                self.gateway.calls.clear()
+                self.gateway.settings_error = RoomError(code, code, uncertain=uncertain)
+                result = self.result('settings', settings={'mode': 'sd'})
+                self.assertEqual(result.error.code, code)
+                self.assertEqual(result.error.uncertain, uncertain)
+                self.assertEqual(self.gateway.calls,
+                                 [('update_settings', 'rm_1', {'mode': 'sd'})])
 
     def test_settings_without_room_reports_error(self):
         self.assertIsNone(self.result('login').error)
         result = self.result('settings', settings={'mode': 'sd'})
         self.assertEqual(result.error.code, 'NO_ROOM')
 
-    def test_leave_resets_revision(self):
+    def test_settings_after_leave_target_new_room(self):
         self.assertIsNone(self.result('login').error)
         self.result('create', max_players=4)
         self.result('settings', settings={'mode': 'sd'})
         self.result('leave')
-        # 重新建房后修订号应从新房间响应重建，而不是沿用旧房间记忆。
+        # 重新建房后的设置必须提交到新房间。
         self.result('create', max_players=4)
         result = self.result('settings', settings={'mode': 'td'})
         self.assertIsNone(result.error)
-        self.assertEqual(result.data['revision'], 1)
+        self.assertEqual(result.data['roomId'], 'rm_2')
+        self.assertEqual(result.data['settings'], {'mode': 'td'})
 
     def test_settings_does_not_block_create(self):
         self.assertIsNone(self.result('login').error)

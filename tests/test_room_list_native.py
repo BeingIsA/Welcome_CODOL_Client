@@ -24,6 +24,7 @@ def relocate_fixture_calls(code, entry):
 class NativeRoomListTests(unittest.TestCase):
     def test_join_callbacks_execute_with_native_stack_contract(self):
         from codol_rebuild.adapters.game.v1649370.room import build_join_adapter
+        from codol_rebuild.adapters.game.v1649370.server_session_bridge import build_tick
         compiler = Path(os.environ.get('WINDIR', 'C:/Windows'))/'Microsoft.NET/Framework/v4.0.30319/csc.exe'
         if not compiler.exists():
             self.skipTest('需要 Windows .NET Framework x86 C# 编译器')
@@ -37,13 +38,21 @@ class NativeRoomListTests(unittest.TestCase):
                 code[address-0x20000000] = 0x90
             relocate_fixture_calls(code, 0x20000000)
             (folder/'code.bin').write_bytes(code)
+            tick = build_tick(0x20002000, 0x21000000, 0x21000034, 0x28006000,
+                              {**plan['entries'], 'create_complete': 0x28006000,
+                               'leave_complete': 0x28006000})
+            tick_code = bytearray(tick['code'])
+            for address in tick['traps']:
+                tick_code[address-0x20002000] = 0x90
+            (folder/'tick.bin').write_bytes(tick_code)
             exe = folder/'fixture.exe'
             build = subprocess.run([str(compiler), '/nologo', '/platform:x86', '/out:'+str(exe),
                                     str(Path(__file__).parent/'native/room_join_fixture.cs')],
                                    capture_output=True, timeout=30)
             self.assertEqual(build.returncode, 0, build.stdout.decode('mbcs', errors='replace'))
             result = subprocess.run([str(exe), str(folder/'code.bin'),
-                                     str(plan['entries']['join_complete']), str(plan['entries']['join_failed'])],
+                                     str(plan['entries']['join_complete']), str(plan['entries']['join_failed']),
+                                     str(plan['entries']['settings_apply']), str(folder/'tick.bin')],
                                     capture_output=True, timeout=20)
             self.assertEqual(result.returncode, 0, (result.stdout+result.stderr).decode('mbcs', errors='replace'))
 

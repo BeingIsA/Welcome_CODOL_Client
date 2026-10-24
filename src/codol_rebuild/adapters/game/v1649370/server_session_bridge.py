@@ -7,6 +7,9 @@ import hashlib
 import struct
 from codol_rebuild.application.room.contracts import RoomError, RoomPort, PERMISSION_ERROR_CODES
 from codol_rebuild.adapters.game.v1649370.player_name import native_name, LANGUAGE, DIRECT_STRING_MODE
+from codol_rebuild.adapters.game.v1649370.room import (
+    JOIN_ERROR_OFFSET, SETTINGS_READY_OFFSET, SETTINGS_ROOM_OFFSET,
+)
 
 ROOM_POINTER = 0x82E13FC
 POLL, ACTION, ROOM, SESSION, LEAVE_ARG, LOGIN, IDENTITY = 0, 4, 8, 12, 16, 20, 24
@@ -183,11 +186,19 @@ def build_tick(entry, state, ready, preview_entry, room_entries, list_publish=No
         emit('8be5'); traps[entry+len(code)] = name; emit('cc')
     emit('8d6424f4'); call(preview_entry); emit('8d64240c 9c60 8bec')
     emit('833d'); word(ready); emit('01'); branch('0f85', 'done')
-    emit('833d'); word(state+POLL); emit('00'); branch('0f84', 'done')
     # 按前端帧节流，避免每帧跨进程暂停。开始请求时重置计数。
     emit('ff05'); word(state+36)
     emit('833d'); word(state+36); emit('06'); branch('0f82', 'done')
     emit('c705'); word(state+36); word(0)
+    if 'settings_apply' in room_entries:
+        trap('realtime')
+        emit('833d'); word(state+SETTINGS_READY_OFFSET); emit('00')
+        branch('0f84', 'poll_command')
+        emit('c705'); word(state+SETTINGS_READY_OFFSET); word(0)
+        emit('83e4f0'); call(room_entries['settings_apply']); emit('8be5')
+        trap('settings_applied')
+        label('poll_command')
+    emit('833d'); word(state+POLL); emit('00'); branch('0f84', 'done')
     trap('poll')
     if list_publish is not None:
         emit('83e4f0'); call(list_publish); emit('8be5')
@@ -227,7 +238,7 @@ def build_tick(entry, state, ready, preview_entry, room_entries, list_publish=No
     return {'code': bytes(code), 'traps': traps}
 
 
-class MultiplayerBridge:
+class ServerSessionBridge:
     """版本适配只拥有原生请求快照，通过联机端口触发业务。"""
     def __init__(self, process, port: RoomPort, record):
         self.process, self.port, self.record = process, port, record
@@ -249,6 +260,7 @@ class MultiplayerBridge:
         self.join_cancelled = False
         self.player_id = None
         self.is_owner = True
+        self.current_room_id = None
 
     def allocate(self):
         """在已暂停的初始化边分配独立通信页。"""
@@ -310,10 +322,14 @@ class MultiplayerBridge:
                 and u32(read, ROOM_POINTER) == room and u32(read, room+0x1C) == session
                 and u32(read, session+0x25C8) == room and read(session, 1) != b'\0')
 
-    def _failure(self, operation, message):
+    def _failure(self, operation, message, error_code=None):
         # 游戏 GFx 接口接收 UTF-8 文本；密码、机器码不进入错误日志。
         raw = message.encode('utf-8')[:510].decode('utf-8', errors='ignore').encode('utf-8') + b'\0'
         checked_write(self.process, self.state+MESSAGE, raw)
+        if operation == 'join':
+            # 原生 0x731440 映射：5 为密码错误，3 为房间不存在。
+            # 每次失败都覆盖，其他失败沿用原有提示，避免复用上次密码错误码。
+            self._word(JOIN_ERROR_OFFSET, 5 if error_code == 'INVALID_ROOM_PASSWORD' else 3)
         self._word(ACTION, 6 if operation == 'join' else 2 if operation == 'create' else 4)
         self.record({'multiplayer': operation, 'success': False, 'error': message})
 
@@ -357,6 +373,10 @@ class MultiplayerBridge:
                 self._submit_settings(u32(self.process.read, frame+4))
             elif phase == 'poll':
                 self._poll()
+            elif phase == 'realtime':
+                self._poll_realtime_event()
+            elif phase == 'settings_applied':
+                self.record({'multiplayer_settings_received': self.current_room_id})
             else:
                 if self.pending:
                     operation, room, session = self.pending
@@ -365,6 +385,8 @@ class MultiplayerBridge:
                         raise ValueError('服务端建房成功，但原生创建未完成')
                     if action == 3 and u32(self.process.read, room+0x1C) != 0:
                         raise ValueError('服务端离房成功，但原生房间未清理')
+                    if action == 3:
+                        self.current_room_id = None
                     if action == 5 and not self._valid_room(room, session):
                         raise ValueError('服务端入房成功，但原生房间未完成')
                     self.record({'multiplayer_native_completed': operation, 'success': action in (1, 3, 5)})
@@ -542,6 +564,45 @@ class MultiplayerBridge:
         except (OSError, ValueError) as error:
             self.record({'multiplayer_settings': 'error', 'error': str(error)})
 
+    def _poll_realtime_event(self):
+        """主线程统一消费应用层事件，按类型分发原生回显。"""
+        if self.pending is not None or self.join_cleanup:
+            return
+        event = self.port.poll_event()
+        if event is None:
+            return
+        handlers = {'room_settings_updated': self._apply_room_settings}
+        handler = handlers.get(event.operation)
+        if handler is not None:
+            handler(event.data)
+
+    def _apply_room_settings(self, payload):
+        """仅准备原生设置回显，不取消息、不提交业务请求。"""
+        if payload['roomId'] != self.current_room_id:
+            return
+        read = self.process.read
+        room = u32(read, ROOM_POINTER)
+        if room < 0x10000:
+            return
+        session = u32(read, room+0x1C)
+        if not self._valid_room(room, session):
+            return
+        settings = payload['settings']
+        # 容量约束属于原生缓冲区要求，不重复执行服务端业务校验。
+        strings = bytearray(512)
+        for offset, key in ((0, 'mode'), (256, 'map')):
+            raw = settings[key].encode('utf-8')
+            if len(raw) > 255:
+                raise ValueError('房间设置字符串超出原生缓冲区')
+            strings[offset:offset+len(raw)] = raw
+        scalars = [(offset, struct.pack(form, settings[key]))
+                   for key, (offset, form) in SETTING_SCALARS.items()]
+        checked_write(self.process, self.join_scratch, bytes(strings))
+        for offset, raw in scalars:
+            checked_write(self.process, room+0x105F0+offset, raw)
+        self._word(SETTINGS_ROOM_OFFSET, room)
+        self._word(SETTINGS_READY_OFFSET, 1)
+
     def _drop_pending(self):
         """丢弃仍在等待的原生请求结果，进入失效后丢弃窗口。"""
         self.pending = None
@@ -608,18 +669,21 @@ class MultiplayerBridge:
         elif self.pending is None or result.operation != self.pending[0]:
             raise ValueError('联机完成结果没有匹配的原生请求')
         elif result.error:
-            self._failure(result.operation, display_message(result.error))
+            self._failure(result.operation, display_message(result.error), result.error.code)
             if result.operation == 'join':
                 self.join_cleanup = self.port.begin('leave', username(self.process.read))
         elif result.operation == 'join':
             try:
                 self._prepare_join_snapshot(result.data)
+                self.current_room_id = result.data['roomId']
                 self._word(ACTION, 5)
             except (ValueError, OSError, KeyError, TypeError, struct.error) as error:
                 self._failure('join', str(error))
                 self.join_cleanup = self.port.begin('leave', username(self.process.read))
         else:
             self.is_owner = result.operation == 'create'
+            if result.operation == 'create':
+                self.current_room_id = result.data['roomId']
             self._word(ACTION, 1 if result.operation == 'create' else 3)
             self.record({'multiplayer': result.operation, 'success': True,
                          **({'roomId': result.data['roomId']} if result.operation == 'create' else {})})

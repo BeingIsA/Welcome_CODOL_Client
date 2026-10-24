@@ -7,7 +7,7 @@ from unittest import mock
 from unittest.mock import Mock
 import capstone
 import pefile
-from codol_rebuild.adapters.game.v1649370 import multiplayer_bridge as bridge
+from codol_rebuild.adapters.game.v1649370 import server_session_bridge as bridge
 from codol_rebuild.adapters.game.v1649370.room import build_room_adapter
 from codol_rebuild.application.room.contracts import Completion, RoomError
 
@@ -79,7 +79,7 @@ class MultiplayerBridgeTests(unittest.TestCase):
         from test_refactor_equivalence import MemoryProcess
         from codol_rebuild.adapters.game.v1649370.room import JOIN_INPUT
         process = MemoryProcess()
-        adapter = bridge.MultiplayerBridge(process, Mock(), Mock())
+        adapter = bridge.ServerSessionBridge(process, Mock(), Mock())
         adapter.allocate()
         room_plan = build_room_adapter(0x30000000, 0x31000000, 0x32000000, deferred=True,
                                        identity_address=adapter.state+bridge.IDENTITY)
@@ -100,7 +100,7 @@ class MultiplayerBridgeTests(unittest.TestCase):
         memory.word(bridge.DIRECT_STRING_MODE, 1)
         port = Mock()
         port.begin.return_value = True
-        adapter = bridge.MultiplayerBridge(memory, port, Mock())
+        adapter = bridge.ServerSessionBridge(memory, port, Mock())
         adapter.state = state
         adapter.join_scratch = 0x26000000
         adapter.player_id = 'pl_me'
@@ -114,6 +114,23 @@ class MultiplayerBridgeTests(unittest.TestCase):
                 'members': [{'playerId': 'pl_owner', 'displayName': '房主', 'isOwner': True},
                             {'playerId': 'pl_me', 'displayName': '队友', 'isOwner': False}]}
         return memory, adapter, data, room, session
+
+    def test_join_failure_preserves_password_reason_and_resets_for_next_failure(self):
+        memory, adapter, data, room, session = self.join_fixture()
+        adapter.login_started = True
+        for code, expected in (('INVALID_ROOM_PASSWORD', 5), ('ROOM_NOT_FOUND', 3),
+                               ('INVALID_ROOM_PASSWORD', 5), ('ROOM_CLOSED', 3)):
+            with self.subTest(code=code):
+                adapter.port.poll.return_value = Completion('join', error=RoomError(code, '入房失败'))
+                adapter.port.begin.reset_mock()
+                with mock.patch.object(bridge, 'username', return_value='队友'):
+                    adapter._poll()
+                self.assertEqual(bridge.u32(memory.read, adapter.state+bridge.JOIN_ERROR_OFFSET), expected)
+                self.assertEqual(bridge.u32(memory.read, adapter.state+bridge.ACTION), 6)
+                self.assertEqual(bridge.u32(memory.read, room+0x1C), 0)
+                adapter.port.begin.assert_called_once_with('leave', '队友')
+        adapter._failure('join', '本地初始化失败')
+        self.assertEqual(bridge.u32(memory.read, adapter.state+bridge.JOIN_ERROR_OFFSET), 3)
 
     def test_join_snapshot_keeps_local_identity_and_remote_owner(self):
         import hashlib
@@ -133,6 +150,45 @@ class MultiplayerBridgeTests(unittest.TestCase):
         self.assertFalse(adapter.is_owner)
         adapter._submit_settings(room+0x105F0)
         adapter.port.begin.assert_not_called()
+
+    def test_settings_event_updates_only_settings_without_submitting(self):
+        memory, adapter, data, room, session = self.join_fixture()
+        adapter.pending = None
+        adapter.current_room_id = data['roomId']
+        adapter.is_owner = False
+        memory.word(room+0x1C, session)
+        memory.word(session+0x25C8, room)
+        memory.write(session, b'\x01')
+        adapter.port.poll_event.return_value = Completion('room_settings_updated', data=data)
+        adapter._apply_room_settings(data)
+        adapter.port.poll_event.assert_not_called()
+        self.assertEqual(bridge.u32(memory.read, adapter.state+bridge.SETTINGS_READY_OFFSET), 1)
+        self.assertEqual(bridge.u32(memory.read, adapter.state+bridge.SETTINGS_ROOM_OFFSET), room)
+        self.assertEqual(memory.read(adapter.join_scratch, 3), b'td\0')
+        self.assertEqual(memory.read(adapter.join_scratch+256, 9), b'mp_crash\0')
+        adapter._submit_settings(room+0x105F0)
+        adapter.port.begin.assert_not_called()
+        # 原生会话已销毁时，迟到事件不得写入游戏对象。
+        memory.word(room+0x1C, 0)
+        before = dict(memory.data)
+        adapter._apply_room_settings(data)
+        self.assertEqual(memory.data, before)
+
+    def test_realtime_dispatch_routes_settings_and_ignores_other_events(self):
+        memory, adapter, data, room, session = self.join_fixture()
+        adapter.pending = None
+        adapter._apply_room_settings = Mock()
+        adapter.port.poll_event.side_effect = [
+            Completion('room_settings_updated', data=data),
+            Completion('unhandled', data={}), None]
+        before = dict(memory.data)
+        for _ in range(3):
+            adapter._poll_realtime_event()
+        adapter._apply_room_settings.assert_called_once_with(data)
+        self.assertEqual(memory.data, before)
+        adapter.pending = ('leave', room, session)
+        adapter._poll_realtime_event()
+        self.assertEqual(adapter.port.poll_event.call_count, 3)
 
     def test_join_snapshot_rejects_capacity_and_nonfinite_settings_before_writes(self):
         memory, adapter, data, room, session = self.join_fixture()
@@ -388,11 +444,14 @@ class MultiplayerBridgeTests(unittest.TestCase):
         decoder = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
         for entry in (0x20000000, 0xf0000000):
             room = build_room_adapter(entry, 0x21000000, 0x22000000, deferred=True, identity_address=0x23000018)
-            tick = bridge.build_tick(entry+4096, 0x23000000, 0x22000000, 0x24000000, room['entries'])
+            from codol_rebuild.adapters.game.v1649370.room import build_join_adapter
+            joined = build_join_adapter(entry+8192, 0x23000000, 0x25000000)
+            entries = {**room['entries'], **joined['entries']}
+            tick = bridge.build_tick(entry+4096, 0x23000000, 0x22000000, 0x24000000, entries)
             for plan, base, externals in (
                 (room, entry, {0x633fe0, 0x801600, 0x7e7e30, 0x62fde6, 0x63e620, 0x62f640,
                                0x62af10, 0x67ec54, 0x7cad60, 0x7c64c0, 0x7c6581, 0x7c64b5, 0x77ffb0}),
-                (tick, entry+4096, {0x24000000, 0x633fe0, 0x7cb7a0, 0x730280, *room['entries'].values()}),
+                (tick, entry+4096, {0x24000000, 0x633fe0, 0x7cb7a0, 0x730280, *entries.values()}),
             ):
                 rows = list(decoder.disasm(plan['code'], base))
                 starts = {row.address for row in rows}
@@ -407,7 +466,7 @@ class MultiplayerBridgeTests(unittest.TestCase):
 
     def setup_bridge(self):
         process, port = Memory(), Mock()
-        value = bridge.MultiplayerBridge(process, port, Mock())
+        value = bridge.ServerSessionBridge(process, port, Mock())
         value.state = 0x20000000
         process.write(value.state, bytes(4096))
         value.login_started = value.login_done = True
