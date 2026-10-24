@@ -65,8 +65,8 @@ class MemberProfileTests(unittest.TestCase):
         from codol_rebuild.application.room.service import RoomSession
         gateway = Mock()
         gateway.room_detail.return_value = {'roomId': 'rm_test', 'members': [
-            {'playerId': 'pl_a', 'profileAvailable': True},
-            {'playerId': 'pl_b', 'profileAvailable': True}]}
+            {'playerId': 'pl_a'},
+            {'playerId': 'pl_b'}]}
         gateway.member_profile.side_effect = [sample_profile(), sample_profile()]
         session = RoomSession(gateway, Mock(), 'http://localhost', 'fingerprint', Mock())
         try:

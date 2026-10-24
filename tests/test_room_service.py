@@ -59,6 +59,10 @@ class Gateway:
             raise RoomError('ROOM_NOT_FOUND', '房间不存在')
         return dict(room)
 
+    def member_profile(self, player_id, room_id, member_id):
+        """成员资料总是存在；格式验证由游戏适配层测试覆盖。"""
+        return {'testMember': member_id}
+
     def list_rooms(self, player_id, cursor):
         self.calls.append(('list', player_id))
         return {'rooms': list(self.rooms.values()), 'nextCursor': None}

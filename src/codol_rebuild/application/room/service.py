@@ -117,9 +117,8 @@ class RoomSession:
     def _load_profiles(self, data, player_id):
         """按成员读取完整资料；原生缺失资料不能用其他玩家的数据代替。"""
         for member in data.get('members', []):
-            if member.get('profileAvailable'):
-                member['profile'] = self._gateway.member_profile(
-                    player_id, data['roomId'], member['playerId'])
+            member['profile'] = self._gateway.member_profile(
+                player_id, data['roomId'], member['playerId'])
 
     def _handle_room_settings_updated(self, payload) -> Completion | None:
         """交付当前房间设置，离房后或其他房间的设置不再回显。"""
