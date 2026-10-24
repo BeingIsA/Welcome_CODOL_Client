@@ -42,14 +42,16 @@ class InitializationTests(unittest.TestCase):
         tables = {**captured['tables'], 'mp/coStartingLoadoutSetting.csv': []}
         schemas = {kind: json.loads(Path(captured['schemas'][label]['schema']).read_text(encoding='utf-8'))
                    for kind, label in [('public', 'playerdata'), ('secure', 'playersecuredata')]}
-        codec = AccountCodec(schemas, tables, [bounty])
+        defaults = [dict(row, gp_cp_sale=False) for row in captured['catalog']
+                    if row['id'] in (30000, 30060, 30061)]
+        codec = AccountCodec(schemas, tables, [bounty, *defaults])
         folder = ROOT/'verification/client/workspaces'
         with tempfile.TemporaryDirectory(dir=folder) as tmp:
             repo = AccountRepository(Path(tmp)/'honor.sqlite3')
             session = AccountSession(repo, codec)
             created = session.initialize()
             self.assertTrue(created['new_account'])
-            self.assertEqual(created['initialization']['owned_ids'], [2056])
+            self.assertEqual(created['initialization']['owned_ids'], [2056, 30000, 30060, 30061])
             self.assertEqual(codec.validate_snapshot(created['profiles']), 2056)
             # 现有档案启动不重新执行新档授权策略；即使新策略不同也不得迁移。
             def forbidden(*args):
@@ -61,6 +63,9 @@ class InitializationTests(unittest.TestCase):
             self.assertEqual(reopened['profiles'], created['profiles'])
             from codol_rebuild.adapters.game.profile_format.fields import Fields
             fields = Fields(schemas['public'])
+            for field, value in (('cardIcon', 30000), ('cardBackground', 30060),
+                                 ('cardTitle', 30061), ('cardNameplate', 0), ('cardFrame', 0)):
+                self.assertEqual(fields.read(created['profiles']['public'], field), value)
             self.assertEqual(fields.read(created['profiles']['public'], 'loadoutVersion'), 3)
             old = bytearray(created['profiles']['public'])
             fields.write(old, 'loadoutVersion', 0)
@@ -72,6 +77,22 @@ class InitializationTests(unittest.TestCase):
             self.assertEqual(migrated['profiles'], created['profiles'])
             self.assertEqual(migrated['initialization'], created['initialization'])
             self.assertEqual(AccountSession(repo, codec).initialize()['revision'], migrated['revision'])
+            # 老账号既保留未选择的零值，也保留非默认选择，启动不补写装扮。
+            existing = bytearray(migrated['profiles']['public'])
+            fields.write(existing, 'cardIcon', 0)
+            fields.write(existing, 'cardBackground', 0)
+            fields.write(existing, 'cardTitle', 12345)
+            existing_profiles = {**migrated['profiles'], 'public': bytes(existing)}
+            revision = repo.save('local', migrated['revision'], existing_profiles, codec.identities,
+                                 initialization=created['initialization'])
+            reopened = AccountSession(repo, codec).initialize()
+            self.assertEqual(reopened['profiles'], existing_profiles)
+            self.assertEqual(reopened['revision'], revision)
+            # 无初始化标记的历史档案同样不能因 initialize 调用而补写默认装扮。
+            legacy, _ = codec.initialize({'profiles': existing_profiles, 'uid': 1},
+                {'progression': {'rank': 70, 'rank_version': 0, 'prestige': 4, 'experience': 0},
+                 'fill_unlock_flags': True, 'unlock_threshold': 32767})
+            self.assertEqual(legacy['public'], existing_profiles['public'])
 
     def test_gp_cp_skus_require_both_currency_and_native_sale(self):
         from codol_rebuild.adapters.game.v1649370.profile import gp_cp_market_items

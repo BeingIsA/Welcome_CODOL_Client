@@ -76,6 +76,14 @@ class AccountCodec:
             blobs[kind]=bytearray(base)
             struct.pack_into('<II',blobs[kind],0,identity['version'],identity['checksum'])
         if not saved['profiles']:
+            # 默认装扮也是具体物品；只在新档写入，旧档零值及已有选择均不补写。
+            byname = {row['name']: row['id'] for row in self.catalog}
+            for field, name in (('cardIcon', 'pci_emblems1'),
+                                ('cardBackground', 'pcb_default'),
+                                ('cardTitle', 'pct_default')):
+                if name not in byname:
+                    raise ValueError('Default player card item missing from catalog: '+name)
+                public_fields.write(blobs['public'], field, byname[name])
             # The original onboarding preview includes character 545. Validate
             # against this build's catalog before using it as the initial selection.
             if policy['character'] not in ids:raise ValueError('Default character missing from catalog')
