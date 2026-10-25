@@ -616,15 +616,7 @@ class ServerSessionBridge:
         checked_write(self.process, session+0x18, struct.pack('<I', len(members)))
         checked_write(self.process, session+0x20, ids[owner_index])
         checked_write(self.process, room+0x338, ids[owner_index])
-        # 按身份保存旧槽位，成员退出造成数组前移时也不能把别人的槽位继承过来。
-        previous_members = {}
-        if self.pending[0] == 'members':
-            for previous_index in range(u32(self.process.read, room+0x105D8)):
-                previous_address = room+0xE368+previous_index*0x1D0
-                previous_members[self.process.read(previous_address, 8)] = (
-                    u32(self.process.read, previous_address+0x88),
-                    self.process.read(previous_address+0xB0, 1))
-        changed_member_mask = 0
+        changed_team = False
         changed_local_team = False
         for index, (identity, name) in enumerate(zip(ids, names)):
             checked_write(self.process, room+0xE368+index*0x1D0, identity+name)
@@ -632,13 +624,8 @@ class ServerSessionBridge:
             member = members[index]
             native_team = {'tf141': 2, 'scar': 1, 'spectator': 6}[member.get('team', 'tf141')]
             address = room+0xE368+index*0x1D0
-            previous_member = previous_members.get(identity)
-            team_changed = previous_member is None or previous_member[0] != native_team
-            if team_changed:
-                changed_member_mask |= 1 << index
-            # 0xFF 是原生无槽位值；先释放所有变化成员的旧槽，再由原生分配。
-            checked_write(self.process, address+0xB0,
-                          b'\xff' if team_changed else previous_member[1])
+            team_changed = u32(self.process.read, address+0x88) != native_team
+            changed_team = changed_team or team_changed
             if member['playerId'] == self.player_id:
                 changed_local_team = team_changed
             profile = self.member_profiles.get(member['playerId'])
@@ -668,7 +655,7 @@ class ServerSessionBridge:
                 packets.append(bytes(packet))
         if self.members_buffer is not None:
             checked_write(self.process, self.members_buffer,
-                          struct.pack('<IIII', room, len(packets), changed_member_mask,
+                          struct.pack('<IIII', room, len(packets), int(changed_team),
                                       int(changed_local_team))+b''.join(packets))
             self._word(52, 1)
         self.record({'multiplayer': self.pending[0], 'success': True, 'roomId': data['roomId'],

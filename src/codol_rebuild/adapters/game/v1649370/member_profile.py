@@ -162,20 +162,15 @@ def build_member_publish(entry, buffer):
         code.extend(struct.pack('<I', value))
     def call(address):
         code.extend(b'\xe8'); word((address-entry-len(code)-4) & 0xffffffff)
-    # buffer+8 是新增/换队成员位图；只分配变化成员，保留其他成员展示位置。
-    # ESI=成员数，EDI=当前成员，栈参数=成员数组。
+    # 换队后由原生分配同组槽位；ESI=成员数，EDI=当前成员，栈参数=成员数组。
     code.extend(b'\x83\x3d'); word(buffer+8); code.extend(bytes.fromhex('000f84'))
     slots_skip = len(code); word(0)
     code.extend(b'\x8b\x1d'); word(buffer)
-    code.extend(b'\x8b\x2d'); word(buffer+8)
-    code.extend(bytes.fromhex('8dbb68e30000'))
+    code.extend(bytes.fromhex('8babd8050100 8dbb68e30000'))
     slots_loop = len(code)
     code.extend(bytes.fromhex('85ed0f84')); slots_end = len(code); word(0)
-    code.extend(bytes.fromhex('d1ed0f83')); member_skip = len(code); word(0)
     code.extend(bytes.fromhex('8bb3d8050100 8d8368e30000 50')); call(0x629FF0)
-    code.extend(bytes.fromhex('83c404 8887b0000000'))
-    struct.pack_into('<i', code, member_skip, len(code)-member_skip-4)
-    code.extend(bytes.fromhex('81c7d0010000 e9'))
+    code.extend(bytes.fromhex('83c404 8887b0000000 81c7d0010000 4d e9'))
     word((slots_loop-len(code)-4) & 0xffffffff)
     struct.pack_into('<i', code, slots_end, len(code)-slots_end-4)
     struct.pack_into('<i', code, slots_skip, len(code)-slots_skip-4)
