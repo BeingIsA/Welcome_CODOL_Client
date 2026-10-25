@@ -138,7 +138,7 @@ class MemberProfileTests(unittest.TestCase):
         decoder = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
         for entry in (0x20000000, 0xf0000000):
             for code, external in ((profile.build_capture(entry, 0x21000000), {0x4f73b0, 0x7c5d60}),
-                                   (profile.build_member_publish(entry, 0x21000000), {0x6305f0, 0x7cbab0})):
+                                   (profile.build_member_publish(entry, 0x21000000), {0x629ff0, 0x6305f0, 0x7cbab0, 0x7cb290})):
                 rows = list(decoder.disasm(code, entry))
                 self.assertEqual(sum(row.size for row in rows), len(code))
                 starts = {row.address for row in rows}

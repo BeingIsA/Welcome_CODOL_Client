@@ -44,6 +44,11 @@ class HttpGateway:
         return self._request('POST', '/api/v1/rooms/'+_identifier(room_id, 'rm')+'/kick',
                              {'targetPlayerId': _identifier(target_player_id, 'pl')}, player_id)
 
+    def change_team(self, player_id, room_id, team):
+        """换队使用本人接口，由服务端校验目标名额。"""
+        return self._request('PATCH', '/api/v1/rooms/'+_identifier(room_id, 'rm')+'/members/me/team',
+                             {'team': team}, player_id)
+
     def __init__(self, server, timeout=5.0):
         self.server = normalize_server(server)
         if not 0.1 <= timeout <= 30:

@@ -30,10 +30,41 @@ class RoomSession:
         self._members_pending = None
         self._kick_pending = None
         self._departure_pending = None
+        self._team_pending = None
+
+    def begin_change_team(self, room_id, team):
+        """共用串行工作线程提交换队，未消费的请求不会重复发送。"""
+        if (self._closed or self._pending is not None or self._team_pending is not None
+                or self._departure_pending is not None or self._members_pending is not None
+                or self._kick_pending is not None):
+            return False
+        self._team_pending = self._executor.submit(self._execute_change_team, room_id, team)
+        return True
+
+    def _execute_change_team(self, room_id, team):
+        """成功读取成员档案供既有回显使用；失败不重试请求。"""
+        try:
+            record = self._record
+            if record is None or record.room_id != room_id:
+                raise RoomError('ROOM_NOT_FOUND', '当前房间已失效')
+            data = self._gateway.change_team(record.player_id, room_id, team)
+            self._load_profiles(data, record.player_id)
+            return Completion('change_team', data=data)
+        except RoomError as error:
+            return Completion('change_team', error=error)
+        except (KeyError, TypeError, ValueError) as error:
+            return Completion('change_team', error=RoomError('INVALID_RESPONSE', str(error)))
+
+    def poll_change_team(self):
+        """一次性消费结果并释放通道，失败也允许后续用户操作。"""
+        if self._team_pending is None or not self._team_pending.done():
+            return None
+        pending_team, self._team_pending = self._team_pending, None
+        return pending_team.result()
 
     def begin_kick(self, room_id, target_player_id):
         """串行提交踢人；不在客户端提前移除成员，也不自动重试写请求。"""
-        if self._closed or self._pending is not None or self._kick_pending is not None or self._departure_pending is not None:
+        if self._closed or self._pending is not None or self._kick_pending is not None or self._departure_pending is not None or self._team_pending is not None:
             return False
         self._kick_pending = self._executor.submit(self._execute_kick, room_id, target_player_id)
         return True
@@ -105,7 +136,8 @@ class RoomSession:
 
     def poll_event(self) -> Completion | None:
         """统一消费实时消息，按类型交给对应业务处理函数。"""
-        if self._closed or self._realtime is None or self._pending is not None:
+        # 换队回包先消费，随后才读取事件快照，避免较旧回包覆盖较新成员列表。
+        if self._closed or self._realtime is None or self._pending is not None or self._team_pending is not None:
             return None
         if self._departure_pending is not None:
             if not self._departure_pending.done():

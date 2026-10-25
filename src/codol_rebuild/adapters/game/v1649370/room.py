@@ -19,6 +19,74 @@ MEMBER_REFRESH = 0x630635
 AVATAR_IDENTITY = 0x7C64AF
 # 仅本地房间命名空间的单人标识；不是平台账号或服务端玩家 ID。
 LOCAL_MEMBER_ID = 1
+
+
+class RoomTeamBridge:
+    """接管联机房间的 UI 换队命令；原生展示刷新不经过此入口。"""
+    SLOT = 0xDDD788
+    HANDLER = 0x7CFB80
+
+    def __init__(self, process, port, room_state):
+        self.process = process
+        self.port = port
+        self.room_state = room_state
+        self.pending_room = None
+
+    def install(self):
+        """仅替换 ChangeTeam 虚表槽，房间外跳回原处理器。"""
+        if (self.process.read(self.SLOT, 4) != struct.pack('<I', self.HANDLER)
+                or self.process.read(self.HANDLER, 6) != bytes.fromhex('558bec8b4508')):
+            raise ValueError('换队原生 ABI 不匹配')
+        entry = self.process.allocate(4096)
+        instruction_bytes = bytearray.fromhex('9c60 8bec cc 619d c20400 619d e9')
+        instruction_bytes.extend(struct.pack('<I',
+            (self.HANDLER-entry-len(instruction_bytes)-4) & 0xffffffff))
+        self.process.write(entry, bytes(instruction_bytes))
+        self.process.executable(entry, 4096)
+        self.process.write(self.SLOT, struct.pack('<I', entry))
+        self.handled = entry+5
+        self.fallback = entry+10
+        return {entry+4: 'change_team'}
+
+    def handle(self, context):
+        """在暂停的主线程提取 UI 目标，不写成员、不发送原生命令。"""
+        room_state = self.room_state()
+        continuation = self.fallback
+        if room_state is not None:
+            continuation = self.handled
+            if self.pending_room is None:
+                try:
+                    def read_word(address):
+                        return struct.unpack('<I', self.process.read(address, 4))[0]
+                    frame = struct.unpack_from('<I', context, 180)[0]
+                    parameters = read_word(frame+40)
+                    arguments = read_word(parameters+16)
+                    if read_word(parameters+20) == 1 and read_word(arguments+12) in (3, 4):
+                        target_team = {0: 'tf141', 1: 'scar', 2: 'spectator'}.get(read_word(arguments+16))
+                        if target_team is not None and self.port.begin_change_team(room_state[0], target_team):
+                            self.pending_room = room_state
+                except (ValueError, OSError, struct.error):
+                    pass  # 无效请求静默结束，不落回原生上行路径。
+        struct.pack_into('<I', context, 184, continuation)
+
+    def poll(self):
+        """失败只释放请求；成功快照仅交给仍有效的原生房间。"""
+        if self.pending_room is None:
+            return None
+        result = self.port.poll_change_team()
+        if result is None:
+            return None
+        requested_room, self.pending_room = self.pending_room, None
+        if result.error is not None or requested_room != self.room_state():
+            return None
+        return result.data
+
+    def discard_pending_result(self):
+        """离房后仍消费旧请求，但即使原生地址复用也不应用旧结果。"""
+        if self.pending_room is not None:
+            self.pending_room = ()
+
+
 CONTRACT = {
     CREATE: bytes.fromhex('e841b11b00'),
     VALID: bytes.fromhex('8b411c5685c0'),

@@ -286,6 +286,7 @@ class ServerSessionBridge:
         self.applying_members = False
         self.member_profiles = {}
         self.member_menu = None
+        self.team_bridge = None
         self.notifications = None
         self.departure_message = None
 
@@ -307,6 +308,9 @@ class ServerSessionBridge:
         self.process.executable(self.profile_capture, 4096)
         if self.process.read(0x7CBAB0, 6) != bytes.fromhex('558bec83e4f8'):
             raise ValueError('玩家装备接收 ABI 不匹配')
+        if (self.process.read(0x629FF0, 6) != bytes.fromhex('558bec5132c0')
+                or self.process.read(0x7CB290, 6) != bytes.fromhex('558bec83e4f8')):
+            raise ValueError('换队槽位或本机展示 ABI 不匹配')
         self.members_buffer = self.process.allocate(4096)
         self.members_apply = self.process.allocate(4096)
         checked_write(self.process, self.members_apply,
@@ -341,6 +345,9 @@ class ServerSessionBridge:
                      [m['playerId'] for m in self.join_snapshot[1]] if self.join_snapshot else []),
             self.record, self.notifications.message)
         menu_traps = self.member_menu.install()
+        from codol_rebuild.adapters.game.v1649370.room import RoomTeamBridge
+        self.team_bridge = RoomTeamBridge(self.process, self.port, self._team_room_state)
+        team_traps = self.team_bridge.install()
         plan = build_tick(entry, self.state, ready, preview_entry, room_plan['entries'], publisher)
         if len(plan['code']) > 4096:
             raise ValueError('联机帧桥超出代码页')
@@ -348,6 +355,7 @@ class ServerSessionBridge:
         self.process.executable(entry, 4096)
         self.traps = {**room_plan['traps'], **plan['traps'], **self.room_list.traps, **join_plan['traps']}
         self.traps.update(menu_traps)
+        self.traps.update(team_traps)
         self.profile_query = member_profile.ProfileQueryBridge(
             self.process, lambda: {hashlib.sha256(key.encode('utf-8')).digest()[:8]: value
                                    for key, value in self.member_profiles.items()})
@@ -372,6 +380,16 @@ class ServerSessionBridge:
 
     def _word(self, offset, value):
         checked_write(self.process, self.state+offset, struct.pack('<I', value))
+
+    def _team_room_state(self):
+        """以已确认房间及原生对象身份关联换队完成，防止离房后的迟到回显。"""
+        if self.current_room_id is None:
+            return None
+        room_pointer = u32(self.process.read, ROOM_POINTER)
+        session_pointer = u32(self.process.read, room_pointer+0x1C) if room_pointer >= 0x10000 else 0
+        if not self._valid_room(room_pointer, session_pointer):
+            return None
+        return self.current_room_id, room_pointer, session_pointer
 
     def _valid_room(self, room, session):
         read = self.process.read
@@ -402,6 +420,10 @@ class ServerSessionBridge:
         thread, ctx = self.process.context(event.tid)
         try:
             phase = self.traps[address]
+            if phase == 'change_team':
+                self.team_bridge.handle(ctx)
+                self.process.set_context(thread, ctx)
+                return
             if phase in ('menu_query', 'menu_kick'):
                 self.member_menu.handle(phase, ctx)
                 self.process.set_context(thread, ctx)
@@ -461,6 +483,8 @@ class ServerSessionBridge:
                     if action in (3, 7) and u32(self.process.read, room+0x1C) != 0:
                         raise ValueError('服务端离房成功，但原生房间未清理')
                     if action in (3, 7):
+                        if self.team_bridge is not None:
+                            self.team_bridge.discard_pending_result()
                         self.current_room_id = None
                         if action == 7:
                             self.is_owner = False
@@ -592,12 +616,18 @@ class ServerSessionBridge:
         checked_write(self.process, session+0x18, struct.pack('<I', len(members)))
         checked_write(self.process, session+0x20, ids[owner_index])
         checked_write(self.process, room+0x338, ids[owner_index])
+        changed_team = False
+        changed_local_team = False
         for index, (identity, name) in enumerate(zip(ids, names)):
             checked_write(self.process, room+0xE368+index*0x1D0, identity+name)
             checked_write(self.process, session+0x40+index*0x60, identity+name)
             member = members[index]
             native_team = {'tf141': 2, 'scar': 1, 'spectator': 6}[member.get('team', 'tf141')]
             address = room+0xE368+index*0x1D0
+            team_changed = u32(self.process.read, address+0x88) != native_team
+            changed_team = changed_team or team_changed
+            if member['playerId'] == self.player_id:
+                changed_local_team = team_changed
             profile = self.member_profiles.get(member['playerId'])
             if profile is not None:
                 for offset, raw in member_profile.member_summary(profile):
@@ -625,7 +655,8 @@ class ServerSessionBridge:
                 packets.append(bytes(packet))
         if self.members_buffer is not None:
             checked_write(self.process, self.members_buffer,
-                          struct.pack('<IIII', room, len(packets), 0, 0)+b''.join(packets))
+                          struct.pack('<IIII', room, len(packets), int(changed_team),
+                                      int(changed_local_team))+b''.join(packets))
             self._word(52, 1)
         self.record({'multiplayer': self.pending[0], 'success': True, 'roomId': data['roomId'],
                      'members': len(members)})
@@ -691,6 +722,11 @@ class ServerSessionBridge:
         """主线程统一消费应用层事件，按类型分发原生回显。"""
         if self.pending is not None or self.join_cleanup:
             return
+        if self.team_bridge is not None:
+            snapshot = self.team_bridge.poll()
+            if snapshot is not None and snapshot['roomId'] == self.current_room_id:
+                self._apply_room_members(snapshot)
+                return
         if self.member_menu is not None:
             snapshot = self.member_menu.poll()
             if snapshot is not None and snapshot['roomId'] == self.current_room_id:

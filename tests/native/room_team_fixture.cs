@@ -1,0 +1,44 @@
+// 换队适配执行夹具：真实槽位函数，模拟成员通知和角色通知。
+using System;
+using System.IO;
+using System.Runtime.InteropServices;
+class RoomTeamFixture {
+    [DllImport("kernel32.dll")] static extern IntPtr VirtualAlloc(IntPtr address, UIntPtr size, uint allocation, uint protection);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] delegate void Entry();
+    static void Require(bool condition) { if (!condition) throw new Exception("native ABI assertion failed"); }
+    static void Allocate(int address, int size) { Require(VirtualAlloc(new IntPtr(address), new UIntPtr((uint)size),0x3000,0x40)==new IntPtr(address)); }
+    static void Write(int address, byte[] bytes) { Marshal.Copy(bytes,0,new IntPtr(address),bytes.Length); }
+    static void Word(int address, int value) { Marshal.WriteInt32(new IntPtr(address),value); }
+    static int Read(int address) { return Marshal.ReadInt32(new IntPtr(address)); }
+    static byte Slot(int index) { return Marshal.ReadByte(new IntPtr(0x2200e418+index*0x1d0)); }
+    static void Stub(int address,int counter,bool stackArgument) {
+        byte[] bytes = stackArgument ? new byte[]{0xff,0x05,0,0,0,0,0xc2,4,0} : new byte[]{0xff,0x05,0,0,0,0,0xc3};
+        Array.Copy(BitConverter.GetBytes(counter),0,bytes,2,4); Write(address,bytes);
+    }
+    static int Main(string[] arguments) {
+        try {
+            Allocate(0x20000000,0x1000);Allocate(0x21000000,0x1000);
+            Allocate(0x22000000,0x20000);Allocate(0x28000000,0x10000);
+            Write(0x20000000,File.ReadAllBytes(arguments[0]));Write(0x28009ff0,File.ReadAllBytes(arguments[1]));
+            Stub(0x280005f0,0x21000800,true);Stub(0x2800bab0,0x21000804,true);Stub(0x2800b290,0x21000808,false);
+            Word(0x21000000,0x22000000);Word(0x21000004,2);Word(0x21000008,1);Word(0x2100000c,1);
+            Word(0x220105d8,18);
+            for(int index=0;index<18;index++) {
+                int member=0x2200e368+index*0x1d0;
+                Word(member,index+1);Word(member+0x88,index<12?2:6);
+            }
+            Entry entry=(Entry)Marshal.GetDelegateForFunctionPointer(new IntPtr(0x20000000),typeof(Entry));
+            entry();
+            Require(Read(0x21000800)==1 && Read(0x21000804)==2 && Read(0x21000808)==1);
+            for(int index=0;index<18;index++) {
+                Require(Slot(index)<19);
+                for(int other=index+1;other<18;other++)
+                    if((index<12)==(other<12)) Require(Slot(index)!=Slot(other));
+            }
+            Word(0x21000008,0);Word(0x2100000c,0);entry();
+            Require(Read(0x21000800)==2 && Read(0x21000804)==4 && Read(0x21000808)==1);
+            Console.WriteLine("12 participants + 6 spectators: original allocator and notification ABI passed");
+            return 0;
+        } catch(Exception error) {Console.WriteLine(error);return 1;}
+    }
+}

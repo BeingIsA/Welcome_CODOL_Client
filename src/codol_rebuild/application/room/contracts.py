@@ -51,6 +51,9 @@ class IdentityStore(Protocol):
 
 class Gateway(Protocol):
     """玩家业务通信端口；所有方法在后台串行执行。"""
+    def change_team(self, player_id: str, room_id: str, team: str) -> dict:
+        """提交本人的绝对目标阵营，返回服务端确认快照。"""
+        ...
     def kick(self, player_id: str, room_id: str, target_player_id: str) -> dict:
         """以房主身份踢出目标，返回服务端确认的房间快照。"""
         ...
@@ -126,6 +129,13 @@ PERMISSION_ERROR_CODES = frozenset({'BANNED', 'FORBIDDEN', 'UNAUTHENTICATED'})
 
 class RoomPort(Protocol):
     """原生桥使用的异步用例接口；调用方不得直接访问工作线程状态。"""
+    def begin_change_team(self, room_id: str, team: str) -> bool:
+        """提交一次换队请求，不提前更新已确认阵营。"""
+        ...
+
+    def poll_change_team(self) -> Completion | None:
+        """消费换队完成结果；失败仅收尾，不驱动 UI 或自动重试。"""
+        ...
     def poll_event(self) -> Completion | None:
         """消费当前房间的设置、成员更新及被踢/关闭完成事件。"""
         ...

@@ -158,6 +158,8 @@ class MultiplayerBridgeTests(unittest.TestCase):
         """准备独立内存，模拟两个服务端成员而不访问游戏进程。"""
         memory = Memory()
         room, session, state = 0x22000000, 0x23000000, 0x24000000
+        # 原生已构造的成员区具有可读的阵营字段。
+        memory.write(room+0xE368, bytes(18*0x1D0))
         memory.write(state, bytes(4096))
         memory.word(bridge.ROOM_POINTER, room)
         memory.word(room+0x1C, 0)
