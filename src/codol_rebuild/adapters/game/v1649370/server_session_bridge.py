@@ -203,8 +203,16 @@ def build_tick(entry, state, ready, preview_entry, room_entries, list_publish=No
             branch('0f84', 'members_done')
             emit('c705'); word(state+52); word(0)
             emit('83e4f0'); call(room_entries['members_apply']); emit('8be5')
+            if 'ready_notify' in room_entries:
+                emit('83e4f0'); call(room_entries['ready_notify']); emit('8be5')
             trap('members_applied')
             label('members_done')
+        if 'ready_notify' in room_entries:
+            emit('833d'); word(state+56); emit('00')
+            branch('0f84', 'ready_done')
+            emit('c705'); word(state+56); word(0)
+            emit('83e4f0'); call(room_entries['ready_notify']); emit('8be5')
+            label('ready_done')
         emit('833d'); word(state+SETTINGS_READY_OFFSET); emit('00')
         branch('0f84', 'poll_command')
         emit('c705'); word(state+SETTINGS_READY_OFFSET); word(0)
@@ -287,6 +295,7 @@ class ServerSessionBridge:
         self.member_profiles = {}
         self.member_menu = None
         self.team_bridge = None
+        self.ready_bridge = None
         self.notifications = None
         self.departure_message = None
 
@@ -348,6 +357,15 @@ class ServerSessionBridge:
         from codol_rebuild.adapters.game.v1649370.room import RoomTeamBridge
         self.team_bridge = RoomTeamBridge(self.process, self.port, self._team_room_state)
         team_traps = self.team_bridge.install()
+        from codol_rebuild.adapters.game.v1649370.room import RoomReadyBridge, build_ready_notifications
+        self.ready_bridge = RoomReadyBridge(self.process, self.port, self._team_room_state,
+                                           lambda: self.applying_members)
+        ready_traps = self.ready_bridge.install()
+        ready_notify = self.process.allocate(4096)
+        checked_write(self.process, ready_notify,
+                      build_ready_notifications(ready_notify, self.members_buffer))
+        self.process.executable(ready_notify, 4096)
+        room_plan['entries']['ready_notify'] = ready_notify
         plan = build_tick(entry, self.state, ready, preview_entry, room_plan['entries'], publisher)
         if len(plan['code']) > 4096:
             raise ValueError('联机帧桥超出代码页')
@@ -356,6 +374,7 @@ class ServerSessionBridge:
         self.traps = {**room_plan['traps'], **plan['traps'], **self.room_list.traps, **join_plan['traps']}
         self.traps.update(menu_traps)
         self.traps.update(team_traps)
+        self.traps.update(ready_traps)
         self.profile_query = member_profile.ProfileQueryBridge(
             self.process, lambda: {hashlib.sha256(key.encode('utf-8')).digest()[:8]: value
                                    for key, value in self.member_profiles.items()})
@@ -420,6 +439,10 @@ class ServerSessionBridge:
         thread, ctx = self.process.context(event.tid)
         try:
             phase = self.traps[address]
+            if phase in ('set_ready', 'get_ready'):
+                self.ready_bridge.handle(phase, ctx)
+                self.process.set_context(thread, ctx)
+                return
             if phase == 'change_team':
                 self.team_bridge.handle(ctx)
                 self.process.set_context(thread, ctx)
@@ -485,6 +508,9 @@ class ServerSessionBridge:
                     if action in (3, 7):
                         if self.team_bridge is not None:
                             self.team_bridge.discard_pending_result()
+                        if self.ready_bridge is not None:
+                            self.ready_bridge.discard_pending_result()
+                        self._word(56, 0)
                         self.current_room_id = None
                         if action == 7:
                             self.is_owner = False
@@ -550,7 +576,7 @@ class ServerSessionBridge:
             raise ValueError(f'当前原生客户端最多支持 {MEMBER_CAPACITY} 个成员')
         for member in members:
             if (member.get('team', 'tf141') not in ('tf141', 'scar', 'spectator')
-                    or member.get('readyState', '准备中') not in ('准备中', '已准备')):
+                    or type(member.get('readyState', False)) is not bool):
                 raise ValueError('成员阵营或准备状态无效')
         if not any(m['playerId'] == self.player_id for m in members):
             raise ValueError('入房快照缺少本机玩家')
@@ -633,7 +659,7 @@ class ServerSessionBridge:
                 for offset, raw in member_profile.member_summary(profile):
                     checked_write(self.process, address+offset, raw)
             checked_write(self.process, address+0x88, struct.pack('<I', native_team))
-            checked_write(self.process, address+0x90, bytes([member.get('readyState') == '已准备']))
+            checked_write(self.process, address+0x90, bytes([member.get('readyState', False)]))
             checked_write(self.process, address+0x92, bytes([member['playerId'] == data['ownerPlayerId']]))
         checked_write(self.process, room+0x105D8,
                       struct.pack('<IIII', len(members), len(members), 0, data['maxPlayers']-len(members)))
@@ -649,8 +675,11 @@ class ServerSessionBridge:
         for member, identity in zip(members, ids):
             profile = self.member_profiles.get(member['playerId'])
             if (profile is not None and member['playerId'] != self.player_id
-                    and member.get('team') in ('tf141', 'scar')):
-                packet = bytearray(profile[member['team']])
+                    and member.get('team') in ('tf141', 'scar', 'spectator')):
+                # 观众也需初始化角色缓存；原生接收入口按成员记录覆盖展示包阵营。
+                # 观众复用已采集的展示数据，不新增第三套档案或伪造角色字段。
+                display_profile = 'tf141' if member['team'] == 'spectator' else member['team']
+                packet = bytearray(profile[display_profile])
                 packet[:8] = identity
                 packets.append(bytes(packet))
         if self.members_buffer is not None:
@@ -722,6 +751,16 @@ class ServerSessionBridge:
         """主线程统一消费应用层事件，按类型分发原生回显。"""
         if self.pending is not None or self.join_cleanup:
             return
+        if self.ready_bridge is not None:
+            result = self.ready_bridge.poll()
+            if result is not None:
+                if result.error is None:
+                    self._apply_room_members(result.data)
+                else:
+                    # 原生请求锁依赖完成通知解除；保留已确认状态，不重试写请求。
+                    self.notifications.message(display_message(result.error))
+                    self._word(56, 1)
+                return
         if self.team_bridge is not None:
             snapshot = self.team_bridge.poll()
             if snapshot is not None and snapshot['roomId'] == self.current_room_id:

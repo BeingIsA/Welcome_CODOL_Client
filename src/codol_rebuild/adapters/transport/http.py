@@ -49,6 +49,11 @@ class HttpGateway:
         return self._request('PATCH', '/api/v1/rooms/'+_identifier(room_id, 'rm')+'/members/me/team',
                              {'team': team}, player_id)
 
+    def change_ready(self, player_id, room_id, ready):
+        """发送绝对准备状态，不在传输层切换状态或重试。"""
+        return self._request('PATCH', '/api/v1/rooms/'+_identifier(room_id, 'rm')+'/members/me/ready',
+                             {'ready': ready}, player_id)
+
     def __init__(self, server, timeout=5.0):
         self.server = normalize_server(server)
         if not 0.1 <= timeout <= 30:

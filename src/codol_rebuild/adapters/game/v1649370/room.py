@@ -87,6 +87,104 @@ class RoomTeamBridge:
             self.pending_room = ()
 
 
+class RoomReadyBridge:
+    """准备专用 GFx 适配：命令提交、本人状态读取与成员回显来源分离。"""
+
+    def __init__(self, process, port, room_state, applying_members):
+        self.process = process
+        self.port = port
+        self.room_state = room_state
+        self.applying_members = applying_members
+        self.pending_room = None
+        self.continuations = {}
+
+    def install(self):
+        """替换两个准备专用虚表槽；房间外仍执行原处理器。"""
+        for address, expected in {
+            0x7CF895: bytes.fromhex('8ad88b4508'),
+            0x7CB4D0: bytes.fromhex('558bec83e4f883ec44'),
+        }.items():
+            if self.process.read(address, len(expected)) != expected:
+                raise ValueError('准备接口原生 ABI 不匹配')
+        traps = {}
+        for phase, slot, handler in (('set_ready', 0xDDD71C, 0x7CF850),
+                                     ('get_ready', 0xDDD728, 0x7CF880)):
+            if self.process.read(slot, 4) != struct.pack('<I', handler):
+                raise ValueError('准备接口原生槽位不匹配')
+            entry = self.process.allocate(4096)
+            instruction_bytes = bytearray.fromhex('9c60 8bec cc 619d')
+            if phase == 'get_ready':
+                # AL 来自确认后的本人成员槽；复用原生 GFx 返回值清理及布尔赋值。
+                instruction_bytes.extend(bytes.fromhex('558bec 5356 e9'))
+                instruction_bytes.extend(struct.pack('<I',
+                    (0x7CF895-entry-len(instruction_bytes)-4) & 0xffffffff))
+            else:
+                instruction_bytes.extend(bytes.fromhex('c20400'))
+            fallback = entry+len(instruction_bytes)
+            instruction_bytes.extend(bytes.fromhex('619d e9'))
+            instruction_bytes.extend(struct.pack('<I',
+                (handler-entry-len(instruction_bytes)-4) & 0xffffffff))
+            self.process.write(entry, bytes(instruction_bytes))
+            self.process.executable(entry, 4096)
+            self.process.write(slot, struct.pack('<I', entry))
+            self.continuations[phase] = (entry+5, fallback)
+            traps[entry+4] = phase
+        return traps
+
+    def handle(self, phase, context):
+        """只在现有主线程暂停点读取参数；服务端回显不会再生成上行命令。"""
+        room_state = self.room_state()
+        handled, fallback = self.continuations[phase]
+        continuation = fallback
+        if room_state is not None:
+            continuation = handled
+            frame = struct.unpack_from('<I', context, 180)[0]
+            if phase == 'get_ready':
+                # 发布器约定本人排在第一槽，原生登录对象不作为服务端身份来源。
+                ready = self.process.read(room_state[1]+0xE368+0x90, 1)[0]
+                self.process.write(frame+28, struct.pack('<I', int(bool(ready))))
+            elif not self.applying_members() and self.pending_room is None:
+                parameters = struct.unpack('<I', self.process.read(frame+40, 4))[0]
+                arguments = struct.unpack('<I', self.process.read(parameters+16, 4))[0]
+                ready = bool(self.process.read(arguments+16, 1)[0])
+                if self.port.begin_change_ready(room_state[0], ready):
+                    self.pending_room = room_state
+        struct.pack_into('<I', context, 184, continuation)
+
+    def poll(self):
+        """交付原请求所属房间的结果，沿用离房失效边界，不重试请求。"""
+        if self.pending_room is None:
+            return None
+        result = self.port.poll_change_ready()
+        if result is None:
+            return None
+        requested_room, self.pending_room = self.pending_room, None
+        return result if requested_room == self.room_state() else None
+
+    def discard_pending_result(self):
+        """离房后继续消费在途结果，但不向重用的房间对象投递。"""
+        if self.pending_room is not None:
+            self.pending_room = ()
+
+
+def build_ready_notifications(entry, room_pointer_address):
+    """成员列表已发布后，沿原生监听器逐个完成准备状态通知。"""
+    instruction_bytes = bytearray.fromhex('9c60 8b1d')
+    instruction_bytes.extend(struct.pack('<I', room_pointer_address))
+    instruction_bytes.extend(bytes.fromhex('8bb3d8050100 8dbb68e30000'))
+    loop_offset = len(instruction_bytes)
+    instruction_bytes.extend(bytes.fromhex('85f6 0f84'))
+    end_offset = len(instruction_bytes)
+    instruction_bytes.extend(bytes(4))
+    instruction_bytes.extend(bytes.fromhex('57 e8'))
+    instruction_bytes.extend(struct.pack('<I', (0x7CB4D0-entry-len(instruction_bytes)-4) & 0xffffffff))
+    instruction_bytes.extend(bytes.fromhex('81c7d0010000 4e e9'))
+    instruction_bytes.extend(struct.pack('<i', loop_offset-len(instruction_bytes)-4))
+    struct.pack_into('<i', instruction_bytes, end_offset, len(instruction_bytes)-end_offset-4)
+    instruction_bytes.extend(bytes.fromhex('619d c3'))
+    return bytes(instruction_bytes)
+
+
 CONTRACT = {
     CREATE: bytes.fromhex('e841b11b00'),
     VALID: bytes.fromhex('8b411c5685c0'),

@@ -42,7 +42,7 @@ def created_snapshot():
     return {'roomId': 'rm_test', 'ownerPlayerId': 'pl_me', 'ownerDisplayName': '测试玩家',
             'maxPlayers': 4, 'playerCount': 1, 'settings': settings,
             'members': [{'playerId': 'pl_me', 'displayName': '测试玩家', 'isOwner': True,
-                         'team': 'tf141', 'readyState': '准备中'}]}
+                         'team': 'tf141', 'readyState': False}]}
 
 
 def write_full_config(memory, room, maximum=6, password=None, mode='', map_name='',
@@ -248,8 +248,8 @@ class MultiplayerBridgeTests(unittest.TestCase):
     def test_member_snapshot_uses_server_team_ready_and_owner(self):
         """本机排首槽不影响服务端阵营；回显不会产生用户设置命令。"""
         memory, adapter, data, room, session = self.join_fixture()
-        data['members'][0].update(team='tf141', readyState='准备中')
-        data['members'][1].update(team='scar', readyState='准备中')
+        data['members'][0].update(team='tf141', readyState=False)
+        data['members'][1].update(team='scar', readyState=True)
         import base64
         from test_member_profile import sample_profile
         for index, member in enumerate(data['members']):
@@ -270,7 +270,7 @@ class MultiplayerBridgeTests(unittest.TestCase):
         local, owner = room+0xE368, room+0xE368+0x1D0
         self.assertEqual(bridge.u32(memory.read, local+0x88), 1)
         self.assertEqual(bridge.u32(memory.read, owner+0x88), 2)
-        self.assertEqual(memory.read(local+0x90, 1), b'\0')
+        self.assertEqual(memory.read(local+0x90, 1), b'\x01')
         self.assertEqual(memory.read(owner+0x90, 1), b'\0')
         self.assertEqual(memory.read(local+0x92, 1), b'\0')
         self.assertEqual(memory.read(owner+0x92, 1), b'\x01')
@@ -278,6 +278,40 @@ class MultiplayerBridgeTests(unittest.TestCase):
         self.assertEqual(memory.read(owner+0x98, 2), bytes((59, 3)))
         self.assertEqual(memory.read(local+0xB2, 10), struct.pack('<5H', *range(111, 116)))
         self.assertEqual(memory.read(owner+0xB2, 10), struct.pack('<5H', *range(101, 106)))
+        adapter.port.begin.assert_not_called()
+
+    def test_spectator_profile_is_published_on_join_and_team_transitions(self):
+        """首次遇到观众也发布模型资料，不依赖其曾加入参战阵营留下的缓存。"""
+        import hashlib
+        from test_member_profile import sample_profile
+        from codol_rebuild.adapters.game.v1649370.member_profile import decode_snapshot
+        memory, adapter, data, room, session = self.join_fixture()
+        owner_profile = sample_profile()
+        data['members'][0].update(team='spectator', profile=owner_profile)
+        data['members'][1].update(team='tf141', profile=sample_profile())
+        adapter._prepare_join_snapshot(data)
+        memory.word(room+0x1C, session)
+        memory.word(session+0x25C8, room)
+        memory.write(session, b'\x01')
+        adapter.members_buffer = 0x27000000
+        adapter.pending = ('join', room, session)
+        decoded_profile = decode_snapshot(owner_profile)
+        for owner_team, local_team in (('spectator', 'tf141'), ('spectator', 'spectator'),
+                                       ('scar', 'spectator'), ('spectator', 'spectator'),
+                                       ('spectator', 'spectator')):
+            with self.subTest(owner_team=owner_team, local_team=local_team):
+                data['members'][0]['team'] = owner_team
+                data['members'][1]['team'] = local_team
+                adapter._prepare_join_snapshot(data, joining=False)
+                adapter._publish_join_snapshot()
+                self.assertEqual(bridge.u32(memory.read, adapter.members_buffer+4), 1)
+                packet = memory.read(adapter.members_buffer+16, 0xA0)
+                self.assertEqual(packet[:8], hashlib.sha256(b'pl_owner').digest()[:8])
+                display_profile = 'tf141' if owner_team == 'spectator' else owner_team
+                self.assertEqual(packet[8:], decoded_profile[display_profile][8:])
+                self.assertEqual(bridge.u32(memory.read, room+0xE368+0x1D0+0x88),
+                                 6 if owner_team == 'spectator' else 1)
+                adapter.pending = ('members', room, session)
         adapter.port.begin.assert_not_called()
 
     def test_realtime_dispatch_routes_settings_and_ignores_other_events(self):
