@@ -191,8 +191,6 @@ class HttpGateway:
     def leave(self, player_id, room_id):
         room_id = _identifier(room_id, 'rm')
         data = self._request('POST', f'/api/v1/rooms/{room_id}/leave', {}, player_id)
-        if type(data.get('left')) is not bool or type(data.get('roomClosed')) is not bool:
-            raise RoomError('INVALID_RESPONSE', '离房响应字段不完整', uncertain=True)
         return data
 
     def list_rooms(self, player_id, cursor):
