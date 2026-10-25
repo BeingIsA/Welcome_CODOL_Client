@@ -30,9 +30,16 @@ class BroadcastNativeTests(unittest.TestCase):
             build = subprocess.run([str(compiler), '/nologo', '/platform:x86', '/out:' + str(executable),
                                     str(project/'client/tests/native/broadcast_fixture.cs')], capture_output=True, timeout=30)
             self.assertEqual(build.returncode, 0, build.stdout.decode('mbcs', errors='replace'))
-            result = subprocess.run([str(executable), str(workspace/'code.bin'), str(plan['poll']),
-                                     str(workspace/'message.bin')], capture_output=True, timeout=20)
-            self.assertEqual(result.returncode, 0, (result.stdout + result.stderr).decode('mbcs', errors='replace'))
+            for native_type, speaker_type in enumerate(('large', 'small')):
+                with self.subTest(speaker_type=speaker_type):
+                    (workspace/'message.bin').write_bytes(encode_message(
+                        server_message(speaker_type)['payload'], '12345', 0x21000000))
+                    result = subprocess.run([str(executable), str(workspace/'code.bin'), str(plan['poll']),
+                                             str(workspace/'message.bin'), str(native_type)],
+                                            capture_output=True, timeout=20)
+                    self.assertEqual(result.returncode, 0,
+                                     (result.stdout + result.stderr).decode('mbcs', errors='replace'))
+
 
 
 if __name__ == '__main__':

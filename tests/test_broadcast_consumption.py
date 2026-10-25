@@ -64,7 +64,7 @@ class BroadcastConsumptionTests(unittest.TestCase):
     def test_consecutive_confirmations_persist_and_last_item_clears_slot(self):
         other_record = self.memory.read(self.pool_address, profile.STRIDE)
         for remaining_count in (2, 1, 0):
-            self.port.poll_sent.return_value = {'messageId': str(remaining_count)}
+            self.port.poll_sent.return_value = {'messageId': str(remaining_count), 'speakerType': 'large'}
             self.poll()
             reopened = AccountRepository(self.repository.path).load('local', Codec.identities)
             self.assertEqual(self.remaining(), remaining_count)
@@ -86,7 +86,7 @@ class BroadcastConsumptionTests(unittest.TestCase):
             self.port.poll_message.return_value = message
             self.poll()
         self.assertEqual(self.remaining(), 3)
-        self.port.poll_sent.return_value = {'messageId': 'broadcast_one'}
+        self.port.poll_sent.return_value = {'messageId': 'broadcast_one', 'speakerType': 'large'}
         self.poll()
         self.assertEqual(self.remaining(), 2)
         self.port.poll_sent.return_value = None
@@ -108,7 +108,7 @@ class BroadcastConsumptionTests(unittest.TestCase):
         with closing(sqlite3.connect(self.repository.path)) as database, database:
             database.execute("CREATE TRIGGER fail_consumption BEFORE UPDATE ON account_initialization "
                              "BEGIN SELECT RAISE(ABORT,'injected failure'); END")
-        self.port.poll_sent.return_value = {'messageId': 'broadcast_one'}
+        self.port.poll_sent.return_value = {'messageId': 'broadcast_one', 'speakerType': 'large'}
         with self.assertRaises(sqlite3.Error):
             self.poll()
         self.assertEqual(self.memory.read(self.record_address, 12), before_record)
@@ -124,13 +124,38 @@ class BroadcastConsumptionTests(unittest.TestCase):
                                  ['initialization']['quantities']['50003'], 2)
             self.memory.write(address, data)
         self.process.write = write_with_order_check
-        self.port.poll_sent.return_value = {'messageId': 'broadcast_one'}
+        self.port.poll_sent.return_value = {'messageId': 'broadcast_one', 'speakerType': 'large'}
         self.poll()
         self.assertEqual(self.memory.read(self.bridge.state, 4), struct.pack('<I', 1))
 
+    def test_small_confirmation_consumes_small_item_and_keeps_large_inventory(self):
+        small_slot = self.pool_address + 2 * profile.STRIDE
+        self.memory.word(small_slot, 0xD59C78)
+        self.memory.write(small_slot + 0x40, struct.pack('<III', 50002, 2, 7))
+        self.memory.word(profile.layout.INVENTORY_COUNT, 3)
+        self.profile_bridge._inventory['items'] = 3
+        initialization = deepcopy(self.initial_state)
+        initialization['owned_ids'].append(50002)
+        initialization['quantities']['50002'] = 2
+        self.repository.save('local', self.account_session.account['revision'],
+                             self.profile_blobs, Codec.identities, initialization=initialization)
+        self.account_session.account = self.repository.load('local', Codec.identities)
+        self.port.poll_sent.return_value = {'messageId': 'small_one', 'speakerType': 'small'}
+        self.port.poll_message.return_value = server_message('large')['payload']
+        self.poll()
+        self.assertEqual(self.remaining(), 3)
+        self.assertEqual(purchase.u32(self.memory.read, small_slot + 0x44), 1)
+        saved = self.repository.load('local', Codec.identities)
+        self.assertEqual(saved['initialization']['quantities'], {'50003': 3, '50002': 1})
+        self.assertEqual(purchase.u32(self.memory.read, self.bridge.state + broadcast.SENT_SPEAKER_TYPE), 1)
+        self.port.poll_sent.return_value = None
+        self.port.poll_message.return_value = server_message('small')['payload']
+        self.poll()
+        self.assertEqual(purchase.u32(self.memory.read, small_slot + 0x44), 1)
+
     def test_missing_native_item_rejects_without_database_change(self):
         self.memory.write(self.record_address, bytes(12))
-        self.port.poll_sent.return_value = {'messageId': 'broadcast_one'}
+        self.port.poll_sent.return_value = {'messageId': 'broadcast_one', 'speakerType': 'large'}
         with self.assertRaisesRegex(ValueError, '库存中找不到消耗物品'):
             self.poll()
         self.assertEqual(self.memory.read(self.record_address, 12), bytes(12))

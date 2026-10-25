@@ -40,10 +40,10 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 class HttpGateway:
     """不重试写请求；连接与响应异常显式标记结果不确定。"""
-    def send_broadcast(self, player_id: str, text: str) -> dict:
-        """发送大喇叭；响应只确认接受，展示由 WS 推送负责。"""
+    def send_broadcast(self, player_id: str, text: str, speaker_type: str) -> dict:
+        """发送大小喇叭；响应只确认接受，展示由 WS 推送负责。"""
         return self._request('POST', '/api/v1/broadcasts',
-                             {'speakerType': 'large', 'text': text}, player_id)
+                             {'speakerType': speaker_type, 'text': text}, player_id)
 
     def kick(self, player_id, room_id, target_player_id):
         """调用玩家房主接口，不使用管理端接口。"""

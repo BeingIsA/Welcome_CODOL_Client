@@ -4,7 +4,7 @@ from pathlib import Path
 import struct
 import threading
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 import pefile
 import capstone
 from codol_rebuild.application.broadcast.service import BroadcastSession
@@ -13,11 +13,11 @@ from codol_rebuild.adapters.transport.http import HttpGateway
 from codol_rebuild.adapters.game.v1649370 import broadcast
 
 
-def server_message():
+def server_message(speaker_type='large'):
     """服务端原始广播信封，发送者也是接收者。"""
     return {'type': 'broadcast', 'payload': {
         'messageId': 'broadcast_one', 'senderId': 'pl_sender', 'senderName': '中文玩家',
-        'speakerType': 'large', 'text': '一起玩吗？', 'sentAt': '2026-10-26T00:00:00+00:00'}}
+        'speakerType': speaker_type, 'text': '一起玩吗？', 'sentAt': '2026-10-26T00:00:00+00:00'}}
 
 
 class BroadcastTests(unittest.TestCase):
@@ -54,7 +54,7 @@ class BroadcastTests(unittest.TestCase):
     def test_http_uses_existing_endpoint_and_authenticated_identity(self):
         gateway = HttpGateway('http://127.0.0.1:8000')
         gateway._request = Mock(return_value={'messageId': 'broadcast_one'})
-        self.assertEqual(gateway.send_broadcast('pl_sender', '一起玩吗？'), {'messageId': 'broadcast_one'})
+        self.assertEqual(gateway.send_broadcast('pl_sender', '一起玩吗？', 'large'), {'messageId': 'broadcast_one'})
         gateway._request.assert_called_once_with('POST', '/api/v1/broadcasts',
             {'speakerType': 'large', 'text': '一起玩吗？'}, 'pl_sender')
 
@@ -62,7 +62,7 @@ class BroadcastTests(unittest.TestCase):
         inbox = EventInbox()
         entered, release = threading.Event(), threading.Event()
 
-        def send(player_id, text):
+        def send(player_id, text, speaker_type):
             entered.set()
             if not release.wait(2):
                 raise RuntimeError('测试请求未释放')
@@ -72,7 +72,7 @@ class BroadcastTests(unittest.TestCase):
         session = BroadcastSession(gateway, inbox, lambda: True)
         session.connected('pl_sender', '中文玩家')
         try:
-            session.begin('一起玩吗？')
+            session.begin('一起玩吗？', 'large')
             self.assertTrue(entered.wait(1))
             self.assertIsNone(session.poll_sent())
             inbox.receive(server_message())
@@ -82,19 +82,19 @@ class BroadcastTests(unittest.TestCase):
         finally:
             release.set()
             session.close()
-        self.assertEqual(session.poll_sent(), {'messageId': 'broadcast_one'})
+        self.assertEqual(session.poll_sent(), {'messageId': 'broadcast_one', 'speakerType': 'large'})
         self.assertIsNone(session.poll_sent())
         self.assertIsNone(session.poll_message())
-        gateway.send_broadcast.assert_called_once_with('pl_sender', '一起玩吗？')
+        gateway.send_broadcast.assert_called_once_with('pl_sender', '一起玩吗？', 'large')
 
     def test_http_completion_never_creates_local_chat_message(self):
         inbox = EventInbox()
         gateway = Mock(send_broadcast=Mock(return_value={'messageId': 'broadcast_one'}))
         session = BroadcastSession(gateway, inbox, lambda: True)
         session.connected('pl_sender', '中文玩家')
-        session.begin('一起玩吗？')
+        session.begin('一起玩吗？', 'large')
         session.close()
-        self.assertEqual(session.poll_sent(), {'messageId': 'broadcast_one'})
+        self.assertEqual(session.poll_sent(), {'messageId': 'broadcast_one', 'speakerType': 'large'})
         self.assertIsNone(session.poll_message())
         inbox.receive(server_message())
         self.assertEqual(session.poll_message()['senderId'], 'pl_sender')
@@ -143,7 +143,7 @@ class BroadcastTests(unittest.TestCase):
         self.assertNotIn('selfSend', fields)  # 由原生接收逻辑依据真实 ID 判断。
         self.assertNotIn('messageId', fields)
 
-    def test_send_parameters_support_managed_string_and_leave_small_speaker_alone(self):
+    def test_send_parameters_support_both_speakers_and_leave_other_types_alone(self):
         memory = bytearray(4096)
         struct.pack_into('<I', memory, 0x104, 0x200)
         struct.pack_into('<I', memory, 0x210, 0x300)
@@ -153,12 +153,55 @@ class BroadcastTests(unittest.TestCase):
         text = '中文发送'.encode('utf-8') + b'\0'
         memory[0x500:0x500+len(text)] = text
         read = lambda address, size: bytes(memory[address:address+size])
-        self.assertEqual(broadcast.read_request(read, 0x100), '中文发送')
+        self.assertEqual(broadcast.read_request(read, 0x100), ('中文发送', 'large'))
         struct.pack_into('<I', memory, 0x310, 1)
+        self.assertEqual(broadcast.read_request(read, 0x100), ('中文发送', 'small'))
+        struct.pack_into('<I', memory, 0x310, 2)
         self.assertIsNone(broadcast.read_request(read, 0x100))
         struct.pack_into('<II', memory, 0x32C, 6, 0x500)
         struct.pack_into('<I', memory, 0x310, 0)
-        self.assertEqual(broadcast.read_request(read, 0x100), '中文发送')
+        self.assertEqual(broadcast.read_request(read, 0x100), ('中文发送', 'large'))
+
+    def test_send_bridge_routes_each_type_once_and_preserves_native_fallback(self):
+        for player_id, request in ((None, ('正文', 'small')), ('pl_sender', None),
+                                   ('pl_sender', ('正文', 'small')), ('pl_sender', ('正文', 'large'))):
+            with self.subTest(player_id=player_id, request=request):
+                context = bytearray(256)
+                struct.pack_into('<I', context, 196, 0x1000)
+                process = Mock(main_thread_id=1)
+                process.context.return_value = (100, context)
+                port = Mock()
+                bridge = broadcast.BroadcastBridge(process, port, Mock(), Mock())
+                bridge.player_id = player_id
+                bridge.traps = {0x2000: 'send'}
+                bridge.plan = {'return': 0x3000}
+                with patch.object(broadcast, 'read_request', return_value=request) as read_request:
+                    bridge.handle(Mock(tid=1), 0x2000)
+                if player_id is not None and request is not None:
+                    port.begin.assert_called_once_with(*request)
+                    self.assertEqual(struct.unpack_from('<I', context, 184)[0], 0x3000)
+                else:
+                    port.begin.assert_not_called()
+                    self.assertEqual(struct.unpack_from('<I', context, 184)[0], 0x2001)
+                if player_id is None:
+                    read_request.assert_not_called()
+
+    def test_small_speaker_uses_shared_http_confirmation_and_push_path(self):
+        gateway = HttpGateway('http://127.0.0.1:8000')
+        gateway._request = Mock(return_value={'messageId': 'small_one'})
+        inbox = EventInbox()
+        session = BroadcastSession(gateway, inbox, lambda: True)
+        session.connected('pl_sender', '中文玩家')
+        session.begin('一起玩吗？', 'small')
+        session.close()
+        self.assertEqual(session.poll_sent(), {'messageId': 'small_one', 'speakerType': 'small'})
+        self.assertIsNone(session.poll_sent())
+        self.assertIsNone(session.poll_message())
+        gateway._request.assert_called_once_with('POST', '/api/v1/broadcasts',
+            {'speakerType': 'small', 'text': '一起玩吗？'}, 'pl_sender')
+        inbox.receive(server_message('small'))
+        self.assertEqual(session.poll_message(), server_message('small')['payload'])
+        self.assertIsNone(session.poll_message())
 
     def test_fixed_image_contract_and_patch_boundaries(self):
         executable = Path(__file__).resolve().parents[1]/'bin/v1649370/codol1649370-offline.exe'

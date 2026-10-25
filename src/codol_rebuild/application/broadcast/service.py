@@ -1,4 +1,4 @@
-"""大喇叭成功路径：HTTP 确认与 WS 消息保持独立。"""
+"""大小喇叭成功路径：HTTP 确认与 WS 消息保持独立。"""
 from concurrent.futures import ThreadPoolExecutor
 from codol_rebuild.application.broadcast.contracts import BroadcastGateway
 
@@ -22,11 +22,16 @@ class BroadcastSession:
         """由登录完成通知交接已确认身份；昵称由服务端决定。"""
         self.player_id = player_id
 
-    def begin(self, text: str) -> None:
+    def begin(self, text: str, speaker_type: str) -> None:
         """提交单次请求；原生发送锁保证同一时刻只有一次发送。"""
         if self.player_id is None or self._pending is not None:
             raise ValueError('广播身份未就绪或前次发送尚未完成')
-        self._pending = self._executor.submit(self._gateway.send_broadcast, self.player_id, text)
+        self._pending = self._executor.submit(self._send, self.player_id, text, speaker_type)
+
+    def _send(self, player_id: str, text: str, speaker_type: str) -> dict:
+        """将请求类型随成功确认交回，HTTP 本身仅返回消息标识。"""
+        confirmation = self._gateway.send_broadcast(player_id, text, speaker_type)
+        return {**confirmation, 'speakerType': speaker_type}
 
     def poll_sent(self) -> dict | None:
         """只返回真实 HTTP 完成结果，不生成展示事件或伪造成功。"""
@@ -36,9 +41,9 @@ class BroadcastSession:
         return completed.result()
 
     def poll_message(self) -> dict | None:
-        """展示只消费服务端推送；首期只接入大喇叭。"""
+        """展示只消费服务端大小喇叭推送。"""
         message = self._messages.poll_event()
-        if message is None or message['payload']['speakerType'] != 'large':
+        if message is None or message['payload']['speakerType'] not in ('large', 'small'):
             return None
         return message['payload']
 

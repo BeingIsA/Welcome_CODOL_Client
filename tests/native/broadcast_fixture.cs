@@ -13,7 +13,7 @@ class BroadcastFixture {
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)] delegate void Run();
     static List<Delegate> callbacks = new List<Delegate>();
     static Dictionary<string, object> fields = new Dictionary<string, object>();
-    static int confirmations, messages, allocations;
+    static int confirmations, messages, allocations, expectedSpeakerType;
     const int State = 0x21000000;
     static int Read(int address) { return Marshal.ReadInt32(new IntPtr(address)); }
     static void Write(int address, int value) { Marshal.WriteInt32(new IntPtr(address), value); }
@@ -59,14 +59,14 @@ class BroadcastFixture {
         return 1;
     }
     static int Complete(int success, int error, int speakerType) {
-        if (success != 1 || error != 0 || speakerType != 0) throw new Exception("wrong completion arguments");
+        if (success != 1 || error != 0 || speakerType != expectedSpeakerType) throw new Exception("wrong completion arguments");
         confirmations++;
         return 1;
     }
     static int Dispatch(int method, int output, int arguments, int count, int controller) {
         if (method != 0xdd601c || output != 0 || arguments != State + 32 || count != 1 || controller != 3)
             throw new Exception("wrong receive ABI");
-        if ((int)fields["channelID"] != 0 || (int)fields["loudSpeakerType"] != 0
+        if ((int)fields["channelID"] != 0 || (int)fields["loudSpeakerType"] != expectedSpeakerType
             || (string)fields["senderID"] != "12345" || (string)fields["senderName"] != "中文玩家"
             || (string)fields["message"] != "一起玩吗？") throw new Exception("wrong message");
         messages++;
@@ -74,6 +74,7 @@ class BroadcastFixture {
     }
     static int Main(string[] arguments) {
         try {
+            expectedSpeakerType = int.Parse(arguments[3]);
             Map(0x20000000, 65536); Map(State, 65536); Map(0x28000000, 65536);
             Callback(0x2800fd70, new One(Create), new byte[]{0xff,0x74,0x24,4}, new byte[]{0x83,0xc4,4,0xc3});
             Callback(0x28006750, new Three(Set), new byte[]{0xff,0x74,0x24,8,0xff,0x74,0x24,8,0x51}, new byte[]{0x83,0xc4,12,0xc2,8,0});
@@ -83,11 +84,11 @@ class BroadcastFixture {
             Bytes(0x20000000, File.ReadAllBytes(arguments[0]));
             Run run = (Run)Marshal.GetDelegateForFunctionPointer(new IntPtr(int.Parse(arguments[1])), typeof(Run));
             run();
-            Write(State, 1); run(); run();
+            Write(State + 12, expectedSpeakerType); Write(State, 1); run(); run();
             if (confirmations != 1 || messages != 0) throw new Exception("HTTP inserted a message");
             Bytes(State, File.ReadAllBytes(arguments[2])); run(); run();
             if (confirmations != 1 || messages != 1 || allocations != 0) throw new Exception("push not independent");
-            Bytes(State, File.ReadAllBytes(arguments[2])); Write(State, 1); run(); run();
+            Bytes(State, File.ReadAllBytes(arguments[2])); Write(State + 12, expectedSpeakerType); Write(State, 1); run(); run();
             if (confirmations != 2 || messages != 2 || allocations != 0) throw new Exception("duplicate notification");
             GC.KeepAlive(callbacks);
             Console.WriteLine("native x86 broadcast: completion, receive ABI, ownership, repeated ticks passed");

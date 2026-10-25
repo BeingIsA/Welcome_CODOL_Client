@@ -1,6 +1,6 @@
-"""1649370 大喇叭桥：专用发送入口与原生成功、接收通知。
+"""1649370 大小喇叭桥：专用发送入口与原生成功、接收通知。
 
-SendLoudSpeaker 的 GFx 参数取法来自 0x7273B0；只接管类型 0。
+SendLoudSpeaker 的 GFx 参数取法来自 0x7273B0；接管类型 0（大）和 1（小）。
 成功复用 0x7C4AB0(bool, error, type)，其 ret 12 清栈；接收沿
 0x72F563 的控制器 3 / cppOnMessageReceived(Object) 约定发布。
 所有进程访问均发生在主线程暂停点；网络结果由应用端口交接。
@@ -11,8 +11,11 @@ from datetime import datetime
 from codol_rebuild.application.broadcast.contracts import BroadcastPort
 
 SEND_HANDLER = 0x7273B0
-# 原版 ChattingController.BIG_LOUD_SPEAKER_ID；类型 0 使用此库存物品。
-BIG_LOUD_SPEAKER_ITEM_ID = 50003
+# 原版 ChatSpeakerType 与 ChattingController 的大小喇叭类型和库存物品。
+SPEAKER_TYPES = {0: 'large', 1: 'small'}
+NATIVE_SPEAKER_TYPES = {speaker_type: native_type for native_type, speaker_type in SPEAKER_TYPES.items()}
+SPEAKER_ITEM_IDS = {'large': 50003, 'small': 50002}
+SENT_SPEAKER_TYPE = 12
 CAPACITY = 65536
 SEND_COMPLETE, MESSAGE_READY, MESSAGE_OBJECT, FIELDS = 0, 4, 32, 64
 BROADCAST_AVAILABLE = 8
@@ -40,11 +43,11 @@ def read_word(read, address):
 
 
 def read_request(read, stack_address):
-    """读取 GFx 参数，不把其他聊天类型解释为大喇叭命令。"""
+    """读取 GFx 参数，不把其他聊天类型解释为大小喇叭命令。"""
     invocation = read_word(read, stack_address + 4)
     values = read_word(read, invocation + 0x10)
     speaker_type = read_word(read, values + 0x10)
-    if speaker_type != 0:
+    if speaker_type not in SPEAKER_TYPES:
         return None
     string_pointer = read_word(read, values + 0x30)
     if read_word(read, values + 0x2C) & 0x40:
@@ -53,7 +56,7 @@ def read_request(read, stack_address):
     for character_offset in range(CAPACITY):
         character = read(string_pointer + character_offset, 1)
         if character == b'\0':
-            return text_bytes.decode('utf-8')
+            return text_bytes.decode('utf-8'), SPEAKER_TYPES[speaker_type]
         text_bytes.extend(character)
     raise ValueError('原生喇叭字符串超过适配缓冲区')
 
@@ -72,7 +75,8 @@ def native_sender_id(read, sender_id, local_player_id):
 def encode_message(message, sender_id, state):
     """转换原生既有字段；服务端消息 ID 不伪装成原生玩家 ID。"""
     time_text = datetime.fromisoformat(message['sentAt']).astimezone().strftime('%H:%M')
-    values = (0, sender_id, message['senderName'], message['text'], time_text, 0)
+    values = (0, sender_id, message['senderName'], message['text'],
+              time_text, NATIVE_SPEAKER_TYPES[message['speakerType']])
     data = bytearray(FIELDS + len(MESSAGE_FIELDS) * 36)
     struct.pack_into('<II', data, MESSAGE_OBJECT, 0xFFFFFFFF, 0xFFFFFFFF)
 
@@ -96,7 +100,7 @@ def encode_message(message, sender_id, state):
 
 
 def build_adapter(entry, state):
-    """只覆盖发送入口六字节；其余原方法及小喇叭路径保持不变。"""
+    """只覆盖发送入口六字节；未接管的调用仍执行原方法。"""
     instructions = bytearray()
     labels, branches, traps = {}, [], {}
 
@@ -141,7 +145,9 @@ def build_adapter(entry, state):
     emit('00')
     branch('0f84', 'message')
     clear(SEND_COMPLETE)
-    emit('6a00 6a00 6a01')
+    emit('ff35')
+    word(state + SENT_SPEAKER_TYPE)
+    emit('6a00 6a01')
     call(0x7C4AB0)
     labels['message'] = len(instructions)
     emit('833d')
@@ -238,9 +244,9 @@ class BroadcastBridge:
             if self.traps[address] == 'send':
                 stack_address = struct.unpack_from('<I', context, 196)[0]
                 if self.player_id is not None:
-                    text = read_request(self.process.read, stack_address)
-                    if text is not None:
-                        self.port.begin(text)
+                    request = read_request(self.process.read, stack_address)
+                    if request is not None:
+                        self.port.begin(*request)
                         next_instruction = self.plan['return']
             else:
                 self.dispatcher.poll()
@@ -248,9 +254,13 @@ class BroadcastBridge:
                 if message is not None:
                     sender_id = native_sender_id(self.process.read, message['senderId'], self.player_id)
                     self._write(self.state, encode_message(message, sender_id, self.state))
-                if self.port.poll_sent() is not None:
+                confirmation = self.port.poll_sent()
+                if confirmation is not None:
                     # 仅 HTTP 确认消耗；原生成功通知随后负责冷却和库存刷新。
-                    self.consume_item(BIG_LOUD_SPEAKER_ITEM_ID)
+                    speaker_type = confirmation['speakerType']
+                    self.consume_item(SPEAKER_ITEM_IDS[speaker_type])
+                    self._write(self.state + SENT_SPEAKER_TYPE,
+                                struct.pack('<I', NATIVE_SPEAKER_TYPES[speaker_type]))
                     self._write(self.state + SEND_COMPLETE, struct.pack('<I', 1))
                 self._write(self.state + BROADCAST_AVAILABLE,
                             struct.pack('<I', int(self.port.available())))
