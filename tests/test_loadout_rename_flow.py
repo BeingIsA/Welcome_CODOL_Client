@@ -72,7 +72,7 @@ def execute(method,names,strings,scope,this,event):
 class LoadoutRenameFlowTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        movie=ui_movie.patch_movie((ROOT/'client/workspaces/ui-investigation/codo.gfx').read_bytes())
+        movie=ui_movie.patch_movie((ROOT/'research/client/ui-investigation/codo.gfx').read_bytes())
         r=Reader(movie);r.p=8+(5+4*(movie[8]>>3)+7)//8+4;cls.methods={}
         wanted=('onSetLoadoutNameHandle','onSanitizedFeedbackHandle','onSanitizedHandle','sanitize')
         while r.p<len(movie):

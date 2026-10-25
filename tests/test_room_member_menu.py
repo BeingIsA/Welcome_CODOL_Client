@@ -104,7 +104,7 @@ def evaluate(method, names, strings, owner, *args):
 
 class MenuTests(unittest.TestCase):
     def test_original_menu_items_and_party_behavior_survive(self):
-        raw=(ROOT/'client/workspaces/ui-investigation/codo.gfx').read_bytes()
+        raw=(ROOT/'research/client/ui-investigation/codo.gfx').read_bytes()
         ms,names,strings=methods(ui_movie.patch_movie(raw))
         generate=next(m for m in ms if 'generateRightClickMenu' in m['name'])
         check=next(m for m in ms if 'canKickPartyMember' in m['name'])
@@ -130,7 +130,7 @@ class MenuTests(unittest.TestCase):
             self.assertEqual(option['label'],'踢出房间' if in_room else '踢出小队')
 
     def test_native_menu_selection_and_filter_bytes_are_unchanged(self):
-        raw=(ROOT/'client/workspaces/ui-investigation/codo.gfx').read_bytes()
+        raw=(ROOT/'research/client/ui-investigation/codo.gfx').read_bytes()
         patched_movie=ui_movie.patch_movie(raw)
         original_methods,_,_=methods(raw)
         patched_methods,_,_=methods(patched_movie)

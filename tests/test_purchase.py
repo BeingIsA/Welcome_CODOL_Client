@@ -234,7 +234,7 @@ class PurchaseTests(unittest.TestCase):
         from codol_rebuild.adapters.game.v1649370 import ui_movie
         sys.path.insert(0, str(ROOT/'research'))
         from trace_matchmaking_debugline import Reader, abc_parse, disassemble
-        movie=ui_movie.patch_movie((ROOT/'client/workspaces/ui-investigation/codo.gfx').read_bytes())
+        movie=ui_movie.patch_movie((ROOT/'research/client/ui-investigation/codo.gfx').read_bytes())
         reader=Reader(movie)
         reader.p=8+(5+4*(movie[8]>>3)+7)//8+4
         chinese_message = False

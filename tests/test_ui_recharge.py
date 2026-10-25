@@ -56,11 +56,11 @@ class RechargeTests(unittest.TestCase):
         ui_recharge.validate_contract(lambda a, n: pe.get_data(a-0x400000, n))
         with self.assertRaises(ValueError):
             ui_recharge.validate_contract(lambda a, n: bytes(n))
-        movie = (ROOT/"client/workspaces/ui-investigation/codo.gfx").read_bytes()
+        movie = (ROOT/"research/client/ui-investigation/codo.gfx").read_bytes()
         self.assertLessEqual(len(zlib.compress(ui_movie.patch_movie(movie), 9)), ui_movie.COMPRESSED_SIZE)
 
     def test_patched_click_execution_success_failure_and_repeat(self):
-        movie = (ROOT/"client/workspaces/ui-investigation/codo.gfx").read_bytes()
+        movie = (ROOT/"research/client/ui-investigation/codo.gfx").read_bytes()
         methods, names, strings = account_methods(ui_movie.patch_movie(movie))
         click = next(m for m in methods if m.get("trait", "").endswith("::onReplenishCPClick"))
         rows = disassemble(click, names, strings)

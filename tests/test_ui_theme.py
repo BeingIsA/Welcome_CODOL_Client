@@ -37,7 +37,7 @@ class ThemeTests(unittest.TestCase):
     def test_mini_client_warning_skips_only_popup_and_keeps_member_counter(self):
         """保留短路分支的落点及栈状态，仅移除整个零净栈变化的弹窗表达式。"""
         from codol_rebuild.adapters.game.v1649370 import ui_theme
-        original = (ROOT / 'client/workspaces/ui-investigation/codo.gfx').read_bytes()
+        original = (ROOT / 'research/client/ui-investigation/codo.gfx').read_bytes()
         patched = ui_movie.patch_movie(original)
         at = ui_theme.MINI_WARNING_OFFSET
         end = at+len(ui_theme.MINI_WARNING_BEFORE)
@@ -53,7 +53,7 @@ class ThemeTests(unittest.TestCase):
             self.assertEqual(patched[start+target], 0x12)
 
     def test_combined_movie_selects_five_without_dvar_call(self):
-        original = (ROOT / 'client/workspaces/ui-investigation/codo.gfx').read_bytes()
+        original = (ROOT / 'research/client/ui-investigation/codo.gfx').read_bytes()
         before, _ = theme_method(original)
         after, rows = theme_method(ui_movie.patch_movie(original))
         self.assertEqual(before['limits'], after['limits'])

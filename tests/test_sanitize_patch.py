@@ -12,9 +12,9 @@ ROOT = Path(__file__).resolve().parents[2]
 class SanitizePatchTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.original = (ROOT/'client/workspaces/ui-investigation/codo.gfx').read_bytes()
+        cls.original = (ROOT/'research/client/ui-investigation/codo.gfx').read_bytes()
         cls.patched = ui_movie.patch_movie(cls.original)
-        zone = (ROOT/'client/workspaces/ui-investigation/ui_mp.zone').read_bytes()
+        zone = (ROOT/'research/client/ui-investigation/ui_mp.zone').read_bytes()
         start = zone.index(ui_movie.RESOURCE_NAME) + len(ui_movie.RESOURCE_NAME)
         cls.compressed = zone[start:start+ui_movie.COMPRESSED_SIZE]
 

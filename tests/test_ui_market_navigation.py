@@ -72,7 +72,7 @@ class MarketNavigationTests(unittest.TestCase):
 
     def test_real_combined_movie_identity_and_capacity(self):
         root = Path(__file__).resolve().parents[2]
-        original = (root/'client/workspaces/ui-investigation/codo.gfx').read_bytes()
+        original = (root/'research/client/ui-investigation/codo.gfx').read_bytes()
         patched = ui_movie.patch_movie(original)
         at = nav.MARKET_ITEMS_OFFSET
         self.assertEqual(original[at:at+len(nav.MARKET_ITEMS_BEFORE)], nav.MARKET_ITEMS_BEFORE)

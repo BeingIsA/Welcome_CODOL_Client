@@ -31,7 +31,7 @@ class RoomNameTests(unittest.TestCase):
                     self.assertIn(int(i.op_str,16),starts | {ORIGINAL_VA})
 
     def test_task_callback_is_deferred_by_original_manager(self):
-        root = Path(__file__).resolve().parents[2]/'client/workspaces/ui-investigation/source/scripts/codo/manager'
+        root = Path(__file__).resolve().parents[2]/'research/client/ui-investigation/source/scripts/codo/manager'
         source = (root/'AsyncTaskManager.as').read_text(encoding='utf-8')
         self.assertLess(source.index('this._asyncTasks[task.group].push(task)'),source.index('task.state = startTask'))
         refresh = source.split('public function cppRefreshTask')[1].split('public function update')[0]

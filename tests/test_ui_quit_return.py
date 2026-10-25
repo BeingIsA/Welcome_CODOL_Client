@@ -19,7 +19,7 @@ def parse(movie,tag):
 class QuitReturnTests(unittest.TestCase):
  @classmethod
  def setUpClass(cls):
-  cls.original=(ROOT/'client/workspaces/ui-investigation/codo.gfx').read_bytes()
+  cls.original=(ROOT/'research/client/ui-investigation/codo.gfx').read_bytes()
   cls.patched=ui_movie.patch_movie(cls.original)
   tag='codo/views/quit_parts/QuitGameSummaryContentNextLoginReward'
   before,_,_=parse(cls.original,tag);after,names,strings=parse(cls.patched,tag)

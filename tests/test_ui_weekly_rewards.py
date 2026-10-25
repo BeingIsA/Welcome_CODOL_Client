@@ -32,7 +32,7 @@ def board(movie):
 class WeeklyRewardTests(unittest.TestCase):
  @classmethod
  def setUpClass(cls):
-  cls.raw=(ROOT/'client/workspaces/ui-investigation/codo.gfx').read_bytes()
+  cls.raw=(ROOT/'research/client/ui-investigation/codo.gfx').read_bytes()
   cls.movie=ui_movie.patch_movie(cls.raw);cls.method,cls.rows=board(cls.movie)
  def test_movie_contract(self):
   original,_=board(self.raw)

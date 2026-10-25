@@ -51,10 +51,10 @@ def evaluate_date(code, start, season, now):
 class NavigationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.original = (ROOT/'client/workspaces/ui-investigation/codo.gfx').read_bytes()
+        cls.original = (ROOT/'research/client/ui-investigation/codo.gfx').read_bytes()
         cls.patched = nav.patch_movie(cls.original)
         cls.code = cls.patched[nav.METHOD_OFFSET:nav.METHOD_OFFSET+200]
-        zone = (ROOT/'client/workspaces/ui-investigation/ui_mp.zone').read_bytes()
+        zone = (ROOT/'research/client/ui-investigation/ui_mp.zone').read_bytes()
         start = zone.index(nav.RESOURCE_NAME) + len(nav.RESOURCE_NAME)
         cls.compressed = zone[start:start+nav.COMPRESSED_SIZE]
 

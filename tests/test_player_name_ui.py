@@ -77,7 +77,7 @@ def execute(method,rows,scope,locals_):
 class PlayerNameUITests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        original=(ROOT/'client/workspaces/ui-investigation/codo.gfx').read_bytes()
+        original=(ROOT/'research/client/ui-investigation/codo.gfx').read_bytes()
         cls.before=methods(original)
         cls.after=methods(ui_movie.patch_movie(original))
 
