@@ -177,7 +177,7 @@ def build_settings_detours(entry):
     return {'code': bytes(code), 'patches': patches, 'traps': traps}
 
 
-def build_tick(entry, state, ready, preview_entry, room_entries, list_publish=None, name_poll=None):
+def build_tick(entry, state, ready, preview_entry, room_entries, list_publish=None, name_poll=None, broadcast_poll=None):
     """包装既有前端帧；网络等待时立即返回，仅就绪结果进入原生回调。"""
     code, labels, refs, traps = bytearray(), {}, [], {}
     def emit(value): code.extend(bytes.fromhex(value))
@@ -195,6 +195,9 @@ def build_tick(entry, state, ready, preview_entry, room_entries, list_publish=No
     emit('ff05'); word(state+36)
     emit('833d'); word(state+36); emit('06'); branch('0f82', 'done')
     emit('c705'); word(state+36); word(0)
+    if broadcast_poll is not None:
+        # 独立于房间请求锁轮询；原生操作仍由游戏主线程执行。
+        emit('83e4f0'); call(broadcast_poll); emit('8be5')
     if name_poll is not None:
         emit('83e4f0'); call(name_poll); emit('8be5')
     if 'settings_apply' in room_entries:
@@ -332,7 +335,7 @@ class ServerSessionBridge:
                       member_profile.build_member_publish(self.members_apply, self.members_buffer))
         self.process.executable(self.members_apply, 4096)
 
-    def install_tick(self, ready, preview_entry, room_plan, name_poll=None):
+    def install_tick(self, ready, preview_entry, room_plan, name_poll=None, broadcast_poll=None):
         """安装主线程完成调度；返回替换原预览 CALL 的新入口。"""
         entry = self.process.allocate(4096)
         from codol_rebuild.adapters.game.v1649370.room_list import RoomListBridge
@@ -372,7 +375,8 @@ class ServerSessionBridge:
                       build_ready_notifications(ready_notify, self.members_buffer))
         self.process.executable(ready_notify, 4096)
         room_plan['entries']['ready_notify'] = ready_notify
-        plan = build_tick(entry, self.state, ready, preview_entry, room_plan['entries'], publisher, name_poll)
+        plan = build_tick(entry, self.state, ready, preview_entry, room_plan['entries'], publisher, name_poll,
+                          broadcast_poll=broadcast_poll)
         if len(plan['code']) > 4096:
             raise ValueError('联机帧桥超出代码页')
         checked_write(self.process, entry, plan['code'])

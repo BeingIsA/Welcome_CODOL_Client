@@ -7,7 +7,7 @@ from codol_rebuild.adapters.game.v1649370.profile_bridge import LocalProfileBrid
 
 class GameSessionBridge:
     """仅拥有版本状态；进程和账号实现由装配入口注入。"""
-    def __init__(self, args, run_dir, image, pe, log, record, phase_done, process: ProcessAccess, account_factory, account_errors, multiplayer=None, rename_session=None):
+    def __init__(self, args, run_dir, image, pe, log, record, phase_done, process: ProcessAccess, account_factory, account_errors, multiplayer=None, rename_session=None, broadcast_session=None, realtime_dispatcher=None):
         self.args=args; self.run_dir=run_dir; self.image=image; self.pe=pe
         self.log=log; self.record=record; self.phase_done=phase_done; self.process=process
         self.account_factory=account_factory; self.account_errors=account_errors
@@ -22,12 +22,23 @@ class GameSessionBridge:
         self.multiplayer = None
         self.rename_session = rename_session
         self.server_name_bridge = None
+        self.broadcast_bridge = None
+        if broadcast_session is not None:
+            from codol_rebuild.adapters.game.v1649370.broadcast import BroadcastBridge
+            self.broadcast_bridge = BroadcastBridge(process, broadcast_session, realtime_dispatcher)
         if multiplayer is not None:
             from codol_rebuild.adapters.game.v1649370.server_session_bridge import ServerSessionBridge
             self.multiplayer = ServerSessionBridge(process, multiplayer, record)
+            self.multiplayer.on_login = self._online_connected
             if rename_session is not None:
-                self.multiplayer.on_login = rename_session.connected
                 self.multiplayer.account_ready = lambda: rename_session.ready
+
+    def _online_connected(self, player_id, display_name):
+        """把已有登录结果显式交给需要身份的适配，不重复登录。"""
+        if self.rename_session is not None:
+            self.rename_session.connected(player_id, display_name)
+        if self.broadcast_bridge is not None:
+            self.broadcast_bridge.connected(player_id, display_name)
 
     def checkpoint(self, force=False):
         self.profiles.save(force=force)
@@ -282,8 +293,9 @@ class GameSessionBridge:
             raise ValueError('离线UI helper代码回读不符')
         self.process.executable(lobby_entry, 4096)
         if self.multiplayer:
+            broadcast_poll = self.broadcast_bridge.install() if self.broadcast_bridge is not None else None
             tick = self.multiplayer.install_tick(profile_data_address+72, lobby_entry, room_plan,
-                                                self.name_adapter.get('poll'))
+                                                self.name_adapter.get('poll'), broadcast_poll=broadcast_poll)
             self.multiplayer.install_settings_detours()
             self.record({'multiplayer_settings_detours': True})
             self.preview_caller_return = tick+9
@@ -354,6 +366,9 @@ class GameSessionBridge:
         return result
 
     def handle_exception(self, event, code, address, row):
+        if code in (2147483651, 1073741855) and self.broadcast_bridge and address in self.broadcast_bridge.traps:
+            self.broadcast_bridge.handle(event, address)
+            return True
         if code in (2147483651, 1073741855) and self.multiplayer and address in self.multiplayer.traps:
             self.multiplayer.handle(event, address)
             return True

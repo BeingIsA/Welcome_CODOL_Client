@@ -25,6 +25,8 @@ def run(args):
     bridge=None
     multiplayer=None
     rename_session=None
+    broadcast_session = None
+    realtime_dispatcher = None
     try:
         prepared=prepare(args,run_dir,stage,log,phase_done)
         if getattr(args,'prepare_only',False):
@@ -40,13 +42,24 @@ def run(args):
             from codol_rebuild.application.accounts.rename import RenameSession
             rename_session = RenameSession(
                 HttpGateway(args.server_url, min(args.server_timeout, 5.0)))
+            from codol_rebuild.application.broadcast.service import BroadcastSession
+            from codol_rebuild.application.realtime.dispatch import EventInbox, RealtimeDispatcher, RoutedConnection
+            realtime_connection = WebSocketConnection(gateway.server, args.server_timeout)
+            realtime_dispatcher = RealtimeDispatcher(realtime_connection)
+            room_inbox, broadcast_inbox = EventInbox(), EventInbox()
+            realtime_dispatcher.register(
+                ('room_settings_updated', 'room_members_updated', 'room_kicked', 'room_closed'), room_inbox)
+            realtime_dispatcher.register(('broadcast',), broadcast_inbox)
+            broadcast_session = BroadcastSession(
+                HttpGateway(args.server_url, args.server_timeout), broadcast_inbox)
             multiplayer = RoomSession(gateway, JsonIdentityStore(args.server_identity),
                                              gateway.server, fingerprint(),
-                                             realtime=WebSocketConnection(gateway.server, args.server_timeout))
+                                             realtime=RoutedConnection(realtime_connection, room_inbox))
             record({'multiplayer_server': gateway.server})
         bridge=GameSessionBridge(args,run_dir,prepared['image'],prepared['pe'],log,record,phase_done,
                                  process,account_factory,(OSError,ValueError,sqlite3.Error), multiplayer=multiplayer,
-                                 rename_session=rename_session)
+                                 rename_session=rename_session, broadcast_session=broadcast_session,
+                                 realtime_dispatcher=realtime_dispatcher)
         debugger=DebugLoop(process,bridge,prepared['pe'],prepared['supplier'],FORBIDDEN)
         process.start(prepared['exe'],prepared['settings'])
         debugger.run()
@@ -68,6 +81,10 @@ def run(args):
                     try:rename_session.close()
                     except Exception as error:
                         log['rename_cleanup_error']=str(error)
+                if broadcast_session:
+                    try:broadcast_session.close()
+                    except Exception as error:
+                        log['broadcast_cleanup_error'] = str(error)
                 reporter.close()
     return log
 
