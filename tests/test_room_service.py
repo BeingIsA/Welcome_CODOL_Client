@@ -1,10 +1,11 @@
 """联机用例回归：异步、重登、写入不确定恢复和身份文件完整性。"""
+from codol_rebuild.application.errors import OnlineError
 from pathlib import Path
 import tempfile
 import threading
 import time
 import unittest
-from codol_rebuild.application.room.contracts import IdentityRecord, RoomError
+from codol_rebuild.application.room.contracts import IdentityRecord
 from codol_rebuild.application.room.service import RoomSession
 from codol_rebuild.adapters.persistence.server_identity import JsonIdentityStore
 from codol_rebuild.adapters.transport.http import normalize_server
@@ -26,27 +27,27 @@ class Gateway:
         if self.wait:
             self.wait.wait(2)
         if self.banned:
-            raise RoomError('BANNED', '已封禁')
+            raise OnlineError('BANNED', '已封禁')
         return {'playerId': player_id or 'pl_test', 'displayName': username}
 
     def create(self, player_id, username, max_players, password, settings=None):
         self.calls.append(('create', player_id, max_players, password, settings))
         if self.rooms:
-            raise RoomError('ALREADY_IN_OTHER_ROOM', '已有房间')
+            raise OnlineError('ALREADY_IN_OTHER_ROOM', '已有房间')
         self.serial += 1
         room = {'roomId': 'rm_'+str(self.serial), 'ownerPlayerId': player_id,
                 'settings': settings or {}}
         self.rooms[room['roomId']] = room
         if self.fail_create:
             self.fail_create = False
-            raise RoomError('NETWORK_ERROR', '响应丢失', uncertain=True)
+            raise OnlineError('NETWORK_ERROR', '响应丢失', uncertain=True)
         return room
 
     def update_settings(self, player_id, room_id, settings):
         self.calls.append(('update_settings', room_id, settings))
         room = self.rooms.get(room_id)
         if room is None:
-            raise RoomError('ROOM_NOT_FOUND', '房间不存在')
+            raise OnlineError('ROOM_NOT_FOUND', '房间不存在')
         if getattr(self, 'settings_error', None):
             raise self.settings_error
         room['settings'] = settings
@@ -56,7 +57,7 @@ class Gateway:
         self.calls.append(('detail', room_id))
         room = self.rooms.get(room_id)
         if room is None:
-            raise RoomError('ROOM_NOT_FOUND', '房间不存在')
+            raise OnlineError('ROOM_NOT_FOUND', '房间不存在')
         return dict(room)
 
     def member_profile(self, player_id, room_id, member_id):
@@ -70,7 +71,7 @@ class Gateway:
     def leave(self, player_id, room_id):
         self.calls.append(('leave', room_id))
         if self.fail_leave:
-            raise RoomError('NETWORK_ERROR', '网络断开', uncertain=True)
+            raise OnlineError('NETWORK_ERROR', '网络断开', uncertain=True)
         self.rooms.pop(room_id, None)
         return {'left': True, 'roomClosed': True}
 
@@ -97,7 +98,7 @@ class RoomTests(unittest.TestCase):
         from unittest.mock import Mock
         for error_code in ('INVALID_ROOM_PASSWORD', 'ROOM_JOIN_BLOCKED'):
             with self.subTest(error_code=error_code):
-                self.gateway.join = Mock(side_effect=RoomError(error_code, '加入被拒绝'))
+                self.gateway.join = Mock(side_effect=OnlineError(error_code, '加入被拒绝'))
                 self.assertEqual(self.result('join', room_id='rm_target').error.code, error_code)
                 restored_record = self.store.load('http://localhost:8080')
                 self.assertIsNone(restored_record.room_id)
@@ -107,7 +108,7 @@ class RoomTests(unittest.TestCase):
     def test_join_lost_response_confirms_membership_and_retains_unknown_target(self):
         self.result('login')
         from unittest.mock import Mock
-        self.gateway.join = Mock(side_effect=RoomError('NETWORK_ERROR', '超时', uncertain=True))
+        self.gateway.join = Mock(side_effect=OnlineError('NETWORK_ERROR', '超时', uncertain=True))
         self.gateway.room_detail = Mock(return_value={
             'roomId': 'rm_target', 'ownerPlayerId': 'pl_owner', 
             'members': [{'playerId': 'pl_test'}]})
@@ -186,7 +187,7 @@ class RoomTests(unittest.TestCase):
         self.session.begin_list('玩家')
         self.assertEqual(self.wait_list().error.code, 'INVALID_RESPONSE')
         def broken(*_):
-            raise RoomError('NETWORK_ERROR', '断网')
+            raise OnlineError('NETWORK_ERROR', '断网')
         self.gateway.list_rooms = broken
         self.session.begin_list('玩家')
         self.assertEqual(self.wait_list().error.code, 'NETWORK_ERROR')
@@ -308,7 +309,7 @@ class RoomTests(unittest.TestCase):
     def test_server_rejection_does_not_trigger_login(self):
         self.assertIsNone(self.result('login').error)
         def rejected(*args):
-            raise RoomError('UNAUTHENTICATED', '服务端拒绝')
+            raise OnlineError('UNAUTHENTICATED', '服务端拒绝')
         self.gateway.list_rooms = rejected
         for _ in range(2):
             self.session.begin_list('新昵称')
@@ -359,7 +360,7 @@ class SettingsSyncTests(RoomTests):
                                 ('NETWORK_ERROR', True)):
             with self.subTest(code=code):
                 self.gateway.calls.clear()
-                self.gateway.settings_error = RoomError(code, code, uncertain=uncertain)
+                self.gateway.settings_error = OnlineError(code, code, uncertain=uncertain)
                 result = self.result('settings', settings={'mode': 'sd'})
                 self.assertEqual(result.error.code, code)
                 self.assertEqual(result.error.uncertain, uncertain)

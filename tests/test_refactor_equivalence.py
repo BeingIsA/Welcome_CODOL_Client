@@ -120,7 +120,7 @@ class RefactorEquivalenceTests(unittest.TestCase):
                 args=types.SimpleNamespace(local_profile=local)
                 after=MemoryProcess();adebug=Debugger(after)
                 bridge=GameSessionBridge(args,Path(tmp),IMAGE,after.pe,{},lambda row:None,lambda name:None,after,None,(ValueError,))
-                bridge.bind_debugger(adebug);bridge.install_menu_preview()
+                bridge.bind_debugger(adebug);bridge.install_lobby_adapters()
                 actual=enc({'writes':after.writes,'protections':after.protections,'breaks':adebug.breaks,
                             'profile_traps':bridge.profile_traps,'preview_traps':bridge.preview_traps,
                             'name_adapter':bridge.name_adapter})

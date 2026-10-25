@@ -1,11 +1,12 @@
 """大厅列表回归：显示数据、生命周期、分页取消与固定版本调用边。"""
+from codol_rebuild.application.errors import OnlineError
 from pathlib import Path
 import struct
 import unittest
 from unittest.mock import Mock
 import pefile
 from codol_rebuild.adapters.game.v1649370 import room_list as listing
-from codol_rebuild.application.room.contracts import Completion, RoomError
+from codol_rebuild.application.room.contracts import Completion
 
 
 def room(identity='rm_one', mode='td'):
@@ -134,7 +135,7 @@ class RoomListTests(unittest.TestCase):
         bridge.poll()
         self.assertIsNone(bridge.view)
         bridge, memory, port, events = self.make_bridge()
-        port.poll_list.return_value = Completion('list', error=RoomError('NETWORK_ERROR', '断网'))
+        port.poll_list.return_value = Completion('list', error=OnlineError('NETWORK_ERROR', '断网'))
         bridge.poll()
         self.assertEqual(memory.read(bridge.state, 4), b'\1\0\0\0')
         self.assertEqual(memory.read(bridge.state+listing.COUNT, 4), bytes(4))

@@ -1,10 +1,11 @@
 """换队命令、静默失败及迟到快照回归；不替代游戏 UI 验收。"""
+from codol_rebuild.application.errors import OnlineError
 import struct
 import unittest
 from unittest.mock import Mock
 
 from codol_rebuild.adapters.game.v1649370.room import RoomTeamBridge
-from codol_rebuild.application.room.contracts import Completion, IdentityRecord, RoomError
+from codol_rebuild.application.room.contracts import Completion, IdentityRecord
 from codol_rebuild.application.room.service import RoomSession
 from codol_rebuild.adapters.transport.http import HttpGateway
 from test_refactor_equivalence import MemoryProcess
@@ -41,7 +42,7 @@ class TeamBridgeTests(unittest.TestCase):
 
     def test_failure_is_consumed_silently_and_next_request_allowed(self):
         self.command(2)
-        self.port.poll_change_team.return_value = Completion('change_team', error=RoomError('ROOM_TEAM_FULL', '满员'))
+        self.port.poll_change_team.return_value = Completion('change_team', error=OnlineError('ROOM_TEAM_FULL', '满员'))
         before = list(self.process.writes)
         self.assertIsNone(self.bridge.poll())
         self.assertEqual(self.process.writes, before)
@@ -86,7 +87,7 @@ class TeamSessionTests(unittest.TestCase):
 
     def test_failure_once_and_channel_released(self):
         gateway = Mock()
-        gateway.change_team.side_effect = RoomError('ROOM_TEAM_FULL', '满员')
+        gateway.change_team.side_effect = OnlineError('ROOM_TEAM_FULL', '满员')
         session = RoomSession(gateway, Mock(), 'http://server', 'fingerprint')
         self.addCleanup(session._executor.shutdown)
         session._record = IdentityRecord('pl_me', 'rm_test')

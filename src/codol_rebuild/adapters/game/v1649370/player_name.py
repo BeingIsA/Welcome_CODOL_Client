@@ -159,7 +159,7 @@ def validate_contract(read):
             raise ValueError(f'玩家昵称ABI不匹配：{address:#x}')
 
 
-def build_adapter(entry, state, ready, initializer):
+def build_adapter(entry, state, ready, initializer, *, deferred=False):
     """GFx独立回调和启动初始化包装；陷阱只交接数据，不调用在线改名。"""
     for address in (entry, state, ready, initializer):
         if type(address) is not int or not 0x10000 <= address <= 0xffffe000:
@@ -185,18 +185,36 @@ def build_adapter(entry, state, ready, initializer):
     for offset in (0, 4):
         emit('c705'); word(state+offset); word(0)
     trap('request')
+    if deferred:
+        # HTTP 等待期间直接返回；后续前端帧消费结果，不能暂停游戏等网络。
+        emit('8be5 619d c20400')
+        label('poll')
+        emit('9c60 8bec')
+        trap('poll')
+        emit('833d'); word(state+136); emit('00'); branch('0f84', 'poll_done')
+        emit('833d'); word(state+136); emit('02'); branch('0f84', 'failure')
     emit('833d'); word(state); emit('01'); branch('0f85', 'failure')
     setter(8); trap('applied')
     emit('833d'); word(state+4); emit('01'); branch('0f84', 'success')
     setter(72); trap('rolled_back')
     label('failure')
-    emit('83e4f0 83ec04 6a00 68'); word(ERROR_STRING); emit('6a00')
+    emit('83e4f0 83ec04 6a00 68'); word(state+144 if deferred else ERROR_STRING); emit('6a00')
     branch('e9', 'complete')
     label('success')
     emit('83e4f0'); native('e8', REFRESH_INVENTORY); native('e8', REFRESH_PREVIEW)
     emit('83e4f0 83ec04 6a00 68'); word(EMPTY_STRING); emit('6a01')
-    label('complete'); native('e8', COMPLETE)
-    emit('8be5 619d c20400')
+    label('complete')
+    if deferred:
+        emit('833d'); word(state+140); emit('00'); branch('0f84', 'poll_completed')
+    native('e8', COMPLETE)
+    if deferred:
+        label('poll_completed')
+        for offset in (136, 140):
+            emit('c705'); word(state+offset); word(0)
+        label('poll_done')
+        emit('8be5 619d c3')
+    else:
+        emit('8be5 619d c20400')
     label('original'); emit('8be5 619d'); native('e9', HANDLER)
     label('initialize')
     emit('9c60 8bec 83e4f0'); native('e8', initializer)
@@ -207,7 +225,91 @@ def build_adapter(entry, state, ready, initializer):
         struct.pack_into('<i', code, position, labels[name]-position-4)
     return {'code': bytes(code), 'traps': traps, 'state': state, 'ready': ready,
             'initializer': entry+labels['initialize'], 'patch_va': HANDLER_SLOT,
-            'before': struct.pack('<I', HANDLER), 'after': struct.pack('<I', entry)}
+            'before': struct.pack('<I', HANDLER), 'after': struct.pack('<I', entry),
+            **({'poll': entry+labels['poll']} if deferred else {})}
+
+
+class ServerNameBridge:
+    """联机改名的主线程适配：应用确认后沿原生 setter 和任务完成路径发布。"""
+
+    def __init__(self, process, profiles, session, adapter, storage_errors, report_error):
+        self.process, self.profiles, self.session = process, profiles, session
+        self.adapter, self.storage_errors = adapter, storage_errors
+        self.report_error = report_error
+        self.completion = None
+        self.waiting_ui = False
+
+    def _write(self, offset, value):
+        """只在已验证的主线程暂停点写入通信区并回读。"""
+        address = self.adapter['state'] + offset
+        self.process.write(address, value)
+        if self.process.read(address, len(value)) != value:
+            raise ValueError('联机改名通信区回读失败')
+
+    def _failure(self, error, notify):
+        """复用原生失败任务；后台恢复失败使用已有通知能力。"""
+        message = str(error).encode('utf-8')[:511].decode('utf-8', errors='ignore').encode('utf-8')
+        self._write(144, message.ljust(512, b'\0'))
+        self._write(136, struct.pack('<II', 2, int(notify)))
+        if not notify:
+            self.report_error(str(error))
+
+    def handle(self, phase, frame, row):
+        """处理请求、逐帧轮询、原生应用及回滚，不同步执行网络调用。"""
+        state = self.adapter['state']
+        if phase == 'request':
+            try:
+                value = read_request(self.process.read, frame, self.adapter['ready'])
+                # 继续使用原有客户端规则及原生编码容量检查；服务端不复验格式。
+                self.profiles.validate_name(value)
+                encode_name(self.process.read, value)
+                self.profiles.check_name_card()
+                self.session.begin(value)
+                self.waiting_ui = True
+            except self.storage_errors as error:
+                self._failure(error, True)
+                row['server_rename_error'] = str(error)
+        elif phase == 'poll':
+            completion = self.session.poll()
+            if completion is None:
+                return
+            self.completion = completion
+            notify = completion.notify and self.waiting_ui
+            self.waiting_ui = False
+            if completion.error is not None:
+                self._failure(completion.error, notify)
+                row['server_rename_error'] = str(completion.error)
+                return
+            try:
+                stage_name(self.process.read, self.process.write, state, completion.display_name)
+                self._write(136, struct.pack('<II', 1, int(notify)))
+                # setter 或本地提交失败时的默认反馈。
+                self._write(144, '改名未能完成。'.encode('utf-8').ljust(512, b'\0'))
+            except self.storage_errors as error:
+                self._failure(error, notify)
+                row['server_rename_error'] = str(error)
+        elif phase == 'applied':
+            try:
+                verify_applied(self.process.read, state)
+                if not self.completion.notify:
+                    self.profiles.synchronize_name(self.completion.display_name)
+                else:
+                    self.profiles.rename(self.completion.display_name)
+                self._write(4, struct.pack('<I', 1))
+                self.session.complete()
+                row['server_rename_saved'] = self.profiles.name_snapshot
+            except self.storage_errors as error:
+                self._write(4, bytes(4))
+                message = str(error).encode('utf-8')[:511].decode('utf-8', errors='ignore').encode('utf-8')
+                self._write(144, message.ljust(512, b'\0'))
+                if not _u32(self.process.read, state+140):
+                    self.report_error(str(error))
+                row['server_rename_error'] = str(error)
+        elif phase == 'rolled_back':
+            verify_applied(self.process.read, state, rollback=True)
+            row['server_rename_rolled_back'] = True
+        else:
+            raise ValueError('未知联机改名阶段')
 
 MARKET_OFFSET = 0x4CCBCC
 METHOD_LENGTH = 178

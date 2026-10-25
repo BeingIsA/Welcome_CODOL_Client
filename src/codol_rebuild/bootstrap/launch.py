@@ -24,6 +24,7 @@ def run(args):
     process.settings_errors=(OSError,ValueError,sqlite3.Error)
     bridge=None
     multiplayer=None
+    rename_session=None
     try:
         prepared=prepare(args,run_dir,stage,log,phase_done)
         if getattr(args,'prepare_only',False):
@@ -36,12 +37,16 @@ def run(args):
             from codol_rebuild.adapters.persistence.server_identity import JsonIdentityStore
             from codol_rebuild.platform.machine_identity import fingerprint
             gateway = HttpGateway(args.server_url, args.server_timeout)
+            from codol_rebuild.application.accounts.rename import RenameSession
+            rename_session = RenameSession(
+                HttpGateway(args.server_url, min(args.server_timeout, 5.0)))
             multiplayer = RoomSession(gateway, JsonIdentityStore(args.server_identity),
                                              gateway.server, fingerprint(),
                                              realtime=WebSocketConnection(gateway.server, args.server_timeout))
             record({'multiplayer_server': gateway.server})
         bridge=GameSessionBridge(args,run_dir,prepared['image'],prepared['pe'],log,record,phase_done,
-                                 process,account_factory,(OSError,ValueError,sqlite3.Error), multiplayer=multiplayer)
+                                 process,account_factory,(OSError,ValueError,sqlite3.Error), multiplayer=multiplayer,
+                                 rename_session=rename_session)
         debugger=DebugLoop(process,bridge,prepared['pe'],prepared['supplier'],FORBIDDEN)
         process.start(prepared['exe'],prepared['settings'])
         debugger.run()
@@ -59,6 +64,10 @@ def run(args):
                     try:multiplayer.close()
                     except Exception as error:
                         log['multiplayer_cleanup_error']=str(error)
+                if rename_session:
+                    try:rename_session.close()
+                    except Exception as error:
+                        log['rename_cleanup_error']=str(error)
                 reporter.close()
     return log
 

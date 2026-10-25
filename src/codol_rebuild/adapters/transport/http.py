@@ -1,4 +1,5 @@
 """标准库 HTTP 玩家接口客户端；统一地址、超时、错误和响应契约检查。"""
+from codol_rebuild.application.errors import OnlineError
 import http.client
 import json
 import re
@@ -6,7 +7,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
-from codol_rebuild.application.room.contracts import RoomError, valid_room_id
+from codol_rebuild.application.room.contracts import valid_room_id
 
 
 def normalize_server(value: str) -> str:
@@ -86,16 +87,16 @@ class HttpGateway:
                     detail = data.get('error', {})
                     if not isinstance(detail, dict):
                         raise ValueError('接口错误响应不符合契约')
-                    raise RoomError(str(detail.get('code', 'HTTP_ERROR')),
+                    raise OnlineError(str(detail.get('code', 'HTTP_ERROR')),
                                            str(detail.get('message', '服务端请求失败')),
                                            uncertain=response.status >= 500)
                 if data.get('apiVersion') != '1' or not isinstance(data.get('data'), dict):
                     raise ValueError('接口版本或响应结构不符合契约')
                 return data['data']
-        except RoomError:
+        except OnlineError:
             raise
         except (OSError, ValueError, urllib.error.URLError, http.client.HTTPException) as error:
-            raise RoomError('NETWORK_ERROR', '无法完成服务端请求：' + str(error),
+            raise OnlineError('NETWORK_ERROR', '无法完成服务端请求：' + str(error),
                                    uncertain=method in ('POST', 'PUT')) from error
 
     def login(self, fingerprint, username, player_id):
@@ -110,8 +111,13 @@ class HttpGateway:
             if player_id and data['playerId'] != player_id:
                 raise ValueError('服务端返回了不同身份，拒绝覆盖原身份')
         except ValueError as error:
-            raise RoomError('INVALID_RESPONSE', str(error), uncertain=True) from error
+            raise OnlineError('INVALID_RESPONSE', str(error), uncertain=True) from error
         return data
+
+    def rename(self, player_id, display_name):
+        """发送改名请求并返回服务端结果。"""
+        return self._request('POST', '/api/v1/players/me/rename',
+                             {'displayName': display_name}, player_id)
 
     def create(self, player_id, username, max_players, password, settings=None, profile=None):
         payload = {'displayName': username, 'maxPlayers': max_players, 'password': password}
@@ -130,7 +136,7 @@ class HttpGateway:
             if settings is not None and data.get('settings') != settings:
                 raise ValueError('房间响应设置与提交值不匹配')
         except ValueError as error:
-            raise RoomError('INVALID_RESPONSE', str(error), uncertain=True) from error
+            raise OnlineError('INVALID_RESPONSE', str(error), uncertain=True) from error
         return data
 
     def join(self, player_id, room_id, username, password, profile=None):
@@ -144,7 +150,7 @@ class HttpGateway:
             if not any(m['playerId'] == player_id for m in data['members']):
                 raise ValueError('加入响应缺少当前玩家')
         except ValueError as error:
-            raise RoomError('INVALID_RESPONSE', str(error), uncertain=True) from error
+            raise OnlineError('INVALID_RESPONSE', str(error), uncertain=True) from error
         return data
 
     def update_settings(self, player_id, room_id, settings):
@@ -155,7 +161,7 @@ class HttpGateway:
             if data.get('settings') != _settings_payload(settings):
                 raise ValueError('设置响应与提交值不匹配')
         except ValueError as error:
-            raise RoomError('INVALID_RESPONSE', str(error), uncertain=True) from error
+            raise OnlineError('INVALID_RESPONSE', str(error), uncertain=True) from error
         return data
 
     def room_detail(self, player_id, room_id):
@@ -165,7 +171,7 @@ class HttpGateway:
             if data.get('roomId') != room_id:
                 raise ValueError('房间详情响应不完整')
         except ValueError as error:
-            raise RoomError('INVALID_RESPONSE', str(error)) from error
+            raise OnlineError('INVALID_RESPONSE', str(error)) from error
         return data
 
     def member_profile(self, player_id, room_id, member_id):
@@ -176,7 +182,7 @@ class HttpGateway:
                              player_id=player_id)
         if (data.get('roomId') != room_id or data.get('playerId') != member_id
                 or 'profile' not in data):
-            raise RoomError('INVALID_RESPONSE', '成员档案响应身份不匹配')
+            raise OnlineError('INVALID_RESPONSE', '成员档案响应身份不匹配')
         return data['profile']
 
     def update_profile(self, player_id, room_id, profile):
@@ -185,7 +191,7 @@ class HttpGateway:
         data = self._request('PUT', f'/api/v1/rooms/{room_id}/members/me/profile',
                              {'profile': profile}, player_id)
         if (data.get('roomId') != room_id or data.get('playerId') != player_id):
-            raise RoomError('INVALID_RESPONSE', '档案上传确认身份不匹配', uncertain=True)
+            raise OnlineError('INVALID_RESPONSE', '档案上传确认身份不匹配', uncertain=True)
         return data
 
     def leave(self, player_id, room_id):
@@ -219,7 +225,7 @@ class HttpGateway:
                         or type(room.get('hasPassword')) is not bool):
                     raise ValueError('房间人数或锁定状态无效')
         except ValueError as error:
-            raise RoomError('INVALID_RESPONSE', str(error)) from error
+            raise OnlineError('INVALID_RESPONSE', str(error)) from error
         return data
 
 def validate_room_snapshot(data, room_id):

@@ -1,4 +1,5 @@
 """房间用例编排：后台串行请求、身份保存和不确定写入恢复。"""
+from codol_rebuild.application.errors import OnlineError
 import threading
 import logging
 import time
@@ -6,7 +7,7 @@ from copy import deepcopy
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from codol_rebuild.application.room.contracts import (
-    Completion, Gateway, IdentityRecord, IdentityStore, RoomError, RealtimeConnection, valid_room_id,
+    Completion, Gateway, IdentityRecord, IdentityStore, RealtimeConnection, valid_room_id,
 )
 
 
@@ -58,7 +59,7 @@ class RoomSession:
         try:
             data = self._gateway.update_profile(player_id, room_id, profile)
             return Completion('update_profile', data=data)
-        except RoomError as error:
+        except OnlineError as error:
             return Completion('update_profile', error=error)
 
     def poll_update_profile(self):
@@ -91,7 +92,7 @@ class RoomSession:
             data = self._gateway.change_ready(self._record.player_id, room_id, ready)
             self._load_profiles(data, self._record.player_id)
             return Completion('change_ready', data=data)
-        except RoomError as error:
+        except OnlineError as error:
             return Completion('change_ready', error=error)
 
     def poll_change_ready(self):
@@ -119,14 +120,14 @@ class RoomSession:
         try:
             record = self._record
             if record is None or record.room_id != room_id:
-                raise RoomError('ROOM_NOT_FOUND', '当前房间已失效')
+                raise OnlineError('ROOM_NOT_FOUND', '当前房间已失效')
             data = self._gateway.change_team(record.player_id, room_id, team)
             self._load_profiles(data, record.player_id)
             return Completion('change_team', data=data)
-        except RoomError as error:
+        except OnlineError as error:
             return Completion('change_team', error=error)
         except (KeyError, TypeError, ValueError) as error:
-            return Completion('change_team', error=RoomError('INVALID_RESPONSE', str(error)))
+            return Completion('change_team', error=OnlineError('INVALID_RESPONSE', str(error)))
 
     def poll_change_team(self):
         """一次性消费结果并释放通道，失败也允许后续用户操作。"""
@@ -151,10 +152,10 @@ class RoomSession:
             data = self._gateway.kick(record.player_id, room_id, target_player_id)
             self._load_profiles(data, record.player_id)
             return Completion('kick', data=data)
-        except RoomError as error:
+        except OnlineError as error:
             return Completion('kick', error=error)
         except (KeyError, TypeError, ValueError) as error:
-            return Completion('kick', error=RoomError('INVALID_RESPONSE', '踢人响应无效：'+str(error)))
+            return Completion('kick', error=OnlineError('INVALID_RESPONSE', '踢人响应无效：'+str(error)))
 
     def poll_kick(self):
         """非阻塞消费一次踢人完成结果。"""
@@ -273,7 +274,7 @@ class RoomSession:
             data = self._gateway.room_detail(record.player_id, record.room_id)
             self._load_profiles(data, record.player_id)
             return Completion('room_members_updated', data=data)
-        except RoomError as error:
+        except OnlineError as error:
             return Completion('room_members_updated', error=error)
 
     def _load_profiles(self, data, player_id):
@@ -327,30 +328,30 @@ class RoomSession:
             if cancelled.is_set():
                 return Completion('list')
             if self._record is None:
-                raise RoomError('NO_IDENTITY', '尚未完成启动登录')
+                raise OnlineError('NO_IDENTITY', '尚未完成启动登录')
             cursor, seen, rooms = None, set(), {}
             deadline = time.monotonic() + 20
             for _ in range(100):
                 if cancelled.is_set():
                     return Completion('list')
                 if time.monotonic() > deadline:
-                    raise RoomError('LIST_TIMEOUT', '房间列表查询超时，请刷新重试')
+                    raise OnlineError('LIST_TIMEOUT', '房间列表查询超时，请刷新重试')
                 page = self._gateway.list_rooms(self._record.player_id, cursor)
                 for room in page['rooms']:
                     rooms[room['roomId']] = room
                 if len(rooms) > 1000:
-                    raise RoomError('LIST_TOO_LARGE', '房间列表超过当前客户端容量')
+                    raise OnlineError('LIST_TOO_LARGE', '房间列表超过当前客户端容量')
                 cursor = page['nextCursor']
                 if cursor is None:
                     return Completion('list', data={'rooms': list(rooms.values())})
                 if cursor in seen:
                     break
                 seen.add(cursor)
-            raise RoomError('INVALID_RESPONSE', '房间分页游标没有前进')
-        except RoomError as error:
+            raise OnlineError('INVALID_RESPONSE', '房间分页游标没有前进')
+        except OnlineError as error:
             return Completion('list', error=error)
         except (OSError, ValueError) as error:
-            return Completion('list', error=RoomError('LOCAL_IDENTITY_ERROR', str(error)))
+            return Completion('list', error=OnlineError('LOCAL_IDENTITY_ERROR', str(error)))
 
     def _login(self, username):
         if self._record is None:
@@ -361,6 +362,7 @@ class RoomSession:
                    else IdentityRecord(data['playerId']))
         if self._realtime is not None:
             self._realtime.start(self._record.player_id, self._fingerprint)
+        return data
 
     def _recover_create(self):
         if not self._record.uncertain_create:
@@ -379,7 +381,7 @@ class RoomSession:
             if cursor in seen:
                 break
             seen.add(cursor)
-        raise RoomError('RECOVERY_FAILED', '无法确认上次建房结果，请稍后重试')
+        raise OnlineError('RECOVERY_FAILED', '无法确认上次建房结果，请稍后重试')
 
     def _leave(self):
         self._recover_create()
@@ -392,9 +394,9 @@ class RoomSession:
                             or not any(isinstance(m, dict) and m.get('playerId') == self._record.player_id
                                        for m in members)):
                         # 查询无成员不能证明在途 POST 未执行，保留记录供下次恢复。
-                        raise RoomError('RECOVERY_PENDING', '上次入房结果尚未确认，请稍后重试', uncertain=True)
+                        raise OnlineError('RECOVERY_PENDING', '上次入房结果尚未确认，请稍后重试', uncertain=True)
                 self._gateway.leave(self._record.player_id, self._record.room_id)
-            except RoomError as error:
+            except OnlineError as error:
                 if error.code not in ('ROOM_NOT_FOUND', 'ROOM_CLOSED'):
                     raise
             self._clear_local_room_record()
@@ -404,23 +406,23 @@ class RoomSession:
     def _join(self, room_id, username, password, profile=None):
         """记录目标后提交加入；响应丢失时查询成员确认，未确认保留退出恢复记录。"""
         if not valid_room_id(room_id):
-            raise RoomError('INVALID_ROOM_ID', '请选择有效房间')
+            raise OnlineError('INVALID_ROOM_ID', '请选择有效房间')
         if self._record.room_id and self._record.room_id != room_id:
-            raise RoomError('ALREADY_IN_OTHER_ROOM', '请先退出当前房间')
+            raise OnlineError('ALREADY_IN_OTHER_ROOM', '请先退出当前房间')
         if self._record.uncertain_create:
-            raise RoomError('RECOVERY_REQUIRED', '请先清理上次未确认的房间')
+            raise OnlineError('RECOVERY_REQUIRED', '请先清理上次未确认的房间')
         previous = self._record
         self._save(replace(previous, room_id=room_id, uncertain_join=True))
         try:
             data = self._gateway.join(previous.player_id, room_id, username, password,
                                       **({'profile': profile} if profile is not None else {}))
-        except RoomError as error:
+        except OnlineError as error:
             if not error.uncertain:
                 self._save(previous)
                 raise
             try:
                 data = self._gateway.room_detail(previous.player_id, room_id)
-            except RoomError:
+            except OnlineError:
                 raise error
             if (data.get('roomId') != room_id or not isinstance(data.get('members'), list)
                     or not any(isinstance(m, dict) and m.get('playerId') == previous.player_id
@@ -434,26 +436,26 @@ class RoomSession:
     def _execute(self, operation, username, max_players, password, settings=None, room_id=None, profile=None):
         try:
             if operation == 'login':
-                self._login(username)
+                login_result = self._login(username)
             elif self._record is None:
-                raise RoomError('NO_IDENTITY', '尚未完成启动登录')
+                raise OnlineError('NO_IDENTITY', '尚未完成启动登录')
             if operation == 'login':
                 self._leave()  # 重启后清理上次未正常退出的房间。
-                data = {'playerId': self._record.player_id, 'displayName': username}
+                data = {'playerId': self._record.player_id, 'displayName': login_result['displayName']}
             elif operation == 'leave':
                 data = self._leave()
             elif operation == 'join':
                 data = self._join(room_id, username, password, profile)
             else:
                 if type(max_players) is not int or not 1 <= max_players <= 255:
-                    raise RoomError('INVALID_MAX_PLAYERS', '房间人数无效')
+                    raise OnlineError('INVALID_MAX_PLAYERS', '房间人数无效')
                 self._leave()
                 self._save(replace(self._record, uncertain_create=True))
                 try:
                     data = self._gateway.create(self._record.player_id, username,
                                                 max_players, password, settings,
                                                 **({'profile': profile} if profile is not None else {}))
-                except RoomError as error:
+                except OnlineError as error:
                     if not error.uncertain:
                         self._save(replace(self._record, uncertain_create=False))
                     raise
@@ -463,29 +465,29 @@ class RoomSession:
                 self._load_profiles(data, self._record.player_id)
                 self._profile_upload_enabled = True
             return Completion(operation, data=data)
-        except RoomError as error:
+        except OnlineError as error:
             return Completion(operation, error=error)
         except (OSError, ValueError) as error:
-            return Completion(operation, error=RoomError('LOCAL_IDENTITY_ERROR', str(error)))
+            return Completion(operation, error=OnlineError('LOCAL_IDENTITY_ERROR', str(error)))
 
     def _execute_settings(self, username, settings):
         """异步提交房内设置变更；每次意图只发送一次，不自动重试写入。"""
         try:
             if self._record is None:
-                raise RoomError('NO_IDENTITY', '尚未完成启动登录')
+                raise OnlineError('NO_IDENTITY', '尚未完成启动登录')
             if self._is_owner is False:
-                raise RoomError('FORBIDDEN', '只有房主可以修改房间设置')
+                raise OnlineError('FORBIDDEN', '只有房主可以修改房间设置')
             if settings is None or not isinstance(settings, dict) or not settings:
-                raise RoomError('INVALID_SETTINGS', '设置数据无效')
+                raise OnlineError('INVALID_SETTINGS', '设置数据无效')
             room_id = self._record.room_id if self._record else None
             if not room_id:
-                raise RoomError('NO_ROOM', '当前不在房间内，设置未同步')
+                raise OnlineError('NO_ROOM', '当前不在房间内，设置未同步')
             data = self._gateway.update_settings(self._record.player_id, room_id, settings)
             return Completion('settings', data=data)
-        except RoomError as error:
+        except OnlineError as error:
             return Completion('settings', error=error)
         except (OSError, ValueError) as error:
-            return Completion('settings', error=RoomError('LOCAL_IDENTITY_ERROR', str(error)))
+            return Completion('settings', error=OnlineError('LOCAL_IDENTITY_ERROR', str(error)))
 
     def close(self) -> None:
         """进程结束后等待有限网络请求收尾；离房失败保留磁盘恢复标记。"""

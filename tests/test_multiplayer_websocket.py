@@ -1,4 +1,5 @@
 """实时连接回归：真实握手、掉线重连、登录门控和退出清理。"""
+from codol_rebuild.application.errors import OnlineError
 import threading
 import json
 import time
@@ -10,7 +11,7 @@ from websockets.sync.server import serve
 from websockets.exceptions import ConnectionClosed
 
 from codol_rebuild.adapters.transport.websocket import WebSocketConnection
-from codol_rebuild.application.room.contracts import RoomError, RealtimeStatus
+from codol_rebuild.application.room.contracts import RealtimeStatus
 from codol_rebuild.application.room.service import RoomSession
 
 
@@ -101,7 +102,7 @@ class RealtimeTests(unittest.TestCase):
     def test_first_connection_failure_does_not_start_thread(self):
         client = WebSocketConnection('http://localhost')
         client._connect = Mock(side_effect=OSError('offline'))
-        with self.assertRaises(RoomError):
+        with self.assertRaises(OnlineError):
             client.start('pl_test', 'fp +&中文')
         self.assertIsNone(client._thread)
         client.close()
@@ -193,8 +194,8 @@ class RealtimeTests(unittest.TestCase):
     def test_failed_handshake_prevents_login_and_retry_preserves_identity(self):
         gateway, store, realtime = Mock(), Mock(), Mock()
         store.load.return_value = None
-        gateway.login.return_value = {'playerId': 'pl_test'}
-        realtime.start.side_effect = [RoomError('WS_CONNECT_FAILED', '失败'), None]
+        gateway.login.return_value = {'playerId': 'pl_test', 'displayName': '测试'}
+        realtime.start.side_effect = [OnlineError('WS_CONNECT_FAILED', '失败'), None]
         session = RoomSession(gateway, store, 'http://localhost', 'fp', realtime)
         def login():
             session.begin('login', '测试')
@@ -210,9 +211,9 @@ class RealtimeTests(unittest.TestCase):
             self.assertEqual(login().error.code, 'WS_CONNECT_FAILED')
             self.assertIsNone(login().error)
             self.assertEqual(gateway.login.call_args.args[-1], 'pl_test')
-            gateway.leave.side_effect = RoomError('NETWORK_ERROR', '失败')
+            gateway.leave.side_effect = OnlineError('NETWORK_ERROR', '失败')
             session._record = replace(session._record, room_id='rm_test')
-            with self.assertRaises(RoomError):
+            with self.assertRaises(OnlineError):
                 session.close()
             realtime.close.assert_called_once()
         finally:

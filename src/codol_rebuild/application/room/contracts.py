@@ -1,4 +1,5 @@
 """房间应用端口与数据契约；不包含 HTTP、原生内存或文件实现。"""
+from codol_rebuild.application.errors import OnlineError
 from dataclasses import dataclass
 from enum import Enum
 from typing import Protocol
@@ -11,14 +12,6 @@ def valid_room_id(value) -> bool:
         re.fullmatch(r'rm_[A-Za-z0-9_-]{1,96}', value) is not None
         or (re.fullmatch(r'[1-9][0-9]{0,18}', value) is not None
             and int(value) <= (1 << 63) - 1))
-
-
-class RoomError(Exception):
-    """可展示的联机错误；uncertain 表示写请求可能已在服务端执行。"""
-    def __init__(self, code: str, message: str, *, uncertain: bool = False):
-        super().__init__(message)
-        self.code = code
-        self.uncertain = uncertain
 
 
 @dataclass(frozen=True)
@@ -35,7 +28,7 @@ class Completion:
     """后台用例完成快照，由调用线程消费一次。"""
     operation: str
     data: dict | None = None
-    error: RoomError | None = None
+    error: OnlineError | None = None
 
 
 class IdentityStore(Protocol):

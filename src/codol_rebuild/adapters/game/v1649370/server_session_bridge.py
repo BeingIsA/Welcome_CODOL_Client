@@ -3,9 +3,10 @@
 HTTP 不在暂停点等待；帧陷阱只提交或消费已完成结果。字符串 playerId 仅在
 业务端使用，原生64位显示标识由其稳定摘要映射，不用作服务端认证。
 """
+from codol_rebuild.application.errors import OnlineError
 import hashlib
 import struct
-from codol_rebuild.application.room.contracts import RoomError, RoomPort, PERMISSION_ERROR_CODES
+from codol_rebuild.application.room.contracts import RoomPort, PERMISSION_ERROR_CODES
 from codol_rebuild.adapters.game.v1649370.player_name import native_name, LANGUAGE, DIRECT_STRING_MODE
 from codol_rebuild.adapters.game.v1649370.room import (
     JOIN_ERROR_OFFSET, JOIN_BLOCKED_ERROR, JOIN_ERROR_MESSAGE_OFFSET,
@@ -25,7 +26,7 @@ SETTINGS_SUBMIT = 0x6300A0
 
 def display_message(error) -> str:
     """权限类失败统一显示为缺少文件，不向用户暴露封禁等权限细节。"""
-    if isinstance(error, RoomError) and error.code in PERMISSION_ERROR_CODES:
+    if isinstance(error, OnlineError) and error.code in PERMISSION_ERROR_CODES:
         return '缺少文件'
     return str(error)
 
@@ -176,7 +177,7 @@ def build_settings_detours(entry):
     return {'code': bytes(code), 'patches': patches, 'traps': traps}
 
 
-def build_tick(entry, state, ready, preview_entry, room_entries, list_publish=None):
+def build_tick(entry, state, ready, preview_entry, room_entries, list_publish=None, name_poll=None):
     """包装既有前端帧；网络等待时立即返回，仅就绪结果进入原生回调。"""
     code, labels, refs, traps = bytearray(), {}, [], {}
     def emit(value): code.extend(bytes.fromhex(value))
@@ -194,6 +195,8 @@ def build_tick(entry, state, ready, preview_entry, room_entries, list_publish=No
     emit('ff05'); word(state+36)
     emit('833d'); word(state+36); emit('06'); branch('0f82', 'done')
     emit('c705'); word(state+36); word(0)
+    if name_poll is not None:
+        emit('83e4f0'); call(name_poll); emit('8be5')
     if 'settings_apply' in room_entries:
         trap('realtime')
         if 'notifications' in room_entries:
@@ -299,6 +302,8 @@ class ServerSessionBridge:
         self.ready_bridge = None
         self.notifications = None
         self.departure_message = None
+        self.on_login = None
+        self.account_ready = lambda: True
 
     def allocate(self):
         """在已暂停的初始化边分配独立通信页。"""
@@ -327,7 +332,7 @@ class ServerSessionBridge:
                       member_profile.build_member_publish(self.members_apply, self.members_buffer))
         self.process.executable(self.members_apply, 4096)
 
-    def install_tick(self, ready, preview_entry, room_plan):
+    def install_tick(self, ready, preview_entry, room_plan, name_poll=None):
         """安装主线程完成调度；返回替换原预览 CALL 的新入口。"""
         entry = self.process.allocate(4096)
         from codol_rebuild.adapters.game.v1649370.room_list import RoomListBridge
@@ -367,7 +372,7 @@ class ServerSessionBridge:
                       build_ready_notifications(ready_notify, self.members_buffer))
         self.process.executable(ready_notify, 4096)
         room_plan['entries']['ready_notify'] = ready_notify
-        plan = build_tick(entry, self.state, ready, preview_entry, room_plan['entries'], publisher)
+        plan = build_tick(entry, self.state, ready, preview_entry, room_plan['entries'], publisher, name_poll)
         if len(plan['code']) > 4096:
             raise ValueError('联机帧桥超出代码页')
         checked_write(self.process, entry, plan['code'])
@@ -573,6 +578,8 @@ class ServerSessionBridge:
         try:
             if not self.login_done:
                 raise ValueError('服务端登录尚未成功')
+            if not self.account_ready():
+                raise ValueError('昵称同步或改名尚未完成')
             room_id = native_string(read, u32(read, frame+4))
             password = native_string(read, u32(read, frame+28)) or None
             if self.room_list is not None:
@@ -732,6 +739,8 @@ class ServerSessionBridge:
             if not self.login_done and not self.login_started:
                 raise ValueError('服务端登录尚未成功')
             if operation == 'create':
+                if not self.account_ready():
+                    raise ValueError('昵称同步或改名尚未完成')
                 maximum, password, settings = room_options(read, room)
                 submitted = self.port.begin(operation, username(read),
                                             max_players=maximum, password=password,
@@ -921,6 +930,8 @@ class ServerSessionBridge:
             checked_write(self.process, self.state+IDENTITY, identity)
             self.login_done = True
             self.player_id = result.data['playerId']
+            if self.on_login is not None:
+                self.on_login(result.data['playerId'], result.data['displayName'])
             self.discard_results = False
             self._word(LOGIN, 1)
             if self.pending is None:

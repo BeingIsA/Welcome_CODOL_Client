@@ -148,3 +148,11 @@ class AccountSession:
         self.name_snapshot = snapshot
         return snapshot
 
+    def synchronize_name(self, value):
+        """保存登录确认的昵称副本，不消耗改名卡。"""
+        if self.name_snapshot['value'] != value:
+            revision = self.repository.save_display_name(
+                self.name, self.name_snapshot['revision'], value)
+            self.name_snapshot = {'value': value, 'revision': revision}
+        return self.name_snapshot
+

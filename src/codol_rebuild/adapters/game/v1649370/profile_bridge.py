@@ -145,6 +145,15 @@ class LocalProfileBridge:
                             self._service.consume_state(NAME_CARD),
                             lambda: self._service.rename(value, NAME_CARD))
 
+    def check_name_card(self):
+        """发送前确认本地档案有一张可消耗改名卡。"""
+        from codol_rebuild.adapters.game.v1649370.player_name import NAME_CARD
+        self._service.consume_state(NAME_CARD)
+
+    def synchronize_name(self, value):
+        """通过账号公开用例保存服务端昵称，不改变库存。"""
+        return self._service.synchronize_name(value)
+
     def credit_state(self, currency, amount, current_balance):
         """应用层充值规则：校验数量与余额上限，返回更新后的授权状态；不写存储。"""
         return self._service.credit_state(currency, amount, current_balance)

@@ -1,4 +1,5 @@
 """房内配装异步上传、生命周期和专用原生调用边回归。"""
+from codol_rebuild.application.errors import OnlineError
 import struct
 import threading
 import time
@@ -12,7 +13,7 @@ from unittest.mock import Mock
 import capstone
 
 from codol_rebuild.application.room.service import RoomSession
-from codol_rebuild.application.room.contracts import IdentityRecord, RoomError
+from codol_rebuild.application.room.contracts import IdentityRecord
 from codol_rebuild.adapters.transport.http import HttpGateway
 from codol_rebuild.adapters.game.v1649370 import member_profile
 from test_refactor_equivalence import MemoryProcess
@@ -72,7 +73,7 @@ class ProfileUpdateSessionTests(unittest.TestCase):
         self.assertTrue(self.session.begin_update_profile('rm_test', {'selection': 1}))
         self.completed()
         self.assertEqual(self.gateway.update_profile.call_args.args[:2], ('pl_me', 'rm_test'))
-        self.gateway.leave.side_effect = RoomError('NETWORK_ERROR', '离房失败', uncertain=True)
+        self.gateway.leave.side_effect = OnlineError('NETWORK_ERROR', '离房失败', uncertain=True)
         self.assertTrue(self.session.begin('leave', '玩家'))
         self.assertFalse(self.session.begin_update_profile('rm_test', {'selection': 2}))
         self.session._pending.result(timeout=2)
@@ -82,7 +83,7 @@ class ProfileUpdateSessionTests(unittest.TestCase):
         self.gateway.leave.side_effect = None
 
     def test_uncertain_failure_is_not_retried_or_automatically_followed(self):
-        self.gateway.update_profile.side_effect = RoomError('NETWORK_ERROR', '超时', uncertain=True)
+        self.gateway.update_profile.side_effect = OnlineError('NETWORK_ERROR', '超时', uncertain=True)
         self.session.begin_update_profile('rm_test', {'selection': 1})
         self.session.begin_update_profile('rm_test', {'selection': 2})
         self.assertTrue(self.completed().error.uncertain)
@@ -93,7 +94,7 @@ class ProfileUpdateSessionTests(unittest.TestCase):
     def test_http_upload_checks_confirmation_identity_and_put_timeout(self):
         gateway = HttpGateway('http://localhost')
         gateway._opener.open = Mock(side_effect=TimeoutError('timeout'))
-        with self.assertRaises(RoomError) as raised:
+        with self.assertRaises(OnlineError) as raised:
             gateway.update_profile('pl_me', 'rm_test', {})
         self.assertTrue(raised.exception.uncertain)
 
@@ -102,7 +103,7 @@ class ProfileUpdateSessionTests(unittest.TestCase):
         gateway._request.assert_called_once_with('PUT', '/api/v1/rooms/rm_test/members/me/profile',
             {'profile': {'selection': 1}}, 'pl_me')
         gateway._request.return_value['playerId'] = 'pl_other'
-        with self.assertRaises(RoomError) as raised:
+        with self.assertRaises(OnlineError) as raised:
             gateway.update_profile('pl_me', 'rm_test', {})
         self.assertTrue(raised.exception.uncertain)
 

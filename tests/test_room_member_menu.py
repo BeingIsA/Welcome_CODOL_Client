@@ -1,4 +1,5 @@
 """房主菜单、原生 ABI 与踢人业务回归；模拟测试不代替原生 UI 验收。"""
+from codol_rebuild.application.errors import OnlineError
 import hashlib
 from pathlib import Path
 import struct
@@ -8,7 +9,7 @@ from unittest.mock import Mock
 
 from codol_rebuild.adapters.game.v1649370 import room_member_menu as menu, ui_movie
 from codol_rebuild.application.room.service import RoomSession
-from codol_rebuild.application.room.contracts import IdentityRecord, RoomError
+from codol_rebuild.application.room.contracts import IdentityRecord
 from codol_rebuild.adapters.transport.http import HttpGateway
 from test_refactor_equivalence import MemoryProcess
 
@@ -182,7 +183,7 @@ class MenuTests(unittest.TestCase):
         gateway=Mock();session=RoomSession(gateway,Mock(),'http://localhost','test')
         session._record=IdentityRecord('pl_me','rm_a');session._is_owner=True
         data={'roomId':'rm_a','members':[{'playerId':'pl_me'}]}
-        gateway.kick.side_effect=RoomError('NETWORK','回包丢失',uncertain=True)
+        gateway.kick.side_effect=OnlineError('NETWORK','回包丢失',uncertain=True)
         gateway.room_detail.return_value=data;gateway.member_profile.return_value={}
         try:
             self.assertTrue(session.begin_kick('rm_a','pl_other'))
@@ -190,7 +191,7 @@ class MenuTests(unittest.TestCase):
             session._kick_pending.result(timeout=3)
             self.assertEqual(session.poll_kick().error.code, 'NETWORK')
             gateway.kick.assert_called_once();gateway.room_detail.assert_not_called()
-            gateway.kick.side_effect=RoomError('FORBIDDEN','服务端拒绝')
+            gateway.kick.side_effect=OnlineError('FORBIDDEN','服务端拒绝')
             self.assertIsNotNone(session._execute_kick('rm_a','pl_me').error)
             session._is_owner=False
             self.assertIsNotNone(session._execute_kick('rm_a','pl_other').error)

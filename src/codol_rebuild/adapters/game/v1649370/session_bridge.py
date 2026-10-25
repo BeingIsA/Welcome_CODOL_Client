@@ -7,7 +7,7 @@ from codol_rebuild.adapters.game.v1649370.profile_bridge import LocalProfileBrid
 
 class GameSessionBridge:
     """仅拥有版本状态；进程和账号实现由装配入口注入。"""
-    def __init__(self, args, run_dir, image, pe, log, record, phase_done, process: ProcessAccess, account_factory, account_errors, multiplayer=None):
+    def __init__(self, args, run_dir, image, pe, log, record, phase_done, process: ProcessAccess, account_factory, account_errors, multiplayer=None, rename_session=None):
         self.args=args; self.run_dir=run_dir; self.image=image; self.pe=pe
         self.log=log; self.record=record; self.phase_done=phase_done; self.process=process
         self.account_factory=account_factory; self.account_errors=account_errors
@@ -20,9 +20,14 @@ class GameSessionBridge:
         self.engine_ready=False; self.menu_queued=False; self.schema_captured=False
         self.preview_caller_return = 0x5EBFF8
         self.multiplayer = None
+        self.rename_session = rename_session
+        self.server_name_bridge = None
         if multiplayer is not None:
             from codol_rebuild.adapters.game.v1649370.server_session_bridge import ServerSessionBridge
             self.multiplayer = ServerSessionBridge(process, multiplayer, record)
+            if rename_session is not None:
+                self.multiplayer.on_login = rename_session.connected
+                self.multiplayer.account_ready = lambda: rename_session.ready
 
     def checkpoint(self, force=False):
         self.profiles.save(force=force)
@@ -45,179 +50,240 @@ class GameSessionBridge:
         for value in self.args.breakpoint:
             address,label=value.split(':',1);self.debug.arm(int(address,0),label)
 
-    def install_menu_preview(self):
-        from codol_rebuild.adapters.game.v1649370.menu_preview import build_menu_preview_helper, validate_menu_preview_image
+    def install_lobby_adapters(self):
+        """在 CRT 入口暂停点安装大厅原生适配；此处仅编排依赖和安装顺序。"""
+        from codol_rebuild.adapters.game.v1649370.menu_preview import validate_menu_preview_image
         validate_menu_preview_image(self.image.read_bytes())
-        entry = self.process.allocate(4096)
-        initializer = None
+        # 保持大厅代码页最先分配，避免改变后续原生地址布局。
+        lobby_entry = self.process.allocate(4096)
+        initializer_address = profile_data_address = room_plan = None
         if self.args.local_profile:
-            from codol_rebuild.adapters.game.v1649370 import ui_movie
-            if self.process.read(ui_movie.LOAD_SITE, len(ui_movie.LOAD_BYTES)) != ui_movie.LOAD_BYTES:
-                raise ValueError('大厅 UI 加载调用边不匹配')
-            self.debug.arm(ui_movie.LOAD_SITE, 'Local navigation resource')
-            from codol_rebuild.adapters.game.v1649370.local_ui_services import local_optional_service_patches, local_welcome_page_patch
-            welcome_patch = local_welcome_page_patch()
-            local_patches = local_optional_service_patches() + [welcome_patch]
-            for va, before, after in local_patches:
-                if self.process.read(va, len(before)) != before:
-                    raise ValueError(f'Local callback mismatch at {va:#x}')
-            for va, before, after in local_patches:
-                self.process.write(va, after)
-                if self.process.read(va, len(after)) != after:
-                    raise ValueError(f'Local callback readback mismatch at {va:#x}')
-            self.record({'local_unsupported_services': ['WarGod credit rating'], 'behavior': 'void request ignored; no score fabricated'})
-            self.record({'local_welcome_auto_popup_disabled': True, 'callback': 'IsWelcomePageShowed', 'patch_va': hex(welcome_patch[0]), 'behavior': 'report welcome already shown; manual MOTD entry unchanged'})
-            from codol_rebuild.adapters.game.v1649370.viewer import VIEW_TRACE_POINTS, VIEW_RESULT_POINTS
-            for address, label in (VIEW_TRACE_POINTS | VIEW_RESULT_POINTS).items():
-                self.debug.arm(address, label)
-            from codol_rebuild.adapters.game.v1649370.profile import build_initializer, inventory_relocations, CAPACITY, STRIDE, INITIALIZER_DATA_SIZE
-            from codol_rebuild.adapters.game.v1649370.profile import validate_account_native_contract
-            validate_account_native_contract(self.process.read)
-            initializer = self.process.allocate(4096)
-            profile_data = self.process.allocate(INITIALIZER_DATA_SIZE)
-            pool_allocation = self.process.allocate(CAPACITY * STRIDE + 32)
-            pool = pool_allocation + 16
-            self.process.write(pool_allocation, b'LOCAL-INVENTORY!')
-            self.process.write(pool + CAPACITY * STRIDE, b'LOCAL-INVENTORY!')
-            relocations = inventory_relocations(pool)
-            for va, before, after in relocations:
-                if self.process.read(va, len(before)) != before:
-                    raise ValueError(f'Inventory operand mismatch at {va:#x}')
-            for va, before, after in relocations:
-                self.process.write(va, after)
-            bridge = build_initializer(initializer, profile_data, pool)
-            self.process.write(initializer, bridge['code'])
-            self.process.write(profile_data, bridge['data'])
-            from codol_rebuild.adapters.game.v1649370.profile import build_stats_ready_adapter
-            stats_entry = initializer + 3072
-            stats = build_stats_ready_adapter(stats_entry, profile_data)
-            if len(bridge['code']) > 3072 or self.process.read(stats['patch_va'], 5) != stats['before']:
-                raise ValueError('Local UI stats adapter image/region mismatch')
-            self.process.write(stats_entry, stats['code'])
-            self.process.write(stats['patch_va'], stats['after'])
-            if self.process.read(stats_entry, len(stats['code'])) != stats['code'] or self.process.read(stats['patch_va'], 5) != stats['after']:
-                raise ValueError('Local UI stats adapter readback mismatch')
-            from codol_rebuild.adapters.game.v1649370.viewer import build_local_viewer_adapter
-            viewer_entry = initializer + 3328
-            viewer = build_local_viewer_adapter(viewer_entry, profile_data + 72)
-            if len(stats['code']) > 256 or len(viewer['code']) > 768 or self.process.read(viewer['patch_va'], len(viewer['gate_before'])) != viewer['gate_before']:
-                raise ValueError('Local viewer adapter image/region mismatch')
-            self.process.write(viewer_entry, viewer['code'])
-            self.process.write(viewer['patch_va'], viewer['after'])
-            if self.process.read(viewer_entry, len(viewer['code'])) != viewer['code'] or self.process.read(viewer['patch_va'], 5) != viewer['after']:
-                raise ValueError('Local viewer adapter readback mismatch')
-            self.log['local_viewer_adapter'] = {'patch_va': hex(viewer['patch_va']), 'local_modes': viewer['local_modes'], 'body_va': hex(viewer['body_va']), 'exit_va': hex(viewer['exit_va'])}
-            self.record({'local_viewer_adapter': self.log['local_viewer_adapter']})
-            from codol_rebuild.adapters.game.v1649370.playlist import build_local_playlist_adapter, validate_local_playlist_contract
-            validate_local_playlist_contract(self.process.read)
-            playlist_entry = self.process.allocate(4096)
-            playlist = build_local_playlist_adapter(playlist_entry, profile_data + 72)
-            if len(playlist['code']) > 4096:
-                raise ValueError('Local playlist adapter exceeds allocation')
-            self.process.write(playlist_entry, playlist['code'])
-            if self.process.read(playlist_entry, len(playlist['code'])) != playlist['code']:
-                raise ValueError('Local playlist adapter readback mismatch')
-            self.process.executable(playlist_entry, 4096)
-            for patch in playlist['patches']:
-                self.process.write(patch['va'], patch['after'])
-                if self.process.read(patch['va'], len(patch['after'])) != patch['after']:
-                    raise ValueError('Local playlist patch readback mismatch')
-            self.log['local_playlist_adapter'] = {'entry': hex(playlist_entry), 'patches': [hex(p['va']) for p in playlist['patches']], 'policy': 'local ready offline, no season and zero configured playlist: UI ID -1; local -1 is invalid'}
-            self.record({'local_playlist_adapter': self.log['local_playlist_adapter']})
-            from codol_rebuild.adapters.game.v1649370.room_name import build_room_name_adapter, validate_room_name_contract
-            validate_room_name_contract(self.process.read)
-            room_name_entry = self.process.allocate(4096)
-            room_name = build_room_name_adapter(room_name_entry, profile_data + 72)
-            self.process.write(room_name_entry, room_name['code'])
-            if self.process.read(room_name_entry, len(room_name['code'])) != room_name['code']:
-                raise ValueError('Room name adapter readback mismatch')
-            self.process.executable(room_name_entry, 4096)
-            self.process.write(room_name['patch_va'], room_name['after'])
-            if self.process.read(room_name['patch_va'], 5) != room_name['after']:
-                raise ValueError('Room name call edge readback mismatch')
-            self.record({'local_room_name_adapter': {'entry': hex(room_name_entry), 'patch_va': hex(room_name['patch_va']), 'policy': 'local room names only; nonempty, <=255 UTF-8 bytes, no ASCII controls', 'completion': 'original cppRefreshTask; original UI task update'}})
-            from codol_rebuild.adapters.game.v1649370.room import build_room_adapter, validate_room_contract
-            validate_room_contract(self.process.read)
-            room_entry = self.process.allocate(4096)
-            room_state = self.process.allocate(4096)
-            if self.multiplayer:
-                self.multiplayer.allocate()
-            room = build_room_adapter(room_entry, room_state, profile_data + 72,
-                                      deferred=self.multiplayer is not None,
-                                      identity_address=self.multiplayer.state+24 if self.multiplayer else None,
-                                      profile_capture=self.multiplayer.profile_capture if self.multiplayer else None)
-            if len(room['code']) > 4096:
-                raise ValueError('Local room adapter exceeds allocation')
-            self.process.write(room_entry, room['code'])
-            if self.process.read(room_entry, len(room['code'])) != room['code']:
-                raise ValueError('Local room adapter readback mismatch')
-            self.process.executable(room_entry, 4096)
-            for patch in room['patches']:
-                self.process.write(patch['va'], patch['after'])
-                if self.process.read(patch['va'], len(patch['after'])) != patch['after']:
-                    raise ValueError('Local room patch readback mismatch')
-            self.record({'local_room_adapter': {'entry': hex(room_entry), 'state': hex(room_state), 'patches': [hex(p['va']) for p in room['patches']], 'completion': 'original native session/create callbacks; local room ownership only'}})
-            self.process.executable(initializer, 4096)
-            self.profile_traps[bridge['trap']] = (profile_data, 'prepare', pool)
-            self.profile_traps[bridge['after']] = (profile_data, 'after', pool)
-            self.record({'local_profile_bridge': hex(initializer), 'trap': hex(bridge['trap'])})
-            from codol_rebuild.adapters.game.v1649370 import player_name
-            player_name.validate_contract(self.process.read)
-            name_entry = self.process.allocate(4096)
-            name_state = self.process.allocate(4096)
-            self.name_adapter = player_name.build_adapter(name_entry, name_state, profile_data + 72, initializer)
-            if len(self.name_adapter['code']) > 4096:
-                raise ValueError('昵称适配超出代码页')
-            self.process.write(name_entry, self.name_adapter['code'])
-            if self.process.read(name_entry, len(self.name_adapter['code'])) != self.name_adapter['code']:
-                raise ValueError('昵称适配代码回读失败')
-            self.process.executable(name_entry, 4096)
-            self.process.write(self.name_adapter['patch_va'], self.name_adapter['after'])
-            if self.process.read(self.name_adapter['patch_va'], 4) != self.name_adapter['after']:
-                raise ValueError('昵称GFx回调安装回读失败')
-            initializer = self.name_adapter['initializer']
-            self.record({'local_player_name_adapter': {'entry': hex(name_entry), 'state': hex(name_state), 'policy': 'local offline only; consume name card atomically; durable commit before success; restore on startup'}})
-            from codol_rebuild.adapters.game.v1649370 import ui_recharge
-            ui_recharge.validate_contract(self.process.read)
-            recharge_entry = self.process.allocate(4096)
-            self.recharge_adapter = ui_recharge.build_adapter(recharge_entry)
-            self.process.write(recharge_entry, self.recharge_adapter['code'])
-            if self.process.read(recharge_entry, len(self.recharge_adapter['code'])) != self.recharge_adapter['code']:
-                raise ValueError('本地充值适配代码回读失败')
-            self.process.executable(recharge_entry, 4096)
-            self.process.write(self.recharge_adapter['patch_va'], self.recharge_adapter['after'])
-            if self.process.read(self.recharge_adapter['patch_va'], 4) != self.recharge_adapter['after']:
-                raise ValueError('本地充值 GFx 回调安装失败')
-            from codol_rebuild.application.accounts.purchase import RECHARGE_AMOUNT
-            self.record({'local_recharge_adapter': {'entry': hex(recharge_entry), 'amount': RECHARGE_AMOUNT}})
-            from codol_rebuild.adapters.game.v1649370 import purchase
-            purchase.validate_contract(self.process.read)
-            purchase_entry = self.process.allocate(4096)
-            purchase_state = self.process.allocate(4096)
-            self.purchase_adapter = purchase.build_adapter(purchase_entry, purchase_state, profile_data + 72)
-            # Refresh may be requested before the first purchase.
-            purchase.checked_write(self.process.read, self.process.write, purchase_state+96,
-                                   struct.pack('<IIII', 0xffffffff, 0xffffffff, 0, 1)+bytes(16))
-            purchase.checked_write(self.process.read, self.process.write, purchase_entry, self.purchase_adapter['code'])
-            self.process.executable(purchase_entry, 4096)
-            purchase.checked_write(self.process.read, self.process.write, purchase.HANDLER_SLOT, self.purchase_adapter['after'])
-            purchase.checked_write(self.process.read, self.process.write, purchase.REFRESH_SLOT, self.purchase_adapter['refresh_after'])
-            self.record({'local_purchase_adapter': {'entry': hex(purchase_entry),
-                         'policy': 'GP/CP products and bundles; permanent equipment; cumulative consumables'}})
-        plan = build_menu_preview_helper(entry, initializer_va=initializer,
-                                         initializer_ready_va=profile_data + 72 if self.args.local_profile else None,
+            self._install_local_ui_hooks()
+            initializer_address, profile_data_address, inventory_pool_address, initialization_plan = self._install_profile_initialization()
+            # profile_data + 72 是原生约定的档案就绪标志，各适配共享此地址。
+            self._install_playlist_adapter(profile_data_address)
+            self._install_room_name_adapter(profile_data_address)
+            room_plan = self._install_room_adapter(profile_data_address)
+            self._register_profile_initializer(initializer_address, profile_data_address, inventory_pool_address, initialization_plan)
+            initializer_address = self._install_player_name_adapter(profile_data_address, initializer_address)
+            self._install_recharge_adapter()
+            self._install_purchase_adapter(profile_data_address)
+        self._install_lobby_entry(lobby_entry, initializer_address, profile_data_address, room_plan)
+
+    def _install_local_ui_hooks(self):
+        """安装大厅资源加载观察点、局部 UI 补丁及角色查看事件。"""
+        # 先验证全部补丁原字节，再依次写入，保留原有安装顺序。
+        from codol_rebuild.adapters.game.v1649370 import ui_movie
+        if self.process.read(ui_movie.LOAD_SITE, len(ui_movie.LOAD_BYTES)) != ui_movie.LOAD_BYTES:
+            raise ValueError('大厅 UI 加载调用边不匹配')
+        self.debug.arm(ui_movie.LOAD_SITE, 'Local navigation resource')
+        from codol_rebuild.adapters.game.v1649370.local_ui_services import local_optional_service_patches, local_welcome_page_patch
+        welcome_patch = local_welcome_page_patch()
+        local_patches = local_optional_service_patches() + [welcome_patch]
+        for patch_address, original_bytes, replacement_bytes in local_patches:
+            if self.process.read(patch_address, len(original_bytes)) != original_bytes:
+                raise ValueError(f'Local callback mismatch at {patch_address:#x}')
+        for patch_address, original_bytes, replacement_bytes in local_patches:
+            self.process.write(patch_address, replacement_bytes)
+            if self.process.read(patch_address, len(replacement_bytes)) != replacement_bytes:
+                raise ValueError(f'Local callback readback mismatch at {patch_address:#x}')
+        self.record({'local_unsupported_services': ['WarGod credit rating'], 'behavior': 'void request ignored; no score fabricated'})
+        self.record({'local_welcome_auto_popup_disabled': True, 'callback': 'IsWelcomePageShowed', 'patch_va': hex(welcome_patch[0]), 'behavior': 'report welcome already shown; manual MOTD entry unchanged'})
+        from codol_rebuild.adapters.game.v1649370.viewer import VIEW_TRACE_POINTS, VIEW_RESULT_POINTS
+        for address, label in (VIEW_TRACE_POINTS | VIEW_RESULT_POINTS).items():
+            self.debug.arm(address, label)
+
+    def _install_profile_initialization(self):
+        """分配档案和库存区域，安装初始化、就绪及角色查看适配。"""
+        # 初始化页沿用原布局：主体占前 3072 字节，就绪适配占后续 256 字节，
+        # 角色查看适配使用最后 768 字节；容量检查防止相互覆盖。
+        from codol_rebuild.adapters.game.v1649370.profile import build_initializer, inventory_relocations, CAPACITY, STRIDE, INITIALIZER_DATA_SIZE
+        from codol_rebuild.adapters.game.v1649370.profile import validate_account_native_contract
+        validate_account_native_contract(self.process.read)
+        initializer_address = self.process.allocate(4096)
+        profile_data_address = self.process.allocate(INITIALIZER_DATA_SIZE)
+        pool_allocation = self.process.allocate(CAPACITY * STRIDE + 32)
+        inventory_pool_address = pool_allocation + 16
+        self.process.write(pool_allocation, b'LOCAL-INVENTORY!')
+        self.process.write(inventory_pool_address + CAPACITY * STRIDE, b'LOCAL-INVENTORY!')
+        relocations = inventory_relocations(inventory_pool_address)
+        for patch_address, original_bytes, replacement_bytes in relocations:
+            if self.process.read(patch_address, len(original_bytes)) != original_bytes:
+                raise ValueError(f'Inventory operand mismatch at {patch_address:#x}')
+        for patch_address, original_bytes, replacement_bytes in relocations:
+            self.process.write(patch_address, replacement_bytes)
+        initialization_plan = build_initializer(initializer_address, profile_data_address, inventory_pool_address)
+        self.process.write(initializer_address, initialization_plan['code'])
+        self.process.write(profile_data_address, initialization_plan['data'])
+        from codol_rebuild.adapters.game.v1649370.profile import build_stats_ready_adapter
+        stats_entry = initializer_address + 3072
+        stats = build_stats_ready_adapter(stats_entry, profile_data_address)
+        if len(initialization_plan['code']) > 3072 or self.process.read(stats['patch_va'], 5) != stats['before']:
+            raise ValueError('Local UI stats adapter image/region mismatch')
+        self.process.write(stats_entry, stats['code'])
+        self.process.write(stats['patch_va'], stats['after'])
+        if self.process.read(stats_entry, len(stats['code'])) != stats['code'] or self.process.read(stats['patch_va'], 5) != stats['after']:
+            raise ValueError('Local UI stats adapter readback mismatch')
+        from codol_rebuild.adapters.game.v1649370.viewer import build_local_viewer_adapter
+        viewer_entry = initializer_address + 3328
+        viewer = build_local_viewer_adapter(viewer_entry, profile_data_address + 72)
+        if len(stats['code']) > 256 or len(viewer['code']) > 768 or self.process.read(viewer['patch_va'], len(viewer['gate_before'])) != viewer['gate_before']:
+            raise ValueError('Local viewer adapter image/region mismatch')
+        self.process.write(viewer_entry, viewer['code'])
+        self.process.write(viewer['patch_va'], viewer['after'])
+        if self.process.read(viewer_entry, len(viewer['code'])) != viewer['code'] or self.process.read(viewer['patch_va'], 5) != viewer['after']:
+            raise ValueError('Local viewer adapter readback mismatch')
+        self.log['local_viewer_adapter'] = {'patch_va': hex(viewer['patch_va']), 'local_modes': viewer['local_modes'], 'body_va': hex(viewer['body_va']), 'exit_va': hex(viewer['exit_va'])}
+        self.record({'local_viewer_adapter': self.log['local_viewer_adapter']})
+        return initializer_address, profile_data_address, inventory_pool_address, initialization_plan
+
+    def _install_playlist_adapter(self, profile_data_address):
+        """安装玩法列表适配，使用档案数据区的就绪标志。"""
+        from codol_rebuild.adapters.game.v1649370.playlist import build_local_playlist_adapter, validate_local_playlist_contract
+        validate_local_playlist_contract(self.process.read)
+        playlist_entry = self.process.allocate(4096)
+        playlist = build_local_playlist_adapter(playlist_entry, profile_data_address + 72)
+        if len(playlist['code']) > 4096:
+            raise ValueError('Local playlist adapter exceeds allocation')
+        self.process.write(playlist_entry, playlist['code'])
+        if self.process.read(playlist_entry, len(playlist['code'])) != playlist['code']:
+            raise ValueError('Local playlist adapter readback mismatch')
+        self.process.executable(playlist_entry, 4096)
+        for patch in playlist['patches']:
+            self.process.write(patch['va'], patch['after'])
+            if self.process.read(patch['va'], len(patch['after'])) != patch['after']:
+                raise ValueError('Local playlist patch readback mismatch')
+        self.log['local_playlist_adapter'] = {'entry': hex(playlist_entry), 'patches': [hex(patch['va']) for patch in playlist['patches']], 'policy': 'local ready offline, no season and zero configured playlist: UI ID -1; local -1 is invalid'}
+        self.record({'local_playlist_adapter': self.log['local_playlist_adapter']})
+
+    def _install_room_name_adapter(self, profile_data_address):
+        """安装房间名适配，保留原生任务完成通知。"""
+        from codol_rebuild.adapters.game.v1649370.room_name import build_room_name_adapter, validate_room_name_contract
+        validate_room_name_contract(self.process.read)
+        room_name_entry = self.process.allocate(4096)
+        room_name = build_room_name_adapter(room_name_entry, profile_data_address + 72)
+        self.process.write(room_name_entry, room_name['code'])
+        if self.process.read(room_name_entry, len(room_name['code'])) != room_name['code']:
+            raise ValueError('Room name adapter readback mismatch')
+        self.process.executable(room_name_entry, 4096)
+        self.process.write(room_name['patch_va'], room_name['after'])
+        if self.process.read(room_name['patch_va'], 5) != room_name['after']:
+            raise ValueError('Room name call edge readback mismatch')
+        self.record({'local_room_name_adapter': {'entry': hex(room_name_entry), 'patch_va': hex(room_name['patch_va']), 'policy': 'local room names only; nonempty, <=255 UTF-8 bytes, no ASCII controls', 'completion': 'original cppRefreshTask; original UI task update'}})
+
+    def _install_room_adapter(self, profile_data_address):
+        """安装房间适配；联机模式注入身份地址及成员档案采集入口。"""
+        from codol_rebuild.adapters.game.v1649370.room import build_room_adapter, validate_room_contract
+        validate_room_contract(self.process.read)
+        room_entry = self.process.allocate(4096)
+        room_state = self.process.allocate(4096)
+        if self.multiplayer:
+            self.multiplayer.allocate()
+        room_plan = build_room_adapter(room_entry, room_state, profile_data_address + 72,
+                                  deferred=self.multiplayer is not None,
+                                  identity_address=self.multiplayer.state+24 if self.multiplayer else None,
+                                  profile_capture=self.multiplayer.profile_capture if self.multiplayer else None)
+        if len(room_plan['code']) > 4096:
+            raise ValueError('Local room adapter exceeds allocation')
+        self.process.write(room_entry, room_plan['code'])
+        if self.process.read(room_entry, len(room_plan['code'])) != room_plan['code']:
+            raise ValueError('Local room adapter readback mismatch')
+        self.process.executable(room_entry, 4096)
+        for patch in room_plan['patches']:
+            self.process.write(patch['va'], patch['after'])
+            if self.process.read(patch['va'], len(patch['after'])) != patch['after']:
+                raise ValueError('Local room patch readback mismatch')
+        self.record({'local_room_adapter': {'entry': hex(room_entry), 'state': hex(room_state), 'patches': [hex(patch['va']) for patch in room_plan['patches']], 'completion': 'original native session/create callbacks; local room ownership only'}})
+        return room_plan
+
+    def _register_profile_initializer(self, initializer_address, profile_data_address, inventory_pool_address, initialization_plan):
+        """启用档案初始化代码页，并登记准备与完成两个暂停点。"""
+        self.process.executable(initializer_address, 4096)
+        self.profile_traps[initialization_plan['trap']] = (profile_data_address, 'prepare', inventory_pool_address)
+        self.profile_traps[initialization_plan['after']] = (profile_data_address, 'after', inventory_pool_address)
+        self.record({'local_profile_bridge': hex(initializer_address), 'trap': hex(initialization_plan['trap'])})
+
+    def _install_player_name_adapter(self, profile_data_address, initializer_address):
+        """安装昵称适配，返回包裹档案初始化的昵称恢复入口。"""
+        # 先恢复已保存昵称，再继续原档案初始化；大厅入口使用返回的新入口。
+        # 联机改名另接主线程轮询，HTTP 仍由注入的应用会话执行。
+        from codol_rebuild.adapters.game.v1649370 import player_name
+        player_name.validate_contract(self.process.read)
+        name_entry = self.process.allocate(4096)
+        name_state = self.process.allocate(4096)
+        self.name_adapter = player_name.build_adapter(name_entry, name_state, profile_data_address + 72, initializer_address,
+                                                     deferred=self.rename_session is not None)
+        if self.rename_session is not None:
+            self.process.write(name_state+136, bytes(520))
+            self.server_name_bridge = player_name.ServerNameBridge(
+                self.process, self.profiles, self.rename_session, self.name_adapter,
+                self.account_errors, lambda message: self.multiplayer.notifications.message(message))
+        if len(self.name_adapter['code']) > 4096:
+            raise ValueError('昵称适配超出代码页')
+        self.process.write(name_entry, self.name_adapter['code'])
+        if self.process.read(name_entry, len(self.name_adapter['code'])) != self.name_adapter['code']:
+            raise ValueError('昵称适配代码回读失败')
+        self.process.executable(name_entry, 4096)
+        self.process.write(self.name_adapter['patch_va'], self.name_adapter['after'])
+        if self.process.read(self.name_adapter['patch_va'], 4) != self.name_adapter['after']:
+            raise ValueError('昵称GFx回调安装回读失败')
+        initializer_address = self.name_adapter['initializer']
+        self.record({'local_player_name_adapter': {'entry': hex(name_entry), 'state': hex(name_state), 'policy': 'local offline only; consume name card atomically; durable commit before success; restore on startup'}})
+        return initializer_address
+
+    def _install_recharge_adapter(self):
+        """安装充值专用 GFx 回调。"""
+        from codol_rebuild.adapters.game.v1649370 import ui_recharge
+        ui_recharge.validate_contract(self.process.read)
+        recharge_entry = self.process.allocate(4096)
+        self.recharge_adapter = ui_recharge.build_adapter(recharge_entry)
+        self.process.write(recharge_entry, self.recharge_adapter['code'])
+        if self.process.read(recharge_entry, len(self.recharge_adapter['code'])) != self.recharge_adapter['code']:
+            raise ValueError('本地充值适配代码回读失败')
+        self.process.executable(recharge_entry, 4096)
+        self.process.write(self.recharge_adapter['patch_va'], self.recharge_adapter['after'])
+        if self.process.read(self.recharge_adapter['patch_va'], 4) != self.recharge_adapter['after']:
+            raise ValueError('本地充值 GFx 回调安装失败')
+        from codol_rebuild.application.accounts.purchase import RECHARGE_AMOUNT
+        self.record({'local_recharge_adapter': {'entry': hex(recharge_entry), 'amount': RECHARGE_AMOUNT}})
+
+    def _install_purchase_adapter(self, profile_data_address):
+        """安装购买和库存刷新回调，初始化首次刷新所需的通信状态。"""
+        from codol_rebuild.adapters.game.v1649370 import purchase
+        purchase.validate_contract(self.process.read)
+        purchase_entry = self.process.allocate(4096)
+        purchase_state = self.process.allocate(4096)
+        self.purchase_adapter = purchase.build_adapter(purchase_entry, purchase_state, profile_data_address + 72)
+        # 首次购买之前也可能请求刷新，因此安装时即初始化刷新状态。
+        purchase.checked_write(self.process.read, self.process.write, purchase_state+96,
+                               struct.pack('<IIII', 0xffffffff, 0xffffffff, 0, 1)+bytes(16))
+        purchase.checked_write(self.process.read, self.process.write, purchase_entry, self.purchase_adapter['code'])
+        self.process.executable(purchase_entry, 4096)
+        purchase.checked_write(self.process.read, self.process.write, purchase.HANDLER_SLOT, self.purchase_adapter['after'])
+        purchase.checked_write(self.process.read, self.process.write, purchase.REFRESH_SLOT, self.purchase_adapter['refresh_after'])
+        self.record({'local_purchase_adapter': {'entry': hex(purchase_entry),
+                     'policy': 'GP/CP products and bundles; permanent equipment; cumulative consumables'}})
+
+    def _install_lobby_entry(self, lobby_entry, initializer_address, profile_data_address, room_plan):
+        """连接大厅预览入口与联机帧轮询，最后发布原生调用边。"""
+        # 所有被调用的适配先安装完成，再替换大厅调用边。
+        # 联机帧轮询依赖房间适配和昵称轮询入口；离线直接进入预览辅助代码。
+        from codol_rebuild.adapters.game.v1649370.menu_preview import build_menu_preview_helper
+        plan = build_menu_preview_helper(lobby_entry, initializer_va=initializer_address,
+                                         initializer_ready_va=profile_data_address + 72 if self.args.local_profile else None,
                                          activation_ready_va=self.multiplayer.state+20 if self.multiplayer else None)
         code = plan['entry_bytes']
         if len(code) > 4096 or self.process.read(plan['patch_va'], len(plan['patch_before'])) != plan['patch_before']:
             raise ValueError('离线UI helper入口或原始调用不符')
         if self.process.read(layout.CONNECTING_BRANCH, 2) != bytes.fromhex('7404') or self.process.read(layout.CONNECTING_FALSE, 2) != bytes.fromhex('32c0'):
             raise ValueError('原生连接提示false分支字节不符')
-        self.process.write(entry, code)
-        if self.process.read(entry, len(code)) != code:
+        self.process.write(lobby_entry, code)
+        if self.process.read(lobby_entry, len(code)) != code:
             raise ValueError('离线UI helper代码回读不符')
-        self.process.executable(entry, 4096)
+        self.process.executable(lobby_entry, 4096)
         if self.multiplayer:
-            tick = self.multiplayer.install_tick(profile_data+72, entry, room)
+            tick = self.multiplayer.install_tick(profile_data_address+72, lobby_entry, room_plan,
+                                                self.name_adapter.get('poll'))
             self.multiplayer.install_settings_detours()
             self.record({'multiplayer_settings_detours': True})
             self.preview_caller_return = tick+9
@@ -227,9 +293,9 @@ class GameSessionBridge:
         if self.process.read(plan['patch_va'], len(plan['patch_after'])) != plan['patch_after'] or self.process.read(layout.CONNECTING_BRANCH, 2) != bytes.fromhex('eb04'):
             raise ValueError('离线UI试验补丁回读失败')
         for phase in ('before', 'after'):
-            self.preview_traps[entry + plan[phase + '_trap_offset']] = phase
+            self.preview_traps[lobby_entry + plan[phase + '_trap_offset']] = phase
         self.preview_metadata.update(plan.get('metadata', {}))
-        self.record({'offline_menu_preview_installed': True, 'helper': hex(entry), 'helper_sha256': hashlib.sha256(code).hexdigest(), 'call_va': hex(plan['patch_va']), 'call_before': plan['patch_before'].hex(), 'call_after': plan['patch_after'].hex(), 'connecting_branch': {'va': '0x60c6f7', 'before': '7404', 'after': 'eb04'}, 'metadata': self.preview_metadata})
+        self.record({'offline_menu_preview_installed': True, 'helper': hex(lobby_entry), 'helper_sha256': hashlib.sha256(code).hexdigest(), 'call_va': hex(plan['patch_va']), 'call_before': plan['patch_before'].hex(), 'call_after': plan['patch_after'].hex(), 'connecting_branch': {'va': '0x60c6f7', 'before': '7404', 'after': 'eb04'}, 'metadata': self.preview_metadata})
         (self.run_dir / 'offline-menu-preview-helper.bin').write_bytes(code)
         self.log['offline_menu_preview'] = True
 
@@ -368,7 +434,9 @@ class GameSessionBridge:
                 if frame != struct.unpack_from('<I', ctx, 196)[0]:
                     raise ValueError('昵称桥保存帧不匹配')
                 row['local_player_name_phase'] = phase
-                if phase == 'request':
+                if self.server_name_bridge is not None and phase != 'restored':
+                    self.server_name_bridge.handle(phase, frame, row)
+                elif phase == 'request':
                     self.pending_name = None
                     try:
                         value = player_name.read_request(self.process.read, frame, self.name_adapter['ready'])
@@ -537,7 +605,7 @@ class GameSessionBridge:
         if label == 'CRT entry' and self.args.trace_files:
             self.debug.install_file_trace()
         if label == 'CRT entry' and self.args.offline_menu_preview:
-            self.install_menu_preview()
+            self.install_lobby_adapters()
         if label == 'Local navigation resource':
             row['local_navigation_resource'] = self.install_navigation_resource()
         if label.startswith('MessageBox'):
