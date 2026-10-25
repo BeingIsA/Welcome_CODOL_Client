@@ -32,6 +32,10 @@ class NativeNotifications:
 
     def message(self, text):
         """主线程排队一次通知；原生确认按钮沿用原有关闭行为。"""
-        encoded_text = text.encode('utf-8')[:1000].decode('utf-8', errors='ignore').encode('utf-8')+b'\0'
+        # 普通通知经 0x72FB20 转换：英语直接使用 UTF-8，其他语言按 CP936 解码。
+        language_pointer = struct.unpack('<I', self.process.read(0x7ACE410, 4))[0]
+        language_value = struct.unpack('<I', self.process.read(language_pointer+12, 4))[0]
+        encoding = 'utf-8' if language_value == 0 else 'gbk'
+        encoded_text = text.encode(encoding)[:1000].decode(encoding, errors='ignore').encode(encoding)+b'\0'
         self.process.write(self.buffer+128, encoded_text)
         self.process.write(self.buffer, struct.pack('<I', 1))

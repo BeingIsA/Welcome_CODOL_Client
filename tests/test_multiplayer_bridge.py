@@ -185,6 +185,7 @@ class MultiplayerBridgeTests(unittest.TestCase):
         memory, adapter, data, room, session = self.join_fixture()
         adapter.login_started = True
         for code, expected in (('INVALID_ROOM_PASSWORD', 5), ('ROOM_NOT_FOUND', 3),
+                               ('ROOM_JOIN_BLOCKED', bridge.JOIN_BLOCKED_ERROR),
                                ('INVALID_ROOM_PASSWORD', 5), ('ROOM_CLOSED', 3)):
             with self.subTest(code=code):
                 adapter.port.poll.return_value = Completion('join', error=RoomError(code, '入房失败'))
@@ -193,6 +194,8 @@ class MultiplayerBridgeTests(unittest.TestCase):
                     adapter._poll()
                 self.assertEqual(bridge.u32(memory.read, adapter.state+bridge.JOIN_ERROR_OFFSET), expected)
                 self.assertEqual(bridge.u32(memory.read, adapter.state+bridge.ACTION), 6)
+                expected_message = '@SF_UI_NOTE_EVER_BE_KICKED' if code == 'ROOM_JOIN_BLOCKED' else '入房失败'
+                self.assertEqual(bridge.native_string(memory.read, adapter.state+bridge.MESSAGE), expected_message)
                 self.assertEqual(bridge.u32(memory.read, room+0x1C), 0)
                 adapter.port.begin.assert_called_once_with('leave', '队友')
         adapter._failure('join', '本地初始化失败')

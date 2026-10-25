@@ -13,7 +13,7 @@ from test_room_list import room
 def relocate_fixture_calls(code, entry):
     """夹具把游戏低地址调用搬到独立高地址，避免与 CLR/ASLR 映像冲突。"""
     for instruction in capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32).disasm(bytes(code), entry):
-        if instruction.mnemonic == 'call' and instruction.op_str.startswith('0x'):
+        if instruction.mnemonic in ('call', 'jmp') and instruction.op_str.startswith('0x'):
             target = int(instruction.op_str, 16)
             if target < 0x10000000:
                 replacement = 0x28000000+(target & 0xffff)
@@ -52,7 +52,8 @@ class NativeRoomListTests(unittest.TestCase):
             self.assertEqual(build.returncode, 0, build.stdout.decode('mbcs', errors='replace'))
             result = subprocess.run([str(exe), str(folder/'code.bin'),
                                      str(plan['entries']['join_complete']), str(plan['entries']['join_failed']),
-                                     str(plan['entries']['settings_apply']), str(folder/'tick.bin')],
+                                     str(plan['entries']['settings_apply']), str(folder/'tick.bin'),
+                                     str((0x7C46EB+5+struct.unpack('<i', plan['patches'][1]['after'][1:])[0]) & 0xffffffff)],
                                     capture_output=True, timeout=20)
             self.assertEqual(result.returncode, 0, (result.stdout+result.stderr).decode('mbcs', errors='replace'))
 

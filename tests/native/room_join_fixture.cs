@@ -44,6 +44,24 @@ class RoomJoinFixture {
             Count(0x28000480,0x120,0);
             Bytes(0x28007910,new byte[]{0xb8,0,0,0,0x24,0xc3});
             Run success=Function(int.Parse(args[1])), failure=Function(int.Parse(args[2]));
+            // 执行局部文本映射桩：禁入返回文本指针，其余错误原样进入原生替身。
+            int errorMapperAddress=int.Parse(args[5]);
+            Bytes(0x28001440,new byte[]{0xff,0x05,0x34,0x01,0x00,0x21,0xc3});
+            foreach(int errorCode in new int[]{0x10000,5,3,1,47,48}) {
+                var mappingCall=new List<byte>(new byte[]{0xb8});
+                mappingCall.AddRange(BitConverter.GetBytes(errorCode));
+                mappingCall.Add(0xe8);
+                mappingCall.AddRange(BitConverter.GetBytes(errorMapperAddress-(0x20004000+10)));
+                mappingCall.Add(0xa3);
+                mappingCall.AddRange(BitConverter.GetBytes(State+0x130));
+                mappingCall.Add(0xc3);
+                Bytes(0x20004000,mappingCall.ToArray());
+                int previousFallbackCount=Read(State+0x134);
+                Function(0x20004000)();
+                if(Read(State+0x130)!=(errorCode==0x10000 ? State+128 : errorCode)
+                   || Read(State+0x134)!=previousFallbackCount+(errorCode==0x10000 ? 0 : 1))
+                    throw new Exception("join error text mapping or stack contract mismatch");
+            }
             success();
             if(Read(Room+0x1c)!=Session || Read(Session+0x25c8)!=Room || Read(State+12)!=Session)
                 throw new Exception("session ownership mismatch");

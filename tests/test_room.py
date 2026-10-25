@@ -35,7 +35,12 @@ class RoomTests(unittest.TestCase):
             starts = {i.address for i in rows}
             for instruction in rows:
                 if (instruction.mnemonic.startswith('j') or instruction.mnemonic == 'call') and instruction.op_str.startswith('0x'):
-                    self.assertIn(int(instruction.op_str, 16), starts | {0xC3F316, 0x7E7910, 0xB75B10, 0x623770, 0x62AF10, 0x6305F0, 0x630480})
+                    self.assertIn(int(instruction.op_str, 16), starts | {0xC3F316, 0x7E7910, 0xB75B10, 0x623770, 0x62AF10, 0x6305F0, 0x630480, 0x731440})
+            # 新增补丁仅覆盖入房失败文本转换的五字节 CALL。
+            self.assertEqual([patch['va'] for patch in plan['patches']], [0x5D3216, 0x7C46EB])
+            for patch in plan['patches']:
+                self.assertEqual(pe.get_data(patch['va']-0x400000, 5), patch['before'])
+                self.assertEqual(len(patch['after']), 5)
 
     def test_image_contract(self):
         image=Path(__file__).resolve().parents[2]/'client/bin/v1649370/codol1649370-offline.exe'

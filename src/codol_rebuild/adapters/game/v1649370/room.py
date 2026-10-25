@@ -236,9 +236,15 @@ def build_room_adapter(entry: int, state: int, ready: int, *, deferred=False, id
 JOIN_INPUT = 0x5D3216
 # 联机通信页中的入房失败码；由版本桥在失败通知前写入。
 JOIN_ERROR_OFFSET = 40
+# 禁入专用码不占用原版 0..47；文本沿用现有失败任务的展示流程。
+JOIN_BLOCKED_ERROR = 0x10000
+JOIN_ERROR_MESSAGE_OFFSET = 128
+JOIN_ERROR_TEXT_CALL = 0x7C46EB
 # 设置回显独立于建房、入房、离房任务槽，避免完成通知互相覆盖。
 SETTINGS_READY_OFFSET, SETTINGS_ROOM_OFFSET = 44, 48
 JOIN_CONTRACT = {
+    JOIN_ERROR_TEXT_CALL: bytes.fromhex('e850cdf6ff'),
+    0x731440: bytes.fromhex('83f82f'),
     JOIN_INPUT: bytes.fromhex('e8fbc06600'),
     0x623770: bytes.fromhex('5333db568bf1'),
     0x7E7910: bytes.fromhex('33d233c0b95046370e'),
@@ -328,9 +334,19 @@ def build_join_adapter(entry, state, scratch, profile_capture=None):
         call(0xB75B10)
     emit('8bcb'); call(0x630480)
     emit('619d c3')
+    # 只适配入房失败通知中的文本转换调用；其他错误原样交给原生函数。
+    label('join_error_text')
+    emit('3d'); word(JOIN_BLOCKED_ERROR)
+    branch('0f85', 'native_join_error_text')
+    emit('b8'); word(state+JOIN_ERROR_MESSAGE_OFFSET)
+    emit('c3')
+    label('native_join_error_text')
+    emit('e9'); word((0x731440-entry-len(code)-4) & 0xffffffff)
     for offset, target in refs:
         struct.pack_into('<i', code, offset, labels[target]-offset-4)
     return {'code': bytes(code), 'traps': traps,
             'entries': {name: entry+labels[name] for name in ('join_complete', 'join_failed', 'settings_apply')},
             'patches': [{'va': JOIN_INPUT, 'before': JOIN_CONTRACT[JOIN_INPUT],
-                         'after': b'\xe8'+struct.pack('<I', (entry-JOIN_INPUT-5) & 0xffffffff)}]}
+                         'after': b'\xe8'+struct.pack('<I', (entry-JOIN_INPUT-5) & 0xffffffff)},
+                        {'va': JOIN_ERROR_TEXT_CALL, 'before': JOIN_CONTRACT[JOIN_ERROR_TEXT_CALL],
+                         'after': b'\xe8'+struct.pack('<I', (entry+labels['join_error_text']-JOIN_ERROR_TEXT_CALL-5) & 0xffffffff)}]}

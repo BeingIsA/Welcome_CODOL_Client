@@ -95,10 +95,14 @@ class RoomTests(unittest.TestCase):
     def test_join_failure_restores_record_without_retry(self):
         self.result('login')
         from unittest.mock import Mock
-        self.gateway.join = Mock(side_effect=RoomError('INVALID_ROOM_PASSWORD', '密码错误'))
-        self.assertEqual(self.result('join', room_id='rm_target').error.code, 'INVALID_ROOM_PASSWORD')
-        self.assertIsNone(self.store.load('http://localhost:8080').room_id)
-        self.gateway.join.assert_called_once()
+        for error_code in ('INVALID_ROOM_PASSWORD', 'ROOM_JOIN_BLOCKED'):
+            with self.subTest(error_code=error_code):
+                self.gateway.join = Mock(side_effect=RoomError(error_code, '加入被拒绝'))
+                self.assertEqual(self.result('join', room_id='rm_target').error.code, error_code)
+                restored_record = self.store.load('http://localhost:8080')
+                self.assertIsNone(restored_record.room_id)
+                self.assertFalse(restored_record.uncertain_join)
+                self.gateway.join.assert_called_once()
 
     def test_join_lost_response_confirms_membership_and_retains_unknown_target(self):
         self.result('login')

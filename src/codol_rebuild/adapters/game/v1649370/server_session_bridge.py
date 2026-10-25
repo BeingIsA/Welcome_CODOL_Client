@@ -8,13 +8,14 @@ import struct
 from codol_rebuild.application.room.contracts import RoomError, RoomPort, PERMISSION_ERROR_CODES
 from codol_rebuild.adapters.game.v1649370.player_name import native_name, LANGUAGE, DIRECT_STRING_MODE
 from codol_rebuild.adapters.game.v1649370.room import (
-    JOIN_ERROR_OFFSET, SETTINGS_READY_OFFSET, SETTINGS_ROOM_OFFSET,
+    JOIN_ERROR_OFFSET, JOIN_BLOCKED_ERROR, JOIN_ERROR_MESSAGE_OFFSET,
+    SETTINGS_READY_OFFSET, SETTINGS_ROOM_OFFSET,
 )
 from codol_rebuild.adapters.game.v1649370 import member_profile
 
 ROOM_POINTER = 0x82E13FC
 POLL, ACTION, ROOM, SESSION, LEAVE_ARG, LOGIN, IDENTITY = 0, 4, 8, 12, 16, 20, 24
-UNDEFINED, MESSAGE = 64, 128
+UNDEFINED, MESSAGE = 64, JOIN_ERROR_MESSAGE_OFFSET
 # 房间设置提交方法本体（房间管理器 vtable+0x7C，构造 0x62C000 写 vtable
 # 0xDC7274 得出）。所有配置变更——建房、规则设置页应用、单项改地图/模式
 # 及管理器内部路径——最终都经此处把新配置拷入管理器 +0x105F0，拦入口
@@ -379,13 +380,18 @@ class ServerSessionBridge:
                 and u32(read, session+0x25C8) == room and read(session, 1) != b'\0')
 
     def _failure(self, operation, message, error_code=None):
+        # 复用原版本地化文本；仅专用禁入错误进入局部文本转换分支。
+        if operation == 'join' and error_code == 'ROOM_JOIN_BLOCKED':
+            message = '@SF_UI_NOTE_EVER_BE_KICKED'
         # 游戏 GFx 接口接收 UTF-8 文本；密码、机器码不进入错误日志。
         raw = message.encode('utf-8')[:510].decode('utf-8', errors='ignore').encode('utf-8') + b'\0'
         checked_write(self.process, self.state+MESSAGE, raw)
         if operation == 'join':
             # 原生 0x731440 映射：5 为密码错误，3 为房间不存在。
-            # 每次失败都覆盖，其他失败沿用原有提示，避免复用上次密码错误码。
-            self._word(JOIN_ERROR_OFFSET, 5 if error_code == 'INVALID_ROOM_PASSWORD' else 3)
+            # 每次失败都覆盖；专用禁入码复用原版文本，其他失败沿用原有提示。
+            native_error_code = (JOIN_BLOCKED_ERROR if error_code == 'ROOM_JOIN_BLOCKED'
+                                 else 5 if error_code == 'INVALID_ROOM_PASSWORD' else 3)
+            self._word(JOIN_ERROR_OFFSET, native_error_code)
         self._word(ACTION, 6 if operation == 'join' else 2 if operation == 'create' else 4)
         self.record({'multiplayer': operation, 'success': False, 'error': message})
 
