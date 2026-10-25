@@ -145,6 +145,16 @@ class LocalProfileBridge:
                             self._service.consume_state(NAME_CARD),
                             lambda: self._service.rename(value, NAME_CARD))
 
+    def consume_item(self, item_id):
+        """在游戏暂停点发布并保存单件消耗；调用方提交成功通知以触发原生刷新。"""
+        from codol_rebuild.adapters.game.v1649370.profile import publish_consumption
+        if not self._ready or not self._account:
+            raise ValueError('本地档案尚未就绪')
+        return publish_consumption(
+            self.process.read, self.process.write, self._inventory, item_id,
+            self._service.consume_state(item_id),
+            lambda: self._service.commit_consumption(item_id))
+
     def check_name_card(self):
         """发送前确认本地档案有一张可消耗改名卡。"""
         from codol_rebuild.adapters.game.v1649370.player_name import NAME_CARD

@@ -25,7 +25,8 @@ class GameSessionBridge:
         self.broadcast_bridge = None
         if broadcast_session is not None:
             from codol_rebuild.adapters.game.v1649370.broadcast import BroadcastBridge
-            self.broadcast_bridge = BroadcastBridge(process, broadcast_session, realtime_dispatcher)
+            self.broadcast_bridge = BroadcastBridge(
+                process, broadcast_session, realtime_dispatcher, self.profiles.consume_item)
         if multiplayer is not None:
             from codol_rebuild.adapters.game.v1649370.server_session_bridge import ServerSessionBridge
             self.multiplayer = ServerSessionBridge(process, multiplayer, record)

@@ -25,6 +25,28 @@ SKU_SALE_OFFSET = 4096 + 65536
 INITIALIZER_DATA_SIZE = SKU_SALE_OFFSET + 65536
 
 
+def publish_consumption(read, write, inventory, item_id, next_state, commit):
+    """发布已规划的单件消耗，沿既有库存槽约定保存数量，提交失败恢复原槽。"""
+    pool_address = int(inventory['pool'], 16)
+    for item_index in range(inventory['items']):
+        record_address = pool_address + item_index * STRIDE + 0x40
+        if struct.unpack('<I', read(record_address, 4))[0] == item_id:
+            break
+    else:
+        raise ValueError('库存中找不到消耗物品')
+    remaining_count = (next_state.get('quantities', {}).get(str(item_id), 1)
+                       if item_id in next_state['owned_ids'] else 0)
+    previous_record = read(record_address, 12)
+    next_record = (struct.pack('<II', item_id, remaining_count) + previous_record[8:]
+                   if remaining_count else bytes(12))
+    try:
+        write(record_address, next_record)
+        return commit()
+    except Exception:
+        write(record_address, previous_record)
+        raise
+
+
 def validate_account_native_contract(read):
     """核对商城 filter=1 分派与 GP/CP 类型、步长、金额偏移，版本不符时拒绝启动。"""
     for address, expected in (

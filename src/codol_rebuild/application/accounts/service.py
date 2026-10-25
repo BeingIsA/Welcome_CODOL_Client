@@ -128,6 +128,15 @@ class AccountSession:
             raise ValueError('旧版全解锁档案没有可消耗物品')
         return consume_entitlement(state, item)
 
+    def commit_consumption(self, item_id):
+        """通过既有账号事务保存一次道具消耗；提交失败不推进已确认快照。"""
+        next_state = self.consume_state(item_id)
+        revision = self.repository.save(
+            self.name, self.account['revision'], self.account['profiles'],
+            self.codec.identities, initialization=next_state)
+        self.account = {**self.account, 'revision': revision, 'initialization': next_state}
+        return next_state
+
     def credit_state(self, currency, amount, current_balance):
         """返回充值后的规划状态；不写存储，供原生适配发布结果。"""
         from codol_rebuild.application.accounts.purchase import credit_currency

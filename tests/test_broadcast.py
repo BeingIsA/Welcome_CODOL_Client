@@ -43,7 +43,7 @@ class BroadcastTests(unittest.TestCase):
         process.read.side_effect = lambda address, size: bytes(
             memory[address - 0x1000:address - 0x1000 + size])
         port = Mock(available=Mock(return_value=True))
-        bridge = broadcast.BroadcastBridge(process, port, Mock())
+        bridge = broadcast.BroadcastBridge(process, port, Mock(), Mock())
         bridge.state = 0x1000
         bridge.connected('pl_sender', '玩家')
         port.connected.assert_called_once_with('pl_sender', '玩家')

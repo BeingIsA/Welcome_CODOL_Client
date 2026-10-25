@@ -11,6 +11,8 @@ from datetime import datetime
 from codol_rebuild.application.broadcast.contracts import BroadcastPort
 
 SEND_HANDLER = 0x7273B0
+# 原版 ChattingController.BIG_LOUD_SPEAKER_ID；类型 0 使用此库存物品。
+BIG_LOUD_SPEAKER_ITEM_ID = 50003
 CAPACITY = 65536
 SEND_COMPLETE, MESSAGE_READY, MESSAGE_OBJECT, FIELDS = 0, 4, 32, 64
 BROADCAST_AVAILABLE = 8
@@ -187,10 +189,11 @@ def build_adapter(entry, state):
 class BroadcastBridge:
     """游戏线程执行原生操作，应用端口负责后台发送与推送交接。"""
 
-    def __init__(self, process, port: BroadcastPort, dispatcher):
+    def __init__(self, process, port: BroadcastPort, dispatcher, consume_item):
         self.process = process
         self.port = port
         self.dispatcher = dispatcher
+        self.consume_item = consume_item
         self.state = None
         self.plan = None
         self.traps = {}
@@ -246,6 +249,8 @@ class BroadcastBridge:
                     sender_id = native_sender_id(self.process.read, message['senderId'], self.player_id)
                     self._write(self.state, encode_message(message, sender_id, self.state))
                 if self.port.poll_sent() is not None:
+                    # 仅 HTTP 确认消耗；原生成功通知随后负责冷却和库存刷新。
+                    self.consume_item(BIG_LOUD_SPEAKER_ITEM_ID)
                     self._write(self.state + SEND_COMPLETE, struct.pack('<I', 1))
                 self._write(self.state + BROADCAST_AVAILABLE,
                             struct.pack('<I', int(self.port.available())))
