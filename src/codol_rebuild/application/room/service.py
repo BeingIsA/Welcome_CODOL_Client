@@ -32,6 +32,51 @@ class RoomSession:
         self._departure_pending = None
         self._team_pending = None
         self._ready_pending = None
+        self._profile_upload_enabled = True
+        self._profile_pending = None
+        self._profile_latest = None
+
+    def begin_update_profile(self, room_id, profile):
+        """复制原生已采集资料，在途时合并为最新快照，不阻塞调用线程。"""
+        if (self._closed or self._pending is not None or self._departure_pending is not None
+                or not self._profile_upload_enabled or self._record is None
+                or self._record.room_id != room_id):
+            return False
+        self._profile_latest = (room_id, self._record.player_id, deepcopy(profile))
+        self._start_profile_update()
+        return True
+
+    def _start_profile_update(self):
+        """同一时刻最多一个上传请求，完成后才发送最新待发快照。"""
+        if self._profile_pending is None and self._profile_latest is not None:
+            submission = self._profile_latest
+            self._profile_latest = None
+            self._profile_pending = self._executor.submit(self._execute_profile_update, *submission)
+
+    def _execute_profile_update(self, room_id, player_id, profile):
+        """网络使用提交时复制的房间、身份和档案。"""
+        try:
+            data = self._gateway.update_profile(player_id, room_id, profile)
+            return Completion('update_profile', data=data)
+        except RoomError as error:
+            return Completion('update_profile', error=error)
+
+    def poll_update_profile(self):
+        """消费上传结果；超时结果未知时不自动补交排队数据。"""
+        if self._profile_pending is None or not self._profile_pending.done():
+            return None
+        pending_profile = self._profile_pending
+        self._profile_pending = None
+        result = pending_profile.result()
+        if result.error is not None and result.error.uncertain:
+            self._profile_latest = None
+            self._profile_upload_enabled = False
+        self._start_profile_update()
+        return result
+
+    def _discard_profile_updates(self):
+        """离房或关闭时清除尚未发送的快照。"""
+        self._profile_latest = None
 
     def begin_change_ready(self, room_id, ready):
         """在既有串行线程提交准备命令，同一请求只提交一次。"""
@@ -138,6 +183,7 @@ class RoomSession:
             return False
         if operation not in ('login', 'create', 'join', 'leave'):
             raise ValueError('未知联机用例')
+        self._discard_profile_updates()
         self._pending = self._executor.submit(self._execute, operation, username,
                                               max_players, password, settings, room_id, deepcopy(profile))
         return True
@@ -201,6 +247,7 @@ class RoomSession:
         """服务端已结束本人的房间归属；只清理本地记录，不再次发送离房命令。"""
         if self._record is None or not self._record.room_id or self._record.room_id != payload.get('roomId'):
             return None
+        self._discard_profile_updates()
         self._departure_pending = self._executor.submit(
             self._complete_room_departure, event_type, payload['roomId'])
         return None
@@ -414,6 +461,7 @@ class RoomSession:
                 self._is_owner = True
             if operation in ('create', 'join'):
                 self._load_profiles(data, self._record.player_id)
+                self._profile_upload_enabled = True
             return Completion(operation, data=data)
         except RoomError as error:
             return Completion(operation, error=error)
@@ -444,6 +492,7 @@ class RoomSession:
         if self._closed:
             return
         self._closed = True
+        self._discard_profile_updates()
         self.cancel_list()
         def cleanup():
             if self._record is not None:

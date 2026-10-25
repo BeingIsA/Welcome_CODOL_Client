@@ -288,6 +288,7 @@ class ServerSessionBridge:
         self.is_owner = True
         self.current_room_id = None
         self.profile_capture = None
+        self.profile_update = None
         self.profile_buffer = None
         self.members_buffer = None
         self.members_apply = None
@@ -375,6 +376,9 @@ class ServerSessionBridge:
         self.traps.update(menu_traps)
         self.traps.update(team_traps)
         self.traps.update(ready_traps)
+        self.profile_update = member_profile.ProfileUpdateBridge(
+            self.process, self.profile_capture, self.profile_buffer)
+        self.traps.update(self.profile_update.install())
         self.profile_query = member_profile.ProfileQueryBridge(
             self.process, lambda: {hashlib.sha256(key.encode('utf-8')).digest()[:8]: value
                                    for key, value in self.member_profiles.items()})
@@ -452,6 +456,23 @@ class ServerSessionBridge:
                 self.process.set_context(thread, ctx)
                 return
             frame = struct.unpack_from('<I', ctx, 196)[0]
+            if phase in ('profile_submit', 'profile_captured'):
+                room_state = self._team_room_state()
+                profile_room_id = room_state[0] if room_state is not None else None
+                try:
+                    profile_snapshot = self.profile_update.handle(
+                        phase, ctx, profile_room_id,
+                        self.applying_members or self.pending is not None or self.join_cleanup)
+                    if profile_snapshot is not None:
+                        if not self.port.begin_update_profile(profile_room_id, profile_snapshot):
+                            self.notifications.message('背包配置未同步，请重新进入房间后再试。')
+                except (ValueError, OSError) as error:
+                    self.record({'multiplayer_profile': 'error', 'error': str(error)})
+                    self.notifications.message('背包配置未同步：' + str(error))
+                if phase == 'profile_captured':
+                    struct.pack_into('<I', ctx, 184, address+1)
+                self.process.set_context(thread, ctx)
+                return
             if phase in ('profile_query', 'profile_initialized'):
                 self.profile_query.handle(phase, ctx)
                 self.process.set_context(thread, ctx)
@@ -749,6 +770,16 @@ class ServerSessionBridge:
 
     def _poll_realtime_event(self):
         """主线程统一消费应用层事件，按类型分发原生回显。"""
+        profile_result = self.port.poll_update_profile() if self.profile_update is not None else None
+        if profile_result is not None:
+            if profile_result.error is not None:
+                message = ('背包同步结果未知，请重新进入房间以确认配置。'
+                           if profile_result.error.uncertain else
+                           '背包配置未同步：' + display_message(profile_result.error))
+                self.notifications.message(message)
+            else:
+                self.record({'multiplayer_profile': 'confirmed',
+                             'roomId': profile_result.data['roomId']})
         if self.pending is not None or self.join_cleanup:
             return
         if self.ready_bridge is not None:

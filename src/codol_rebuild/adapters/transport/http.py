@@ -96,7 +96,7 @@ class HttpGateway:
             raise
         except (OSError, ValueError, urllib.error.URLError, http.client.HTTPException) as error:
             raise RoomError('NETWORK_ERROR', '无法完成服务端请求：' + str(error),
-                                   uncertain=method == 'POST') from error
+                                   uncertain=method in ('POST', 'PUT')) from error
 
     def login(self, fingerprint, username, player_id):
         payload = {'fingerprint': fingerprint, 'username': username}
@@ -178,6 +178,15 @@ class HttpGateway:
                 or 'profile' not in data):
             raise RoomError('INVALID_RESPONSE', '成员档案响应身份不匹配')
         return data['profile']
+
+    def update_profile(self, player_id, room_id, profile):
+        """传送当前完整档案；确认身份不匹配视为结果未知。"""
+        room_id = _identifier(room_id, 'rm')
+        data = self._request('PUT', f'/api/v1/rooms/{room_id}/members/me/profile',
+                             {'profile': profile}, player_id)
+        if (data.get('roomId') != room_id or data.get('playerId') != player_id):
+            raise RoomError('INVALID_RESPONSE', '档案上传确认身份不匹配', uncertain=True)
+        return data
 
     def leave(self, player_id, room_id):
         room_id = _identifier(room_id, 'rm')

@@ -18,6 +18,72 @@ CAPTURE_CONTRACT = {0x4F73B0: bytes.fromhex('568bf06a088d46106a00'),
 QUERY_SITE = 0x68D52A
 QUERY_BEFORE = bytes.fromhex('a1209de500')
 CONTAINER_SIZE = 0x22290
+PROFILE_SUBMIT_SITE = 0x7C6576
+PROFILE_SUBMIT_BEFORE = bytes.fromhex('8b118b8224010000')
+PROFILE_SUBMIT_RETURN = 0x7C6581
+
+
+def build_profile_submit(entry, capture_entry):
+    """仅替换原生变化判断后的虚调用取址，保留比较、缓存和模型更新。"""
+    code = bytearray(b'\xcc')
+    traps = {entry: 'profile_submit'}
+
+    def branch(opcode, target):
+        code.extend(bytes([opcode]) + struct.pack('<I', (target-entry-len(code)-5) & 0xffffffff))
+
+    fallback = entry + len(code)
+    code.extend(PROFILE_SUBMIT_BEFORE)
+    branch(0xe9, PROFILE_SUBMIT_SITE + len(PROFILE_SUBMIT_BEFORE))
+    capture = entry + len(code)
+    code.extend(bytes.fromhex('9c60'))
+    branch(0xe8, capture_entry)
+    traps[entry + len(code)] = 'profile_captured'
+    code.append(0xcc)
+    code.extend(bytes.fromhex('619d'))
+    branch(0xe9, PROFILE_SUBMIT_RETURN)
+    patch = b'\xe9' + struct.pack('<I', (entry-PROFILE_SUBMIT_SITE-5) & 0xffffffff) + b'\x90'*3
+    return {'code': bytes(code), 'traps': traps, 'fallback': fallback,
+            'capture': capture, 'patch': patch}
+
+
+class ProfileUpdateBridge:
+    """在原生已完成本地修改的上行边采集，房外回退原虚调用。"""
+
+    def __init__(self, process, capture_entry, display_buffer):
+        self.process = process
+        self.capture_entry = capture_entry
+        self.display_buffer = display_buffer
+        self.captured_room_id = None
+
+    def install(self):
+        """校验专用提交边及未修改的 push/call，只覆盖八字节取址指令。"""
+        expected_bytes = PROFILE_SUBMIT_BEFORE + bytes.fromhex('57ffd0')
+        if self.process.read(PROFILE_SUBMIT_SITE, len(expected_bytes)) != expected_bytes:
+            raise ValueError('房内档案提交 ABI 不匹配')
+        entry = self.process.allocate(4096)
+        self.plan = build_profile_submit(entry, self.capture_entry)
+        self.process.write(entry, self.plan['code'])
+        self.process.executable(entry, 4096)
+        self.process.write(PROFILE_SUBMIT_SITE, self.plan['patch'])
+        return self.plan['traps']
+
+    def handle(self, phase, context, room_id, suppress):
+        """调用者保证主线程和房间生命周期；返回独立快照，不访问网络。"""
+        if phase == 'profile_submit':
+            self.captured_room_id = None
+            continuation = self.plan['fallback']
+            if room_id is not None:
+                continuation = PROFILE_SUBMIT_RETURN if suppress else self.plan['capture']
+                if not suppress:
+                    self.captured_room_id = room_id
+            struct.pack_into('<I', context, 184, continuation)
+            return None
+        # 原生采集返回后恢复保存的寄存器，由 host 的陷阱分派继续到下一条指令。
+        captured_room_id = self.captured_room_id
+        self.captured_room_id = None
+        if captured_room_id is not None and captured_room_id == room_id and not suppress:
+            return capture_snapshot(self.process.read, self.display_buffer)
+        return None
 
 # 固定版本 DDL 字节偏移；回归测试用原生捕获的 schema 校验。
 # 6236F0 的五个 getter 顺序对应房间成员 +B2 起的五个 uint16。

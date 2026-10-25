@@ -51,6 +51,10 @@ class IdentityStore(Protocol):
 
 class Gateway(Protocol):
     """玩家业务通信端口；所有方法在后台串行执行。"""
+    def update_profile(self, player_id: str, room_id: str, profile: dict) -> dict:
+        """更新当前房内完整档案，返回房间和玩家身份确认。"""
+        ...
+
     def change_ready(self, player_id: str, room_id: str, ready: bool) -> dict:
         """设置本人准备状态，返回服务端确认的房间快照。"""
         ...
@@ -77,7 +81,7 @@ class Gateway(Protocol):
         ...
 
     def member_profile(self, player_id: str, room_id: str, member_id: str) -> dict | None:
-        """读取同房成员入房时提交的完整档案，缺少快照时返回 None。"""
+        """读取同房成员最近提交的完整档案，缺少快照时返回 None。"""
         ...
 
     def update_settings(self, player_id: str, room_id: str, settings: dict) -> dict:
@@ -133,6 +137,14 @@ PERMISSION_ERROR_CODES = frozenset({'BANNED', 'FORBIDDEN', 'UNAUTHENTICATED'})
 
 class RoomPort(Protocol):
     """原生桥使用的异步用例接口；调用方不得直接访问工作线程状态。"""
+    def begin_update_profile(self, room_id: str, profile: dict) -> bool:
+        """异步上传当前档案；在途期间只保留最新待发送快照。"""
+        ...
+
+    def poll_update_profile(self) -> Completion | None:
+        """消费上传结果，不自动重试失败请求。"""
+        ...
+
     def begin_change_ready(self, room_id: str, ready: bool) -> bool:
         """异步提交一次准备或取消准备命令。"""
         ...
