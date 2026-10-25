@@ -162,18 +162,30 @@ def build_member_publish(entry, buffer):
         code.extend(struct.pack('<I', value))
     def call(address):
         code.extend(b'\xe8'); word((address-entry-len(code)-4) & 0xffffffff)
-    # 换队后由原生分配同组槽位；ESI=成员数，EDI=当前成员，栈参数=成员数组。
+    # buffer+8 是新增/换队成员位图；只分配变化成员，保留其他成员展示位置。
+    # ESI=成员数，EDI=当前成员，栈参数=成员数组。
     code.extend(b'\x83\x3d'); word(buffer+8); code.extend(bytes.fromhex('000f84'))
     slots_skip = len(code); word(0)
     code.extend(b'\x8b\x1d'); word(buffer)
-    code.extend(bytes.fromhex('8babd8050100 8dbb68e30000'))
+    code.extend(b'\x8b\x2d'); word(buffer+8)
+    code.extend(bytes.fromhex('8dbb68e30000'))
     slots_loop = len(code)
     code.extend(bytes.fromhex('85ed0f84')); slots_end = len(code); word(0)
+    code.extend(bytes.fromhex('d1ed0f83')); member_skip = len(code); word(0)
     code.extend(bytes.fromhex('8bb3d8050100 8d8368e30000 50')); call(0x629FF0)
-    code.extend(bytes.fromhex('83c404 8887b0000000 81c7d0010000 4d e9'))
+    code.extend(bytes.fromhex('83c404 8887b0000000'))
+    struct.pack_into('<i', code, member_skip, len(code)-member_skip-4)
+    code.extend(bytes.fromhex('81c7d0010000 e9'))
     word((slots_loop-len(code)-4) & 0xffffffff)
     struct.pack_into('<i', code, slots_end, len(code)-slots_end-4)
     struct.pack_into('<i', code, slots_skip, len(code)-slots_skip-4)
+    # 本人阵营确认变化后，先同步原生展示状态，再沿原生通知重建模型与选择。
+    # 成员发布约定第一个槽为本人；重复快照及他人换队不覆盖原生选择状态。
+    code.extend(b'\x83\x3d'); word(buffer+12); code.extend(bytes.fromhex('000f84'))
+    team_skip = len(code); word(0)
+    code.extend(b'\xa1'); word(buffer)
+    code.extend(bytes.fromhex('8b80f0e30000 a3')); word(0x0849B618)
+    struct.pack_into('<i', code, team_skip, len(code)-team_skip-4)
     code.extend(b'\x8b\x0d'); word(buffer)
     code.extend(bytes.fromhex('6a01')); call(0x6305F0)
     code.extend(b'\x8b\x1d'); word(buffer+4)

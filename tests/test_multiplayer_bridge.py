@@ -280,6 +280,39 @@ class MultiplayerBridgeTests(unittest.TestCase):
         self.assertEqual(memory.read(owner+0xB2, 10), struct.pack('<5H', *range(101, 106)))
         adapter.port.begin.assert_not_called()
 
+    def test_member_slots_follow_identity_and_only_changed_members_are_allocated(self):
+        """重复、换队和成员前移均保留未变化玩家的展示槽位。"""
+        memory, adapter, data, room, session = self.join_fixture()
+        data['members'].append({'playerId': 'pl_third', 'displayName': '第三人', 'team': 'tf141'})
+        adapter._prepare_join_snapshot(data)
+        memory.word(room+0x1C, session)
+        memory.word(session+0x25C8, room)
+        memory.write(session, b'\x01')
+        adapter.members_buffer = 0x27000000
+        adapter.pending = ('join', room, session)
+        adapter._publish_join_snapshot()
+        self.assertEqual(struct.unpack('<II', memory.read(adapter.members_buffer+8, 8)), (7, 1))
+        for member_index, slot in enumerate((0, 4, 7)):
+            memory.write(room+0xE418+member_index*0x1D0, bytes([slot]))
+        adapter.pending = ('members', room, session)
+        adapter._publish_join_snapshot()
+        self.assertEqual(struct.unpack('<II', memory.read(adapter.members_buffer+8, 8)), (0, 0))
+        data['members'][0]['team'] = 'scar'
+        adapter._prepare_join_snapshot(data, joining=False)
+        adapter._publish_join_snapshot()
+        self.assertEqual(struct.unpack('<II', memory.read(adapter.members_buffer+8, 8)), (2, 0))
+        self.assertEqual(memory.read(room+0xE418, 1), b'\x00')
+        self.assertEqual(memory.read(room+0xE418+0x1D0, 1), b'\xff')
+        self.assertEqual(memory.read(room+0xE418+2*0x1D0, 1), b'\x07')
+        # 原房主退出，第三人前移；仍按身份保留槽位 7。
+        data['members'].pop(0)
+        data['ownerPlayerId'] = 'pl_me'
+        data['members'][0]['team'] = 'spectator'
+        adapter._prepare_join_snapshot(data, joining=False)
+        adapter._publish_join_snapshot()
+        self.assertEqual(struct.unpack('<II', memory.read(adapter.members_buffer+8, 8)), (1, 1))
+        self.assertEqual(memory.read(room+0xE418+0x1D0, 1), b'\x07')
+
     def test_realtime_dispatch_routes_settings_and_ignores_other_events(self):
         memory, adapter, data, room, session = self.join_fixture()
         adapter.pending = None
