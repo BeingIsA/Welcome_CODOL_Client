@@ -1,4 +1,4 @@
-"""验证聊天入口局部解锁及原生状态、发送流程的保留；不代替实机验收。"""
+"""验证本地频道状态适配和原生显示检查的恢复；不代替实机验收。"""
 from pathlib import Path
 import itertools
 import struct
@@ -65,6 +65,10 @@ def evaluate_method(instructions, view_state, providers, parameter=None, stop_of
             value_stack.append(None)
         elif operation == 'pushbyte':
             value_stack.append(operands[0] if operands[0] < 128 else operands[0] - 256)
+        elif operation == 'getlex':
+            value_stack.append(providers[operands[0].split('::')[-1]])
+        elif operation == 'newarray':
+            value_stack.append([value_stack.pop() for unused_index in range(operands[0])][::-1])
         elif operation == 'findpropstrict':
             value_stack.append(providers)
         elif operation == 'getproperty':
@@ -89,13 +93,14 @@ def evaluate_method(instructions, view_state, providers, parameter=None, stop_of
                 should_jump = bool(value_stack.pop()) == (operation == 'iftrue')
             if should_jump:
                 instruction_index = instruction_map[operands[0]]
-        elif operation == 'callproperty':
+        elif operation in ('callproperty', 'callpropvoid'):
             argument_count = operands[1]
             arguments = [value_stack.pop() for unused_index in range(argument_count)][::-1]
             value_stack.pop()
             method_name = operands[0].split('::')[-1]
             calls.append((method_name, arguments))
-            value_stack.append(providers[arguments[0]] if method_name == 'getDP' else None)
+            if operation != 'callpropvoid':
+                value_stack.append(providers[arguments[0]] if method_name == 'getDP' else None)
         elif operation in ('returnvoid', 'returnvalue'):
             result = value_stack.pop() if operation == 'returnvalue' else None
             if value_stack:
@@ -133,44 +138,46 @@ class ChatUITests(unittest.TestCase):
                 if entry['instruction'].startswith('if') or entry['instruction'] == 'jump':
                     self.assertIn(entry['args'][0], boundaries)
         for method_name in ('onPostMessage', 'onLoudSpeakerBtnClicked',
-                            'onLoudSpeakerSendSuccess', 'onShowSpeakAnimation'):
+                            'onLoudSpeakerSendSuccess', 'onShowSpeakAnimation',
+                            'enableData', 'onBigSpeakerChannelStateChanged',
+                            'refreshHistoryList', 'checkCanChangeMainChatPanel'):
             self.assertEqual(self.before[method_name][0]['code'], self.after[method_name][0]['code'])
 
-    def test_status_refresh_keeps_inputs_available_without_faking_channel_state(self):
+    def test_status_checks_follow_local_channel_existence_and_preserve_locks(self):
         """覆盖已加入、未加入、关闭、故障组合以及输入展开状态。"""
         for joined, locked, broken, expanded in itertools.product((False, True), repeat=4):
             providers = {'GLOBAL': 0, 'INPUT_STATE': 1}
             for provider_name, provider_value in (
                 ('IS_IN_GLOBAL_CHANNEL', joined), ('IS_IN_BIG_SPEAKER_CHANNEL', joined),
                 ('IS_GLOBAL_CHAT_LOCKED', locked), ('IS_GLOBAL_CHAT_BROKEN', broken),
-                ('JOINED_GLOBAL_CHAT_GROUP', 7)):
+                ('JOINED_GLOBAL_CHAT_GROUP', 7), ('CHAT_CHANNEL_OBJ', {'id': 0} if joined else None)):
                 providers[provider_name] = provider_name
                 providers[provider_name + '_value'] = provider_value
-            provider_keys = {name: name + '_value' for name in providers if name.startswith(('IS_', 'JOINED_')) and not name.endswith('_value')}
+            provider_keys = {name: name + '_value' for name in providers if name.startswith(('IS_', 'JOINED_', 'CHAT_')) and not name.endswith('_value')}
             providers['DataID'] = provider_keys
             providers['ChattingChannelType'] = {'GLOBAL': 0}
             view_state = {'mCurrentChannelType': 0, 'mState': int(expanded),
                           'myChatList': {}, 'myControlPanel': {},
-                          'mySmallSpeakerBtn': {}, 'myBigSpeakerBtn': {}}
+                          'mySmallSpeakerBtn': {}, 'myBigSpeakerBtn': {}, 'mAllRawChannels': []}
             unused_result, calls = evaluate_method(self.after['onGlobalChatChannelStateChanged'][1], view_state, providers)
             self.assertEqual(view_state['mGlobalChatJoined'], joined)
             self.assertEqual(view_state['mGlobalChatLocked'], locked or broken)
-            self.assertTrue(view_state['mySmallSpeakerBtn']['enabled'])
-            self.assertIn(('switchJoiningGlobalChatNote', [False]), calls)
-            self.assertFalse(any(name == 'tryToCloseInput' for name, arguments in calls))
+            self.assertEqual(view_state['mySmallSpeakerBtn']['enabled'], joined)
+            self.assertIn(('switchJoiningGlobalChatNote', [not joined or locked or broken]), calls)
+            self.assertEqual(any(name == 'tryToCloseInput' for name, arguments in calls), not joined and expanded)
             evaluate_method(self.after['onBigSpeakerChannelStateChanged'][1], view_state, providers)
-            self.assertTrue(view_state['myBigSpeakerBtn']['enabled'])
+            self.assertEqual(view_state['myBigSpeakerBtn']['enabled'], joined and not locked and not broken)
             evaluate_method(self.after['enableData'][1], view_state, providers,
                             start_offset=58, stop_offset=106)
-            self.assertTrue(view_state['mySmallSpeakerBtn']['enabled'])
-            self.assertTrue(view_state['myBigSpeakerBtn']['enabled'])
+            self.assertEqual(view_state['mySmallSpeakerBtn']['enabled'], joined)
+            self.assertEqual(view_state['myBigSpeakerBtn']['enabled'], joined and not locked)
             unused_result, history_calls = evaluate_method(
                 self.after['refreshHistoryList'][1], view_state, providers,
                 start_offset=56, stop_offset=115)
-            self.assertEqual(history_calls, [('switchJoiningGlobalChatNote', [False])])
+            self.assertEqual(history_calls, [('switchJoiningGlobalChatNote', [not joined])])
             for want_to_expand in (False, True):
                 result, unused_calls = evaluate_method(self.after['checkCanChangeMainChatPanel'][1], view_state, providers, want_to_expand)
-                self.assertTrue(result)
+                self.assertEqual(result, not want_to_expand or joined)
 
 
 if __name__ == '__main__':

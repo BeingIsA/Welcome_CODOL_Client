@@ -13,6 +13,10 @@ class BroadcastGateway(Protocol):
 class BroadcastPort(Protocol):
     """游戏适配使用的成功路径接口。"""
 
+    def available(self) -> bool:
+        """返回身份及推送连接是否就绪，供原生入口状态查询。"""
+        ...
+
     def connected(self, player_id: str, display_name: str) -> None:
         """交接已确认的登录身份。"""
         ...

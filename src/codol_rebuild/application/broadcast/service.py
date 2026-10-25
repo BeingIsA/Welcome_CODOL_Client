@@ -6,12 +6,17 @@ from codol_rebuild.application.broadcast.contracts import BroadcastGateway
 class BroadcastSession:
     """使用登录结果中的身份，不承担登录、扣道具或失败恢复。"""
 
-    def __init__(self, gateway: BroadcastGateway, messages):
+    def __init__(self, gateway: BroadcastGateway, messages, connection_available):
         self._gateway = gateway
         self._messages = messages
+        self._connection_available = connection_available
         self.player_id = None
         self._pending = None
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='codol-broadcast')
+
+    def available(self) -> bool:
+        """身份由登录用例确认，连接可用性由装配时注入的查询提供。"""
+        return self.player_id is not None and self._connection_available()
 
     def connected(self, player_id: str, display_name: str) -> None:
         """由登录完成通知交接已确认身份；昵称由服务端决定。"""

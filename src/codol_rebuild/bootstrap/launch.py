@@ -51,7 +51,8 @@ def run(args):
                 ('room_settings_updated', 'room_members_updated', 'room_kicked', 'room_closed'), room_inbox)
             realtime_dispatcher.register(('broadcast',), broadcast_inbox)
             broadcast_session = BroadcastSession(
-                HttpGateway(args.server_url, args.server_timeout), broadcast_inbox)
+                HttpGateway(args.server_url, args.server_timeout), broadcast_inbox,
+                lambda: realtime_connection.status().value == 'connected')
             multiplayer = RoomSession(gateway, JsonIdentityStore(args.server_identity),
                                              gateway.server, fingerprint(),
                                              realtime=RoutedConnection(realtime_connection, room_inbox))

@@ -21,6 +21,36 @@ def server_message():
 
 
 class BroadcastTests(unittest.TestCase):
+    def test_availability_requires_identity_and_current_connection(self):
+        connection_available = Mock(return_value=False)
+        session = BroadcastSession(Mock(), EventInbox(), connection_available)
+        try:
+            self.assertFalse(session.available())
+            session.connected('pl_sender', '玩家')
+            self.assertFalse(session.available())
+            connection_available.return_value = True
+            self.assertTrue(session.available())
+            connection_available.return_value = False
+            self.assertFalse(session.available())
+        finally:
+            session.close()
+
+    def test_login_updates_native_availability_before_next_poll(self):
+        memory = bytearray(64)
+        process = Mock()
+        process.write.side_effect = lambda address, data: memory.__setitem__(
+            slice(address - 0x1000, address - 0x1000 + len(data)), data)
+        process.read.side_effect = lambda address, size: bytes(
+            memory[address - 0x1000:address - 0x1000 + size])
+        port = Mock(available=Mock(return_value=True))
+        bridge = broadcast.BroadcastBridge(process, port, Mock())
+        bridge.state = 0x1000
+        bridge.connected('pl_sender', '玩家')
+        port.connected.assert_called_once_with('pl_sender', '玩家')
+        self.assertEqual(struct.unpack_from('<I', memory, broadcast.BROADCAST_AVAILABLE)[0], 1)
+        process.write.assert_called_once_with(0x1000 + broadcast.BROADCAST_AVAILABLE,
+                                             struct.pack('<I', 1))
+
     def test_http_uses_existing_endpoint_and_authenticated_identity(self):
         gateway = HttpGateway('http://127.0.0.1:8000')
         gateway._request = Mock(return_value={'messageId': 'broadcast_one'})
@@ -39,7 +69,7 @@ class BroadcastTests(unittest.TestCase):
             return {'messageId': 'broadcast_one'}
 
         gateway = Mock(send_broadcast=Mock(side_effect=send))
-        session = BroadcastSession(gateway, inbox)
+        session = BroadcastSession(gateway, inbox, lambda: True)
         session.connected('pl_sender', '中文玩家')
         try:
             session.begin('一起玩吗？')
@@ -60,7 +90,7 @@ class BroadcastTests(unittest.TestCase):
     def test_http_completion_never_creates_local_chat_message(self):
         inbox = EventInbox()
         gateway = Mock(send_broadcast=Mock(return_value={'messageId': 'broadcast_one'}))
-        session = BroadcastSession(gateway, inbox)
+        session = BroadcastSession(gateway, inbox, lambda: True)
         session.connected('pl_sender', '中文玩家')
         session.begin('一起玩吗？')
         session.close()

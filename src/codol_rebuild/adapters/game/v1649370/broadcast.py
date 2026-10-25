@@ -13,9 +13,13 @@ from codol_rebuild.application.broadcast.contracts import BroadcastPort
 SEND_HANDLER = 0x7273B0
 CAPACITY = 65536
 SEND_COMPLETE, MESSAGE_READY, MESSAGE_OBJECT, FIELDS = 0, 4, 32, 64
+BROADCAST_AVAILABLE = 8
+# IsInBigSpeakerChannel 只替换读取来源，保留原 GFx 布尔返回及对象释放逻辑。
+AVAILABILITY_SOURCE = 0x5D2DE9
 MESSAGE_FIELDS = ('channelID', 'senderID', 'senderName', 'message',
                   'formatedTime', 'loudSpeakerType')
 CONTRACT = {
+    0x5D2DE7: bytes.fromhex('8a1df44a2c08'),
     SEND_HANDLER: bytes.fromhex('558bec83e4f8'),
     0x7C4AB0: bytes.fromhex('558bec83ec64'),
     0x7C4B67: bytes.fromhex('c20c00'),
@@ -193,9 +197,12 @@ class BroadcastBridge:
         self.player_id = None
 
     def connected(self, player_id, display_name):
-        """保存本人的服务端身份，仅用于原生显示 ID 转换。"""
+        """交接身份，并在登录完成暂停点同步入口状态，避免多等一个调度周期。"""
         self.player_id = player_id
         self.port.connected(player_id, display_name)
+        if self.state is not None:
+            self._write(self.state + BROADCAST_AVAILABLE,
+                        struct.pack('<I', int(self.port.available())))
 
     def install(self):
         """验证固定版本 ABI 后安装专用入口，返回独立轮询桩。"""
@@ -209,6 +216,7 @@ class BroadcastBridge:
         self._write(entry, self.plan['code'])
         self.process.executable(entry, 4096)
         self._write(SEND_HANDLER, self.plan['patch'])
+        self._write(AVAILABILITY_SOURCE, struct.pack('<I', self.state + BROADCAST_AVAILABLE))
         self.traps = self.plan['traps']
         return self.plan['poll']
 
@@ -239,6 +247,8 @@ class BroadcastBridge:
                     self._write(self.state, encode_message(message, sender_id, self.state))
                 if self.port.poll_sent() is not None:
                     self._write(self.state + SEND_COMPLETE, struct.pack('<I', 1))
+                self._write(self.state + BROADCAST_AVAILABLE,
+                            struct.pack('<I', int(self.port.available())))
             struct.pack_into('<I', context, 184, next_instruction)
             self.process.set_context(thread, context)
         finally:
