@@ -68,6 +68,27 @@ static bool is_descendant(const fs::path& parent, const fs::path& target) {
     }
     return b != target.end();
 }
+
+// 仅放行本守卫所属项目中的固定版本槽位；不能由调用方指定任意公共 EXE 根。
+static bool is_reusable_target(const fs::path& client_root, const fs::path& run,
+                               const fs::path& target) {
+    const fs::path sessions = client_root / L"workspaces" / L"offline-runs";
+    const fs::path programs = client_root / L"workspaces" / L"runtime-programs";
+    if (run.parent_path() != sessions || target.filename() != L"codol1649370-offline.exe") return false;
+    const fs::path runtime = target.parent_path();
+    const fs::path slot = runtime.parent_path();
+    const fs::path revision = slot.parent_path();
+    if (runtime.filename() != L"runtime" || revision.parent_path() != programs) return false;
+    const std::wstring revision_name = revision.filename().wstring();
+    const std::wstring slot_name = slot.filename().wstring();
+    return revision_name.size() == 64 &&
+        std::all_of(revision_name.begin(), revision_name.end(), [](wchar_t character) {
+            return (character >= L'0' && character <= L'9') || (character >= L'a' && character <= L'f');
+        }) && slot_name.size() >= 9 && slot_name.substr(0, 5) == L"slot-" &&
+        std::all_of(slot_name.begin() + 5, slot_name.end(), [](wchar_t character) {
+            return character >= L'0' && character <= L'9';
+        });
+}
 static void write_new(const fs::path& path, const std::string& text) {
     // 只新建本次会话证据，不覆盖已有运行记录。
     HANDLE file = CreateFileW(path.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr,
@@ -101,8 +122,13 @@ int wmain(int argc, wchar_t** argv) {
         if (bound_seconds > 3660) throw std::runtime_error("Invalid time bound");
         run = fs::canonical(fs::path(argv[1]));
         target = fs::canonical(fs::path(argv[3]));
-        if (!fs::is_directory(run) || !fs::is_regular_file(target) || !is_descendant(run, target))
-            throw std::runtime_error("Target must be inside the run directory");
+        wchar_t guard_filename[32768];
+        const DWORD filename_length = GetModuleFileNameW(nullptr, guard_filename, 32768);
+        require(filename_length > 0 && filename_length < 32768, "Read guard path");
+        const fs::path client_root = fs::canonical(fs::path(guard_filename)).parent_path().parent_path();
+        if (!fs::is_directory(run) || !fs::is_regular_file(target) ||
+            (!is_descendant(run, target) && !is_reusable_target(client_root, run, target)))
+            throw std::runtime_error("Target must be inside this run or a project runtime slot");
         for (const wchar_t* name : {L"guard-ready.json", L"guard-result.json", L"guard-done.json"})
             if (fs::exists(run / name)) throw std::runtime_error("Run already has guard state");
     } catch (const std::exception&) { return 2; }

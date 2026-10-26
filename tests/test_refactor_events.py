@@ -213,6 +213,27 @@ class ProfileLifecycleTests(unittest.TestCase):
                 self.assertEqual(quote.call_args.args[2][545]['type_bytes'][0], 0)
 
 class LifecycleTests(unittest.TestCase):
+    def test_runtime_lease_released_after_failed_process_start(self):
+        """程序启动失败也须先关闭进程，再释放共享运行槽位。"""
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(launch, 'ROOT', Path(directory)), \
+             patch.object(launch, 'prepare') as prepare, \
+             patch.object(launch, 'ProcessSession') as process_class, \
+             patch.object(launch, 'GameSessionBridge'), \
+             patch.object(launch, 'DebugLoop'):
+            lease = Mock(path=Path(directory) / 'program')
+            prepare.return_value = {'runtime_lease': lease, 'image': None, 'pe': None,
+                                    'exe': lease.path / 'game.exe', 'settings': None}
+            process = process_class.return_value
+            process.is_running.return_value = False
+            process.start.side_effect = ValueError('start failed')
+            calls = Mock()
+            calls.attach_mock(process.close, 'close_process')
+            calls.attach_mock(lease.close, 'release_directory')
+            result = launch.run(SimpleNamespace(name='lease-failure'))
+            self.assertEqual(result['error'], 'start failed')
+            self.assertEqual([entry[0] for entry in calls.mock_calls], ['close_process', 'release_directory'])
+
     def test_prepare_failure_records_result_without_starting(self):
         with tempfile.TemporaryDirectory() as tmp, patch.object(launch,'ROOT',Path(tmp)),patch.object(launch,'prepare',side_effect=ValueError('bad image')),patch.object(launch,'ProcessSession') as cls:
             process=cls.return_value;process.is_running.return_value=False

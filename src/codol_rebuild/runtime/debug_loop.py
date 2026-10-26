@@ -8,8 +8,8 @@ from codol_rebuild.platform.win32 import K,PTR,SIZE,EVENT,api,check,close
 
 class DebugLoop:
     """不解释版本地址或业务状态，游戏事件由处理器承接。"""
-    def __init__(self, process, bridge, pe, supplier, forbidden):
-        self.process=process;self.bridge=bridge;self.pe=pe;self.supplier=supplier
+    def __init__(self, process, bridge, pe, forbidden):
+        self.process=process;self.bridge=bridge;self.pe=pe
         self.args=process.args;self.log=process.log;self.record=process.record
         self.forbidden=forbidden;self.breaks={};self.file_traps={};self.tids=set();self.rearm={}
         bridge.bind_debugger(self)
@@ -99,11 +99,6 @@ class DebugLoop:
                         try:
                             path = self.process.cstring(pointer, self.file_traps[address].endswith('W'), strict=True)
                             row['file_missing']['path'] = path
-                            if self.supplier:
-                                supplied = self.supplier.supply(path)
-                                row['resource_supply'] = supplied
-                                if supplied.get('status') in ('supplied', 'already_present'):
-                                    self.process.write(ebp - 12, struct.pack('<I', 1))
                         except (OSError, ValueError) as error:
                             row['file_missing']['error_detail'] = str(error)
                         struct.pack_into('<I', ctx, 184, address + 1)

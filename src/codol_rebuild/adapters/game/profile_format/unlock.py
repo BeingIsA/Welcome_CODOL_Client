@@ -2,7 +2,7 @@
 
 独立模块：只依赖「已捕获的 schema JSON」（profile_schema.capture_schema 的产物）
 与一段基础档案缓冲（bytes）+ 标准库。不读写进程、不启动游戏，也不导入
-offline_debug / launch_offline / schema_scan——把档案注入回客户端是将来另一个独立
+运行宿主 / 启动入口 / schema_scan——把档案注入回客户端是将来另一个独立
 模块的职责，本模块只负责产出「全解锁」档案字节；持久化位于 storage.profile_archive。
 
 偏移语义（与旧版 2.6.9.7 已跑通的 progression.py / profile_store.py 一致，字段偏移

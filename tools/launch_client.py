@@ -2,7 +2,7 @@
 
 从当前普通用户 Python 进程调用现有宿主；仅临时断网守卫请求系统 UAC。
 --dry-run 只验证输入并显示计划，不创建会话、不运行客户端、不弹 UAC。
-默认使用完整原生资源树；旧分库参数仅保留为显式诊断入口。
+统一使用完整原生资源树与可复用程序目录。
 """
 from __future__ import annotations
 
@@ -12,7 +12,6 @@ from datetime import datetime
 import hashlib
 import json
 from pathlib import Path
-import re
 import sys
 import uuid
 
@@ -42,26 +41,19 @@ def host_options(source: Path) -> set[str]:
 
 def build_plan(options: argparse.Namespace) -> dict:
     requested_native = getattr(options, 'native_library', None)
-    legacy_resources = bool(options.resource_library or options.loose_library or options.supply_resources or options.prewarm_run)
-    if requested_native and legacy_resources:
-        raise ValueError('--native-library 不能与旧分库或按需补件混用')
-    native_library = None if legacy_resources else (requested_native or ROOT / 'resources/v1649370/game').resolve()
+    native_library = (requested_native or ROOT / 'resources/v1649370/game').resolve()
     image = ROOT / 'bin/v1649370/codol1649370-offline.exe'
     patches = ROOT / 'resources/v1649370/offline-menu-patches.json'
-    overlay = ROOT / 'resources/v1649370/offline-resources'
-    deps = ROOT / 'resources/v1649370/runtime-deps'
     host = ROOT / 'src/codol_rebuild/bootstrap/launch.py'
     for path in (image, patches, host, ROOT / 'bin/offline_guard.exe'):
         if not path.is_file():
             raise ValueError(f'离线入口缺少文件：{path}')
-    for path in ((native_library,) if native_library else (overlay, deps)):
-        if not path.is_dir():
-            raise ValueError(f'离线入口缺少目录：{path}')
-    if native_library:
-        from codol_rebuild.resources.native_library import read_manifest
-        if not native_library.is_relative_to((ROOT / 'resources/v1649370').resolve()):
-            raise ValueError('完整原生库必须位于项目固定版本资源目录')
-        read_manifest(native_library)
+    if not native_library.is_dir():
+        raise ValueError(f'离线入口缺少目录：{native_library}')
+    from codol_rebuild.resources.native_library import read_manifest
+    if not native_library.is_relative_to((ROOT / 'resources/v1649370').resolve()):
+        raise ValueError('完整原生库必须位于项目固定版本资源目录')
+    read_manifest(native_library)
     if hashlib.sha256(image.read_bytes()).hexdigest() != IMAGE_SHA256:
         raise ValueError('离线镜像与已验证 1649370 镜像指纹不符')
     rows = json.loads(patches.read_text(encoding='utf-8'))
@@ -70,7 +62,6 @@ def build_plan(options: argparse.Namespace) -> dict:
             or [(row.get('va'), row.get('before'), row.get('after')) for row in rows] != list(PATCH_BYTES)):
         raise ValueError('要求已验证的五项补丁：地址、修改前后字节必须完全一致')
     session = datetime.now().strftime('offline-%Y%m%d-%H%M%S-') + uuid.uuid4().hex[:8]
-    supply_resources = bool(options.supply_resources or options.prewarm_run)
     arguments = ['--name', session]
     required = {'--name', '--image', '--patches', '--breakpoint'}
     if options.seconds is None:
@@ -81,19 +72,12 @@ def build_plan(options: argparse.Namespace) -> dict:
         required.add('--seconds')
     # 由原生流程衔接启动动画与界面，避免额外菜单命令打断动画显示。
     arguments += ['--image', str(image), '--patches', str(patches)]
-    if native_library:
-        arguments += ['--native-library', str(native_library)]
-        required.add('--native-library')
-    else:
-        arguments += ['--overlay', str(overlay)]
-        required.add('--overlay')
+    arguments += ['--native-library', str(native_library)]
+    required.add('--native-library')
     if getattr(options,'verify_resources',False):
         arguments.append('--verify-resources');required.add('--verify-resources')
     if getattr(options,'prepare_only',False):
         arguments.append('--prepare-only');required.add('--prepare-only')
-    if supply_resources:
-        arguments.append('--supply-resources')
-        required.add('--supply-resources')
     if options.offline_menu_preview:
         arguments.append('--offline-menu-preview')
         required.add('--offline-menu-preview')
@@ -110,32 +94,9 @@ def build_plan(options: argparse.Namespace) -> dict:
         if options.server_identity:
             arguments += ['--server-identity', str(options.server_identity.resolve())]
             required.add('--server-identity')
-    if options.prewarm_run:
-        if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,127}', options.prewarm_run):
-            raise ValueError('--prewarm-run 必须是已有会话名，不接受路径或别名')
-        allowed = (ROOT / 'workspaces/offline-runs').resolve()
-        previous = (allowed / options.prewarm_run).resolve()
-        if previous.parent != allowed or not (previous / 'resource-supply.jsonl').is_file():
-            raise ValueError('--prewarm-run 必须指向项目会话中的资源供应记录')
-        arguments += ['--prewarm-run', options.prewarm_run]
-        required.add('--prewarm-run')
     if options.capture_schema:
         arguments.append('--capture-schema')
         required.add('--capture-schema')
-    library_roots = [overlay.resolve()]
-    for flag, requested in (('--resource-library', options.resource_library),
-                            ('--loose-library', options.loose_library)):
-        if requested is None:
-            continue
-        library = requested.resolve()
-        if not library.is_dir() or not any(library.is_relative_to(base.resolve()) for base in (ROOT / 'resources/v1649370', ROOT / 'workspaces')):
-            raise ValueError(flag + ' 必须是本项目固定资源目录或 workspaces 内的资源库目录')
-        if any(library == other or library.is_relative_to(other) or other.is_relative_to(library)
-               for other in library_roots):
-            raise ValueError('图片库、松散资源库和基础 overlay 目录不能重叠')
-        library_roots.append(library)
-        arguments += [flag, str(library)]
-        required.add(flag)
     for point in BREAKPOINTS:
         arguments += ['--breakpoint', point]
     arguments += ['--', '+set', '2439', '0']
@@ -144,14 +105,13 @@ def build_plan(options: argparse.Namespace) -> dict:
             'local_profile': getattr(options,'local_profile',False),
             'dry_run': options.dry_run, 'main_menu_verified': False, 'session': session,
             'offline_menu_preview': options.offline_menu_preview,
-            'supply_resources': supply_resources,
             'capture_schema': options.capture_schema,
             'output_directory': str(ROOT / 'workspaces/offline-runs' / session),
             'lifetime': 'until-close' if options.seconds is None else 'bounded',
             'seconds': options.seconds, 'python': sys.executable,
             'host_identity': '当前 Python 用户和权限；入口不请求提升宿主',
             'uac': '仅临时断网守卫；客户端使用低权限令牌且守卫未就绪时不恢复执行',
-            'resource_library_policy': ('完整原生资源树；启动前校验，仅联接顶层目录；玩家设置独立保存' if native_library else '显式旧分库诊断：分别校验 overlay 和资源库'),
+            'resource_library_policy': '完整原生资源树；启动前校验，仅联接顶层目录；玩家设置独立保存',
             'missing_host_options': missing, 'entrypoint': 'codol_rebuild.bootstrap.launch.main',
             'arguments': arguments}
 
@@ -161,14 +121,9 @@ def main(argv: list[str] | None = None) -> int:
     lifetime = parser.add_mutually_exclusive_group()
     lifetime.add_argument('--until-close', action='store_true', help='运行直到关闭或致命错误（默认）')
     lifetime.add_argument('--seconds', type=int, help='改为 1..600 秒有时限的诊断运行')
-    parser.add_argument('--prewarm-run', help='从已有会话资源记录重新核验并预热；只接受会话名')
-    parser.add_argument('--resource-library', type=Path, help='已构建 IWI 图片库路径，宿主在启动前校验并复用共享缓存')
-    parser.add_argument('--loose-library', type=Path, help='已构建模型、音频和指定配置库路径，宿主在启动前校验并复用共享缓存')
     parser.add_argument('--native-library', type=Path, help='完整原生资源根；默认 resources/v1649370/game')
     parser.add_argument('--offline-menu-preview', action=argparse.BooleanOptionalAction, default=False,
                         help='启用已验证到角色选择页的原生 UI 激活；不创建在线资料或库存')
-    parser.add_argument('--supply-resources', action='store_true',
-                        help='启用文件缺失断点和单次资源补件，仅用于诊断（默认关闭）')
     parser.add_argument('--capture-schema', action='store_true',
                         help='在前端帧只读扫描档案 DDL 指纹并导出结构定义（不写目标进程）')
     parser.add_argument('--local-profile', action='store_true', help='启用本地档案适配（实验验证中）')

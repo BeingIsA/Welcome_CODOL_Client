@@ -18,6 +18,7 @@ class ProcessSession:
         self.settings_errors=(OSError,ValueError)
         self.resumed=False
         self.settings=None
+        self.runtime_lease=None
         self.settings_task=PeriodicTask(2)
 
     @staticmethod
@@ -128,9 +129,12 @@ class ProcessSession:
         self.log['command_line'] = subprocess.list2cmdline([str(exe), '-q', *display_defaults, *self.args.argument])
         command = C.create_unicode_buffer(self.log['command_line'])
         env = {key: os.environ[key] for key in ('SystemRoot', 'WINDIR', 'COMSPEC', 'SystemDrive', 'NUMBER_OF_PROCESSORS', 'PROCESSOR_ARCHITECTURE') if key in os.environ}
-        env.update({'PATH': str(self.stage) + ';' + os.environ['SystemRoot'] + '\\System32', 'TEMP': str(self.stage / 'temp'), 'TMP': str(self.stage / 'temp'), 'USERPROFILE': str(self.stage), 'LOCALAPPDATA': str(self.stage / 'localappdata'), 'APPDATA': str(self.stage / 'appdata')})
+        session_stage = self.run_dir / 'runtime'
+        env.update({'PATH': str(self.stage) + ';' + os.environ['SystemRoot'] + '\\System32', 'TEMP': str(session_stage / 'temp'), 'TMP': str(session_stage / 'temp'), 'USERPROFILE': str(session_stage), 'LOCALAPPDATA': str(session_stage / 'localappdata'), 'APPDATA': str(session_stage / 'appdata')})
         environment = C.create_unicode_buffer('\x00'.join((k + '=' + v for k, v in sorted(env.items()))) + '\x00\x00')
         check(api(A, 'CreateProcessAsUserW', W.BOOL, PTR, W.LPCWSTR, W.LPWSTR, PTR, PTR, W.BOOL, W.DWORD, PTR, W.LPCWSTR, C.POINTER(SI), C.POINTER(PI))(self.token, str(exe), command, None, None, False, 1030, environment, str(self.stage), C.byref(si), C.byref(self.info)))
+        if self.runtime_lease is not None:
+            self.runtime_lease.hold_for_process(self.info.process)
         self.log['pid'] = self.info.pid
         self.log['token'] = token_info(self.info.process)
         if self.log['token'] != {'elevated': 0, 'appcontainer': 0, 'integrity': 4096}:

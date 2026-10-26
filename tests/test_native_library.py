@@ -164,18 +164,18 @@ class NativeLibraryTests(unittest.TestCase):
             patches.enter_context(patch.object(resource_setup, 'ROOT', self.project_root / 'client'))
             patches.enter_context(patch.object(native_library, 'read_manifest', return_value=(b'manifest', manifest)))
             patches.enter_context(patch.object(resource_setup, 'prepare_library'))
-            patches.enter_context(patch.object(resource_setup, 'link_resource', side_effect=AssertionError('file link')))
-            mounts = resource_setup.prepare_native_library(game_root, runtime, runtime.parent, {}, False)
-        self.assertEqual([destination.name for source, destination, root in mounts], list(native_library.MOUNT_DIRECTORIES))
-        self.assertTrue(all(destination.parent == runtime for source, destination, root in mounts))
-        self.assertEqual((runtime / 'libcef.dll').read_bytes(), b'dependency')
-        self.assertNotEqual((runtime / 'libcef.dll').stat().st_ino, dependency.stat().st_ino)
+            resource_directories, dependencies = resource_setup.prepare_native_library(game_root, runtime.parent, {}, False)
+        self.assertEqual([directory.name for directory in resource_directories], list(native_library.MOUNT_DIRECTORIES))
+        self.assertTrue(all(directory.parent == game_root for directory in resource_directories))
+        self.assertEqual(dependencies, manifest['resources'])
+        self.assertFalse((runtime / 'libcef.dll').exists(), '资源校验不再复制程序依赖')
 
-    def test_native_and_legacy_arguments_cannot_mix(self):
+    def test_removed_legacy_arguments_are_rejected(self):
         from codol_rebuild.bootstrap.config import parse_args
         with contextlib.redirect_stderr(io.StringIO()):
-            for legacy in ('--overlay', '--resource-library', '--loose-library'):
+            for legacy in ('--overlay', '--resource-library', '--loose-library', '--prewarm-run'):
                 with self.subTest(legacy=legacy), self.assertRaises(SystemExit):
-                    parse_args(['--name', 'test', '--native-library', 'game', legacy, 'old'])
+                    parse_args(['--name', 'test', legacy, 'old'])
             with self.assertRaises(SystemExit):
-                parse_args(['--name', 'test', '--native-library', 'game', '--supply-resources'])
+                parse_args(['--name', 'test', '--supply-resources'])
+        self.assertEqual(parse_args(['--name', 'test']).native_library.name, 'game')

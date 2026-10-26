@@ -4,7 +4,7 @@
 即使宿主提前退出，也要等游戏进程结束后才能再次租用该目录。
 """
 from pathlib import Path
-import ctypes as ctypes
+import ctypes
 from ctypes import wintypes
 import re
 

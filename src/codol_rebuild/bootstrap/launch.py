@@ -29,8 +29,13 @@ def run(args):
     chat_session = None
     broadcast_session = None
     realtime_dispatcher = None
+    runtime_lease = None
     try:
         prepared=prepare(args,run_dir,stage,log,phase_done)
+        runtime_lease = prepared.get('runtime_lease')
+        if runtime_lease is not None:
+            process.stage = runtime_lease.path
+            process.runtime_lease = runtime_lease
         if getattr(args,'prepare_only',False):
             log['prepared_only']=True
             return log
@@ -68,7 +73,7 @@ def run(args):
                                  process,account_factory,(OSError,ValueError,sqlite3.Error), multiplayer=multiplayer,
                                  rename_session=rename_session, broadcast_session=broadcast_session,
                                  realtime_dispatcher=realtime_dispatcher, chat_session=chat_session, online_session=online_session)
-        debugger=DebugLoop(process,bridge,prepared['pe'],prepared['supplier'],FORBIDDEN)
+        debugger=DebugLoop(process,bridge,prepared['pe'],FORBIDDEN)
         process.start(prepared['exe'],prepared['settings'])
         debugger.run()
     except Exception as error:
@@ -93,6 +98,8 @@ def run(args):
                     try:broadcast_session.close()
                     except Exception as error:
                         log['broadcast_cleanup_error'] = str(error)
+                if runtime_lease is not None:
+                    runtime_lease.close()
                 reporter.close()
     return log
 
