@@ -113,10 +113,20 @@ class ResourceFixture(unittest.TestCase):
         # 不在 client/workspaces 下；此前按 workspaces 校验导致真实缓存必然报“路径越界”。
         target=self.write_cache_manifest()
         result=self.supplier().supply('images/mixedcase.iwi')
-        self.assertEqual(result['status'],'supplied')
+        self.assertEqual(result['status'],'supplied',result)
         self.assertEqual(Path(result['destination']).read_bytes(),DATA)
         self.assertEqual(result['provenance']['cache_path'],str(target))
         self.assertIn('历史严格解码清单',result['provenance']['verification'])
+
+    def test_decoded_cache_index_uses_current_resource_root(self):
+        """历史清单的输出路径仅作证据，当前缓存始终定位到固定资源目录。"""
+        target = self.write_cache_manifest()
+        supplier = self.supplier()
+        cache_path, cache_entry = supplier._decoded['main/images/mixedcase.iwi']
+        self.assertEqual(cache_path, target)
+        self.assertTrue(cache_path.is_relative_to(self.root/'client/resources/v1649370/offline-resources'))
+        self.assertFalse(cache_path.is_relative_to(self.workspace))
+        self.assertEqual(cache_entry['sha256'], resources.digest(DATA))
 
     def test_decoded_cache_and_receipt_candidates_coexist(self):
         # 缓存命中后清单候选与提取收据候选应同时进入比较，而非缓存异常中断回退。
@@ -130,10 +140,17 @@ class ResourceFixture(unittest.TestCase):
         # 防御性校验仍有效：登记路径一旦越出资源根必须拒绝，不能因放宽基准而失效。
         self.write_cache_manifest()
         supplier=self.supplier()
-        path,entry=supplier._decoded['main/images/mixedcase.iwi']
-        supplier._decoded['main/images/mixedcase.iwi']=(self.root/'escape/main/images/mixedcase.iwi',entry)
-        result=supplier.supply('images/mixedcase.iwi')
-        self.assertEqual(result['status'],'error');self.assertIn('越界',result['reason'])
+        cache_entry = supplier._decoded['main/images/mixedcase.iwi'][1]
+        for cache_path in (self.root/'escape/main/images/mixedcase.iwi',
+                           self.workspace/'offline-resources/main/images/mixedcase.iwi'):
+            with self.subTest(cache_path=cache_path):
+                # 两处都放入合法内容，证明拒绝原因是目录越界，而非文件缺失或摘要错误。
+                cache_path.parent.mkdir(parents=True, exist_ok=True)
+                cache_path.write_bytes(DATA)
+                supplier._decoded['main/images/mixedcase.iwi'] = (cache_path, cache_entry)
+                result = supplier.supply('images/mixedcase.iwi')
+                self.assertEqual(result['status'], 'error', result)
+                self.assertIn('越界', result['reason'])
 
     def test_decoded_cache_digest_is_required(self):
         output=self.root/'client/resources/v1649370/offline-resources';target=output/'main/images/mixedcase.iwi';target.parent.mkdir(parents=True);target.write_bytes(DATA)
@@ -145,7 +162,9 @@ class ResourceFixture(unittest.TestCase):
         supplier=self.supplier()
         self.assertEqual(supplier._decoded['main/images/mixedcase.iwi'][0], target)
         target.write_bytes(b'bad!'+DATA[4:])
-        self.assertEqual(supplier.supply('images/mixedcase.iwi')['status'],'error')
+        result = supplier.supply('images/mixedcase.iwi')
+        self.assertEqual(result['status'], 'error', result)
+        self.assertIn('摘要', result['reason'])
 
 
 class DecoderTests(unittest.TestCase):

@@ -5,7 +5,7 @@ import json
 from pathlib import Path, PurePosixPath
 import struct
 from codol_rebuild.resources import offline_resources
-from codol_rebuild.resources.offline_resources import (OfflineResourceSupplier, RAW_INVENTORIES, ARCHIVES,
+from codol_rebuild.resources.offline_resources import (ResourceSource, RAW_INVENTORIES, ARCHIVES,
                                 canonical_iwi, decode_loose, digest)
 from codol_rebuild.resources.image_library import build_library
 
@@ -73,7 +73,7 @@ def inspect_format(data: bytes, kind: str) -> dict:
     return {'kind':'MPEG_audio','scope':'ID3边界和首帧头；未解码全部音频帧'}
 
 
-class LooseResourceSource(OfflineResourceSupplier):
+class LooseResourceSource(ResourceSource):
     """与图库共享固定源包、收据、解码、覆盖选择；输出只允许指定非IWI数据类型。"""
     library_directory = 'offline-loose-library'
     library_kind = 'loose_startup_resources'
@@ -95,7 +95,6 @@ class LooseResourceSource(OfflineResourceSupplier):
             self._rules[item['resource']]={'selected_archive':item['selected_archive'],'file_item_index':item['file_item_index'],
                 'evidence':{'path':AUDIT_PATH,'sha256':AUDIT_SHA},
                 'candidates':[{k:c[k] for k in ('archive','encoded_sha256','decoded_sha256','decoded_size')}for c in item['candidates']]}
-        self._decoded={};self._receipts={};self.manifest=None
         for archive,receipt_hash in RAW_INVENTORIES.items():
             folder=(self.workspace/'offline-resource-raw'/Path(archive).stem).resolve()
             if not folder.is_relative_to(self.workspace): raise ValueError('非IWI缓存目录越界')
@@ -112,6 +111,10 @@ class LooseResourceSource(OfflineResourceSupplier):
                     raise ValueError('非IWI源条目路径或解码名不符')
                 self._receipts.setdefault(logical,[]).append((archive,folder,entry,receipt_hash))
         if set(self._receipts)!=set(self.expected): raise ValueError('非IWI实际收据集合与完整审计不符')
+
+    def library_constraints(self) -> dict:
+        """返回非图片完整审计集合的数量、总尺寸约束快照。"""
+        return {'resource_count': self.expected_count, 'expected_output_bytes': self.expected_bytes}
 
     def resolution_for(self,name: str) -> dict | None:
         return self._rules.get(name)

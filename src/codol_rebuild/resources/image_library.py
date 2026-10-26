@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""批量建立新版图片库；输出固定工作区目录，冲突不选边，失败不隐瞒。"""
+"""通过只读来源接口批量建立固定资源库；冲突不选边，失败不隐瞒。"""
 from __future__ import annotations
 import json
 import os
@@ -9,7 +9,7 @@ import struct
 import time
 import uuid
 import zlib
-from codol_rebuild.resources.offline_resources import (OfflineResourceSupplier, ARCHIVES, RAW_INVENTORIES,
+from codol_rebuild.resources.offline_resources import (ResourceSource, OfflineResourceSupplier, ARCHIVES, RAW_INVENTORIES,
                                 EXE_SHA, MAX_RESOURCE, canonical_iwi, digest)
 
 
@@ -28,7 +28,7 @@ def _json(path: Path, data: dict) -> None:
         tmp.unlink(missing_ok=True)
 
 
-def _known_conflicts(project: Path, source: OfflineResourceSupplier) -> tuple[dict, list]:
+def _known_conflicts(project: Path, source: ResourceSource) -> tuple[dict, list]:
     # 同组分片已证明存在不同解码内容；即使该分片尚未加入供应器，也不能忽略证据。
     conflicts = {}; evidence = []
     path = project/'client/resources/v1649370/startup-resource-content-conflicts-v2.json'
@@ -45,7 +45,7 @@ def _known_conflicts(project: Path, source: OfflineResourceSupplier) -> tuple[di
     return conflicts, evidence
 
 
-def plan_library(project: Path, source: OfflineResourceSupplier) -> dict:
+def plan_library(project: Path, source: ResourceSource) -> dict:
     """统计尾部声明大小；声明尚不是解码结果，发布时必须重新完整校验。"""
     project = Path(project).resolve()
     if source.project != project:
@@ -59,7 +59,7 @@ def plan_library(project: Path, source: OfflineResourceSupplier) -> dict:
     if root != expected or not root.is_relative_to((project/'client/resources/v1649370').resolve()):
         raise ValueError('素材库目录存在越界链接')
     conflicts, evidence = _known_conflicts(project,source)
-    names = sorted(set(source._decoded) | set(source._receipts))
+    names = source.indexed_names()
     items = []; declared_total = 0; missing_total = 0
     for name in names:
         if source.canonical_resource(name) != name:
@@ -69,9 +69,10 @@ def plan_library(project: Path, source: OfflineResourceSupplier) -> dict:
             if name in conflicts and source.resolution_for(name) is None:
                 items.append({**item,'status':'conflict',**conflicts[name]}); continue
             sizes = []
-            if name in source._decoded:
-                sizes.append(source._decoded[name][1]['size'])
-            for _, folder, entry, _ in source._receipts.get(name, []):
+            cached_entry = source.cached_entry(name)
+            if cached_entry is not None:
+                sizes.append(cached_entry[1]['size'])
+            for _, folder, entry, _ in source.receipt_entries(name):
                 path = (folder/entry['path']).resolve()
                 if not path.is_relative_to(folder):
                     raise ValueError('来源缓存路径越界')
@@ -94,7 +95,8 @@ def plan_library(project: Path, source: OfflineResourceSupplier) -> dict:
             items.append({**item,'status':'ready','expected_size':size,'candidate_declared_sizes':sizes})
         except (OSError, ValueError, KeyError, TypeError, struct.error) as exc:
             items.append({**item,'status':'error','reason':str(exc)})
-    if hasattr(source,'expected_count') and (len(names)!=source.expected_count or declared_total!=source.expected_bytes):
+    constraints = source.library_constraints()
+    if constraints is not None and (len(names)!=constraints['resource_count'] or declared_total!=constraints['expected_output_bytes']):
         raise ValueError('完整类型库条目或声明尺寸与已审闭包不符')
     probe = root if root.exists() else project
     usage = shutil.disk_usage(probe)
@@ -111,7 +113,7 @@ def plan_library(project: Path, source: OfflineResourceSupplier) -> dict:
             'decoded_manifest':source.manifest,'conflict_evidence':evidence,'items':items}
 
 
-def build_library(project: Path, *, source: OfflineResourceSupplier | None = None,
+def build_library(project: Path, *, source: ResourceSource | None = None,
                   plan_only: bool = False, progress=None) -> dict:
     """固定目录发布全部无歧义候选，可重跑；每个失败和冲突都出现在最终清单中。"""
     project = Path(project).resolve()

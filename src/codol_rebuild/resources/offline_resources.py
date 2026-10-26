@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""宿主侧同版本 IWI 按需补件；只读取已提取缓存，不运行客户端或 DLL。
+"""宿主侧同版本资源只读来源及 IWI 按需补件；不运行客户端或 DLL。
 
 AES-CTR 算法与密钥常量来自已固定摘要的旧研究 codec.py（AGPL-3.0-or-later），
 密钥已内联为模块常量，不读取任何旧版游戏资源。每次补件均记录原包与内容摘要。
 """
 from __future__ import annotations
+from abc import ABC, abstractmethod
+from copy import deepcopy
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
@@ -243,13 +245,121 @@ def canonical_iwi(name: str) -> str | None:
     return '/'.join(parts).lower()
 
 
-class OfflineResourceSupplier:
-    """独立 runtime 的精确补件器；supply 返回结构化状态，不改变 API 结果。"""
-    canonical_resource = staticmethod(canonical_iwi)
+class ResourceSource(ABC):
+    """只读资源来源：校验源包与候选、选择已证明的覆盖结果，不加载类型专用清单或写入文件。"""
+    encoded_verification = '固定新版源包/提取收据/编码资源摘要 + 严格解码校验'
 
-    def __init__(self, project_root: Path, runtime_root: Path | None = None):
+    def __init__(self, project_root: Path):
         self.project = Path(project_root).resolve()
         self.workspace = (self.project/'client/workspaces').resolve()
+        self._verified = {}
+        self._receipts = {}
+        self.manifest = None
+
+    @staticmethod
+    @abstractmethod
+    def canonical_resource(name: str) -> str | None:
+        """由具体来源限定资源类型并规范化逻辑路径。"""
+        raise NotImplementedError
+
+    @abstractmethod
+    def resolution_for(self, name: str) -> dict | None:
+        """由具体来源提供该资源已确认的覆盖证据。"""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _decode_resource(self, raw: bytes, filename: str) -> bytes:
+        """由具体来源按资源类型选择严格解码器。"""
+        raise NotImplementedError
+
+    def indexed_names(self) -> tuple[str, ...]:
+        """返回已登记资源名称的独立、有序快照。"""
+        return tuple(sorted(self._receipts))
+
+    def cached_entry(self, name: str) -> tuple[Path, dict] | None:
+        """仅收据来源没有已解码缓存；支持缓存的具体来源返回独立快照。"""
+        return None
+
+    def receipt_entries(self, name: str) -> tuple:
+        """返回提取收据候选的独立快照，调用者不能修改来源索引。"""
+        return deepcopy(tuple(self._receipts.get(name, ())))
+
+    def library_constraints(self) -> dict | None:
+        """返回已审完整集合的数量和尺寸约束；未要求完整集合的来源返回空值。"""
+        return None
+
+    def _source(self, archive: str) -> dict:
+        # 源包已随资源输入副本固化到项目 workspaces，不再引用外部原客户端目录。
+        path = (self.project/'client/workspaces/offline-resource-inputs'/archive).resolve()
+        allowed = (self.project/'client/workspaces/offline-resource-inputs').resolve()
+        if path.parent != allowed or archive not in ARCHIVES:
+            raise ValueError('源包不在新版允许范围内')
+        stat = path.stat(); stamp = (stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
+        if self._verified.get(path) != stamp:
+            if file_digest(path) != ARCHIVES[archive]:
+                raise ValueError('新版源包摘要不符')
+            self._verified[path] = stamp
+        return {'archive':archive,'source_archive_path':str(path),'archive_sha256':ARCHIVES[archive]}
+
+    def select_candidate(self, name: str, candidates: list[tuple[bytes, dict]]) -> tuple[bytes, dict]:
+        """按需与批量共享选择规则；不同内容只能使用逐候选指纹绑定的原生证据。"""
+        if not candidates:
+            raise ValueError('资源没有可验证候选')
+        resolution = self.resolution_for(name)
+        if resolution is None:
+            if any(raw != candidates[0][0] for raw, _ in candidates[1:]):
+                raise ValueError('同名候选内容冲突，尚无已证实原生覆盖规则')
+            return candidates[0]
+        proof = (self.project/resolution['evidence']['path']).resolve()
+        if not proof.is_relative_to(self.project/'client/resources/v1649370'):
+            raise ValueError('覆盖规则证据路径越界')
+        if digest(proof.read_bytes()) != resolution['evidence']['sha256']:
+            raise ValueError('覆盖规则证据摘要不符')
+        observed = {(p['archive'],p.get('encoded_sha256'),digest(raw),len(raw)) for raw,p in candidates}
+        expected = {(p['archive'],p['encoded_sha256'],p['decoded_sha256'],p['decoded_size']) for p in resolution['candidates']}
+        if observed != expected:
+            raise ValueError('覆盖规则实际候选与已证明指纹不符')
+        selected = [(raw,p) for raw,p in candidates if p['archive']==resolution['selected_archive']]
+        if len(selected) != 1:
+            raise ValueError('覆盖规则没有唯一已验证赢家')
+        raw,p = selected[0]
+        return raw,{**p,'resolution':resolution}
+
+    def _load_encoded(self, candidate: tuple) -> tuple[bytes, dict]:
+        """校验单个实际候选，供按需供件和批量冲突比对共同使用。"""
+        archive, folder, entry, receipt_hash = candidate
+        path = (folder/entry['path']).resolve()
+        if not path.is_relative_to(folder):
+            raise ValueError('提取收据资源路径越界')
+        provenance = self._source(archive)
+        if path.stat().st_size != entry['encoded_size'] or path.stat().st_size > MAX_RESOURCE:
+            raise ValueError('提取收据编码资源尺寸不符')
+        raw = path.read_bytes()
+        if digest(raw) != entry['encoded_sha256']:
+            raise ValueError('提取收据编码资源摘要不符')
+        data = self._decode_resource(raw, entry['decode_filename'])
+        provenance.update(cache_path=str(path), source_archive_resource=entry['path'], inventory_sha256=receipt_hash, encoded_sha256=digest(raw), encoded_size=len(raw), verification=self.encoded_verification)
+        return data, provenance
+
+    def load_candidates(self, name: str, *, allow_missing: bool = False) -> list[tuple[bytes, dict]]:
+        """批量模式验证全部候选；调用方比较真实字节后才能发布，不按顺序择一。"""
+        if self.canonical_resource(name) != name:
+            raise ValueError('候选逻辑路径必须已规范化')
+        candidates = []
+        for candidate in self._receipts.get(name, []):
+            if allow_missing and not (candidate[1]/candidate[2]['path']).is_file():
+                continue
+            candidates.append(self._load_encoded(candidate))
+        return candidates
+
+
+class OfflineResourceSupplier(ResourceSource):
+    """图片清单与 IWI 校验、独立 runtime 补件；只读建库可省略 runtime。"""
+    canonical_resource = staticmethod(canonical_iwi)
+    encoded_verification = '固定新版源包/提取收据/编码资源摘要 + AES-CTR/严格 zlib/IWi09 校验'
+
+    def __init__(self, project_root: Path, runtime_root: Path | None = None):
+        super().__init__(project_root)
         # 不提供 runtime 时仅加载来源索引，供批量素材库复用，不具有补件写入目标。
         self.runtime = Path(runtime_root).resolve() if runtime_root is not None else None
         if self.runtime is not None:
@@ -258,11 +368,8 @@ class OfflineResourceSupplier:
                 raise ValueError('补件目标必须是本项目 offline-runs/<run>/runtime')
             if not self.runtime.is_dir():
                 raise ValueError('独立 runtime 尚未创建')
-        self._verified = {}
         self._lock = threading.RLock()
         self._decoded = {}
-        self._receipts = {}
-        self.manifest = None
         for name in ('offline-resources-manifest-v3.json','offline-resources-manifest-v2.json','offline-resources-manifest.json'):
             manifest = self.project/'client/resources/v1649370'/name
             if not manifest.is_file():
@@ -306,23 +413,30 @@ class OfflineResourceSupplier:
                         raise ValueError('提取条目路径与解码文件名不符')
                     self._receipts.setdefault(name, []).append((archive, folder, entry, receipt_hash))
 
-    def _source(self, archive: str) -> dict:
-        # 源包已随资源输入副本固化到项目 workspaces，不再引用外部原客户端目录。
-        path = (self.project/'client/workspaces/offline-resource-inputs'/archive).resolve()
-        allowed = (self.project/'client/workspaces/offline-resource-inputs').resolve()
-        if path.parent != allowed or archive not in ARCHIVES:
-            raise ValueError('源包不在新版允许范围内')
-        stat = path.stat(); stamp = (stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
-        if self._verified.get(path) != stamp:
-            if file_digest(path) != ARCHIVES[archive]:
-                raise ValueError('新版源包摘要不符')
-            self._verified[path] = stamp
-        return {'archive':archive,'source_archive_path':str(path),'archive_sha256':ARCHIVES[archive]}
+    def indexed_names(self) -> tuple[str, ...]:
+        """合并图片缓存和提取收据中的资源名称。"""
+        return tuple(sorted(set(self._decoded) | set(super().indexed_names())))
+
+    def cached_entry(self, name: str) -> tuple[Path, dict] | None:
+        """返回图片缓存路径与清单条目的独立快照。"""
+        return deepcopy(self._decoded.get(name))
+
+    def load_candidates(self, name: str, *, allow_missing: bool = False) -> list[tuple[bytes, dict]]:
+        """先校验图片缓存，再读取收据候选，保留原有候选顺序和失败行为。"""
+        if self.canonical_resource(name) != name:
+            raise ValueError('候选逻辑路径必须已规范化')
+        candidates = []
+        if name in self._decoded:
+            candidates.append(self._load_cached(name))
+        candidates.extend(super().load_candidates(name, allow_missing=allow_missing))
+        return candidates
 
     def _load_cached(self, name: str) -> tuple[bytes, dict] | None:
         if name in self._decoded:
             path, entry = self._decoded[name]; path = path.resolve()
-            if not path.is_relative_to(self.workspace):
+            # 已解码资源固定部署在 resources；workspaces 仅承载输入、中间材料和运行会话。
+            resource_root = (self.project/'client/resources/v1649370/offline-resources').resolve()
+            if not path.is_relative_to(resource_root):
                 raise ValueError('已解码缓存路径越界')
             provenance = self._source(entry['archive'])
             if path.stat().st_size != entry['size'] or path.stat().st_size > MAX_RESOURCE:
@@ -344,61 +458,8 @@ class OfflineResourceSupplier:
     def resolution_for(self, name: str) -> dict | None:
         return RESOLUTIONS.get(name)
 
-    def select_candidate(self, name: str, candidates: list[tuple[bytes, dict]]) -> tuple[bytes, dict]:
-        """按需与批量共享选择规则；不同内容只能使用逐候选指纹绑定的原生证据。"""
-        if not candidates:
-            raise ValueError('资源没有可验证候选')
-        resolution = self.resolution_for(name)
-        if resolution is None:
-            if any(raw != candidates[0][0] for raw, _ in candidates[1:]):
-                raise ValueError('同名候选内容冲突，尚无已证实原生覆盖规则')
-            return candidates[0]
-        proof = (self.project/resolution['evidence']['path']).resolve()
-        if not proof.is_relative_to(self.project/'client/resources/v1649370'):
-            raise ValueError('覆盖规则证据路径越界')
-        if digest(proof.read_bytes()) != resolution['evidence']['sha256']:
-            raise ValueError('覆盖规则证据摘要不符')
-        observed = {(p['archive'],p.get('encoded_sha256'),digest(raw),len(raw)) for raw,p in candidates}
-        expected = {(p['archive'],p['encoded_sha256'],p['decoded_sha256'],p['decoded_size']) for p in resolution['candidates']}
-        if observed != expected:
-            raise ValueError('覆盖规则实际候选与已证明指纹不符')
-        selected = [(raw,p) for raw,p in candidates if p['archive']==resolution['selected_archive']]
-        if len(selected) != 1:
-            raise ValueError('覆盖规则没有唯一已验证赢家')
-        raw,p = selected[0]
-        return raw,{**p,'resolution':resolution}
-
-    def _load_encoded(self, candidate: tuple) -> tuple[bytes, dict]:
-        """校验单个实际候选，供按需供件和批量冲突比对共同使用。"""
-        archive, folder, entry, receipt_hash = candidate
-        path = (folder/entry['path']).resolve()
-        if not path.is_relative_to(folder):
-            raise ValueError('提取收据资源路径越界')
-        provenance = self._source(archive)
-        if path.stat().st_size != entry['encoded_size'] or path.stat().st_size > MAX_RESOURCE:
-            raise ValueError('提取收据编码资源尺寸不符')
-        raw = path.read_bytes()
-        if digest(raw) != entry['encoded_sha256']:
-            raise ValueError('提取收据编码资源摘要不符')
-        data = self._decode_resource(raw, entry['decode_filename'])
-        provenance.update(cache_path=str(path), source_archive_resource=entry['path'], inventory_sha256=receipt_hash, encoded_sha256=digest(raw), encoded_size=len(raw), verification='固定新版源包/提取收据/编码资源摘要 + AES-CTR/严格 zlib/IWi09 校验')
-        return data, provenance
-
     def _decode_resource(self, raw: bytes, filename: str) -> bytes:
         return decode_iwi(raw, filename, RESOURCE_KEY)
-
-    def load_candidates(self, name: str, *, allow_missing: bool = False) -> list[tuple[bytes, dict]]:
-        """批量模式验证全部候选；调用方比较真实字节后才能发布，不按顺序择一。"""
-        if self.canonical_resource(name) != name:
-            raise ValueError('候选逻辑路径必须已规范化')
-        candidates = []
-        if name in self._decoded:
-            candidates.append(self._load_cached(name))
-        for candidate in self._receipts.get(name, []):
-            if allow_missing and not (candidate[1]/candidate[2]['path']).is_file():
-                continue
-            candidates.append(self._load_encoded(candidate))
-        return candidates
 
     def supply(self, requested_path: str) -> dict:
         """允许相对 .\\main\\images 或 runtime 内绝对路径；只排他创建真实资源。"""

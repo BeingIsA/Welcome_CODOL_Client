@@ -40,17 +40,42 @@ class PublicInterfaceOnlyTests(fixtures.ResourceFixture):
         self.assertEqual(result['summary']['status'], 'complete')
         self.assertEqual(result['summary']['error'], 0)
 
+    def test_query_snapshots_cannot_change_candidate_loading(self):
+        """调用者修改查询得到的元数据，不能改变后续实际读取和校验。"""
+        self.write_cache_manifest()
+        supplier = resources.OfflineResourceSupplier(self.root)
+        logical_name = 'main/images/mixedcase.iwi'
+        cached_entry = supplier.cached_entry(logical_name)
+        receipt_entries = supplier.receipt_entries(logical_name)
+        cached_entry[1]['size'] = 0
+        receipt_entries[0][2]['encoded_size'] = 0
+        candidates = supplier.load_candidates(logical_name)
+        self.assertEqual([resource_bytes for resource_bytes, provenance in candidates],
+                         [fixtures.DATA, fixtures.DATA])
+        self.assertEqual(supplier.indexed_names(), (logical_name,))
+        self.assertIsNone(supplier.cached_entry('main/images/absent.iwi'))
+        self.assertEqual(supplier.receipt_entries('main/images/absent.iwi'), ())
+
 
 class LooseIndependenceTests(LooseTests):
     def test_loose_source_no_longer_loads_iwi_manifest(self):
         # 松散来源改为直接继承只读基类：损坏的 IWI 缓存清单不应影响其构造。
-        self.prepare()
+        expected_resources = self.prepare()[1]
         manifest_dir = self.root/'client/resources/v1649370'
         (manifest_dir/'offline-resources-manifest-v3.json').write_text(json.dumps({'source_exe_sha256': 'bad'}), encoding='utf-8')
         with self.assertRaises(ValueError):
             resources.OfflineResourceSupplier(self.root)
         source = loose.LooseResourceSource(self.root)
         self.assertEqual(len(source.indexed_names()), 4)
+        self.assertFalse(hasattr(source, 'supply'), '只读非图片来源不应暴露 runtime 补件能力')
+        constraints = source.library_constraints()
+        constraints['resource_count'] = 0
+        constraints['expected_output_bytes'] = 0
+        result = build_library(self.root, source=GuardedSource(source))
+        self.assertEqual(result['summary']['status'], 'complete')
+        self.assertEqual(result['summary']['published'], len(expected_resources))
+        for name, expected_content in expected_resources.items():
+            self.assertEqual((Path(result['output_root'])/name).read_bytes(), expected_content)
 
 
 class DecodeConsistencyTests(fixtures.ResourceFixture):
