@@ -7,14 +7,16 @@ from codol_rebuild.adapters.game.v1649370.chat.chat_message import (
 )
 
 SEND_DISPATCH = 0x726F2E
-SEND_TAIL = 0x727172
+# 原生提前返回分支与分派点使用相同栈布局，释放 GFx 临时对象后正常返回。
+# 日志尾部另有 28 字节参数栈，不能从分派点直接跳入其清理段。
+SEND_CLEANUP = 0x726FA4
 CHANNEL_SCOPES = {0: 'lobby', 3: 'room'}
 NATIVE_CHANNELS = {scope: channel for channel, scope in CHANNEL_SCOPES.items()}
 CONTRACT = {
     **MESSAGE_CONTRACT,
     SEND_DISPATCH: bytes.fromhex('8b44241083f809'),
     0x726F35: bytes.fromhex('0f8737020000'),
-    # 原生 GFx 已完成参数提取；共享尾部继续记录聊天并释放临时对象。
+    # 原生 GFx 已完成参数提取；已接管发送只续行到原生对象清理。
     0xDB8060: b'message\0',
     0xDD4DDC: b'channelID\0',
 }
@@ -99,7 +101,7 @@ class ChatBridge:
                     if request is not None:
                         text, scope = request
                         self.port.begin(text, scope, room_id)
-                        next_instruction = SEND_TAIL
+                        next_instruction = SEND_CLEANUP
                 else:
                     message = self.port.poll_message(room_id)
                     if message is not None:

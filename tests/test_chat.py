@@ -134,7 +134,7 @@ class ChatTests(unittest.TestCase):
             struct.pack_into('<II', memory, 0x110, channel, 0x500)
             self.assertEqual(chat.read_request(read, 0x100), ('聊天&lt;正文&gt;', scope) if scope else None)
 
-    def test_send_preserves_native_tail_and_unhandled_channel_fallback(self):
+    def test_send_uses_native_cleanup_and_preserves_unhandled_channel_fallback(self):
         for identity, request in ((None, ('正文', 'lobby')), ('pl_self', None),
                                   ('pl_self', ('正文', 'lobby')), ('pl_self', ('正文', 'room'))):
             context = bytearray(256)
@@ -148,7 +148,7 @@ class ChatTests(unittest.TestCase):
                 bridge.handle(Mock(tid=1), 0x2000)
             if identity is not None and request is not None:
                 port.begin.assert_called_once_with(*request, '10')
-                self.assertEqual(struct.unpack_from('<I', context, 184)[0], chat.SEND_TAIL)
+                self.assertEqual(struct.unpack_from('<I', context, 184)[0], chat.SEND_CLEANUP)
             else:
                 port.begin.assert_not_called()
                 self.assertEqual(struct.unpack_from('<I', context, 184)[0], 0x2001)
