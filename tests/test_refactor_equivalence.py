@@ -91,7 +91,18 @@ class RefactorEquivalenceTests(unittest.TestCase):
         self.assertGreater(len(files),10)
         for old in files:
             if old.name=='image.py':continue
+            # 2026-10-27 已移除宿主菜单命令注入；保留历史夹具，不要求恢复废弃模块。
+            if old.name == 'menu_queue.py':
+                self.assertFalse(list((PKG/'adapters/game/v1649370').rglob(old.name)))
+                continue
             baseline=ast.parse(old.read_text(encoding='utf-8'))
+            if old.name == 'layout.py':
+                removed_names = {'ENGINE_RETURN', 'COMMAND_QUEUE', 'COMMAND_DESCRIPTOR',
+                                 'COMMAND_BUFFER', 'COMMAND_LOCK'}
+                baseline.body = [statement for statement in baseline.body
+                                 if not (isinstance(statement, ast.Assign)
+                                         and any(isinstance(target, ast.Name) and target.id in removed_names
+                                                 for target in statement.targets))]
             current_path = next((PKG/'adapters/game/v1649370').rglob(old.name), PKG/'adapters/game/v1649370'/old.name)
             current=ast.parse(current_path.read_text(encoding='utf-8'))
             self.assertEqual(ast.dump(baseline),ast.dump(current),old.name)

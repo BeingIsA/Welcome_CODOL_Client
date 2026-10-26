@@ -17,7 +17,7 @@ class GameSessionBridge:
         self.purchase_adapter=None
         self.profiles=LocalProfileBridge(process, account_factory, log, record)
         self.debug=None
-        self.engine_ready=False; self.menu_queued=False; self.schema_captured=False
+        self.schema_captured=False
         self.preview_caller_return = 0x5EBFF8
         self.session_traps = {}
         self.online_session = online_session
@@ -67,8 +67,6 @@ class GameSessionBridge:
     def module_loaded(self, base):
         if base!=layout.IMAGE_BASE: raise ValueError('实际ImageBase不符')
         self.debug.arm(layout.CRT_ENTRY,'CRT entry'); self.debug.arm(layout.WIN_MAIN,'WinMain')
-        if self.args.queue_main_menu:
-            self.debug.arm(layout.ENGINE_RETURN,'Engine init returned'); self.debug.arm(layout.MAIN_MENU,'Switch to main menu')
         if self.args.capture_schema:
             self.debug.arm(layout.FRONTEND_TICK,'Frontend tick'); self.debug.arm(layout.MAIN_MENU,'Switch to main menu')
         for value in self.args.breakpoint:
@@ -629,39 +627,11 @@ class GameSessionBridge:
         if label in ('WinMain', 'Com Init'):
             pointer = struct.unpack('<I', self.process.read(esp + 12, 4))[0] if label == 'WinMain' else layout.STARTUP_ARGUMENTS
             row['startup_arguments'] = self.process.cstring(pointer, strict=True)
-        if label in ('Frontend tick', 'Switch to main menu', 'Engine init returned', 'Menu command queue'):
+        if label in ('Frontend tick', 'Switch to main menu', 'Engine init returned'):
             row['observed_state'] = self.observe_state()
         if label == 'Engine init returned':
-            self.engine_ready=True
             self.log['engine_init_returned'] = True
             self.phase_done('engine-init')
-            if self.args.queue_main_menu:
-                self.debug.arm(layout.COMMAND_QUEUE, 'Menu command queue')
-        if label == 'Menu command queue':
-            from codol_rebuild.adapters.game.v1649370.frontend.menu_queue import build_queue_plan
-            values = struct.unpack('<3I', self.process.read(esp, 12))
-            pointer, capacity, length = struct.unpack('<3I', self.process.read(layout.COMMAND_DESCRIPTOR, 12))
-            state = {**row['observed_state'], 'thread_id': event.tid, 'main_thread_id': self.process.main_thread_id, 'return_address': values[0], 'local_client_index': values[1], 'controller_index': values[2], 'engine_returned': self.engine_ready, 'already_queued': self.menu_queued}
-            try:
-                if pointer != layout.COMMAND_BUFFER or capacity != 131072 or length >= capacity:
-                    raise ValueError('命令缓冲结构不符合固定版本')
-                critical = struct.unpack('<4I', self.process.read(layout.COMMAND_LOCK, 16))
-                row['command_lock'] = {'recursion_count': critical[2], 'owning_thread': critical[3]}
-                if critical[3] != event.tid or critical[2] < 1:
-                    raise ValueError('命令临界区未由当前主线程持有')
-                plan = build_queue_plan(pointer, capacity, length, self.process.read(pointer, length) if length else b'', state)
-            except ValueError as error:
-                row['menu_queue_refused'] = str(error)
-            else:
-                self.process.write(plan['payload_address'], plan['payload'])
-                if self.process.read(plan['payload_address'], len(plan['payload'])) != plan['payload']:
-                    raise ValueError('命令数据回读失败')
-                self.process.write(plan['length_address'], plan['length_bytes'])
-                if self.process.read(plan['length_address'], 4) != plan['length_bytes']:
-                    raise ValueError('命令长度回读失败')
-                self.menu_queued=True
-                self.log['menu_command_queued'] = True
-                row['menu_queue'] = {'new_length': plan['new_length'], 'payload_address': hex(plan['payload_address']), 'command': 'switchtomainmenu'}
         if label == 'CRT entry' and self.args.trace_files:
             self.debug.install_file_trace()
         if label == 'CRT entry' and self.args.offline_menu_preview:

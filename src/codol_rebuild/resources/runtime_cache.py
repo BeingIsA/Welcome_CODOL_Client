@@ -38,7 +38,8 @@ def save_receipt(path, value):
     os.replace(pending, path)
 
 
-def prepare_library(root, library, manifest_bytes, entries, canonical, protect, *, audit=None, force_verify=False):
+def prepare_library(root, library, manifest_bytes, entries, canonical, protect, *, audit=None, force_verify=False,
+                    external_manifest=None):
     """校验并保护源资源库，普通会话直接挂接；工作目录仅保存校验记录。"""
     library = Path(library).resolve()
     key = hashlib.sha256(manifest_bytes + str(library).encode('utf-8')).hexdigest()
@@ -50,10 +51,12 @@ def prepare_library(root, library, manifest_bytes, entries, canonical, protect, 
             raise ValueError('资源库路径非法或重复: ' + name)
         names.add(name)
     before = tree_stamp(library)
-    # 构建报告和被替代资源留在库内，但挂接的 main 中不能混入未登记内容。
-    if {name for name in before if name.startswith('main/')} != names:
+    # 完整原生库把清单放在树外，树内所有文件均须登记；旧库仅挂接 main。
+    runtime_names = set(before) if external_manifest is not None else {name for name in before if name.startswith('main/')}
+    if runtime_names != names:
         raise ValueError('资源库包含缺失或未登记的运行文件')
-    if (library / 'manifest.json').read_bytes() != manifest_bytes:
+    source_manifest = Path(external_manifest) if external_manifest is not None else library / 'manifest.json'
+    if source_manifest.read_bytes() != manifest_bytes:
         raise ValueError('资源库清单发生变化')
     current = {'schema': 1, 'library': str(library), 'source': before}
     try:

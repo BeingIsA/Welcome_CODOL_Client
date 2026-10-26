@@ -62,8 +62,7 @@ def build_plan(options: argparse.Namespace) -> dict:
     session = datetime.now().strftime('offline-%Y%m%d-%H%M%S-') + uuid.uuid4().hex[:8]
     supply_resources = bool(options.supply_resources or options.prewarm_run)
     arguments = ['--name', session]
-    required = {'--name', '--image', '--patches', '--overlay',
-                '--queue-main-menu', '--breakpoint'}
+    required = {'--name', '--image', '--patches', '--overlay', '--breakpoint'}
     if options.seconds is None:
         arguments.append('--until-close')
         required.add('--until-close')
@@ -71,7 +70,7 @@ def build_plan(options: argparse.Namespace) -> dict:
         arguments += ['--seconds', str(options.seconds)]
         required.add('--seconds')
     arguments += ['--image', str(image), '--patches', str(patches),
-                  '--overlay', str(overlay), '--queue-main-menu']
+                  '--overlay', str(overlay)]
     if getattr(options,'verify_resources',False):
         arguments.append('--verify-resources');required.add('--verify-resources')
     if getattr(options,'prepare_only',False):

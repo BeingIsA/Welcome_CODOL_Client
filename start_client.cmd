@@ -30,7 +30,7 @@ set "SERVER_PORT=%SERVER_PORT: =%"
 echo CODOL 1649370 Local Full-Unlock Test
 echo Resource validation may take a while. UAC is for the temporary offline guard.
 echo Local account: data\accounts. Server: http://%SERVER_IP%:%SERVER_PORT%
-python -B -X utf8 "%~dp0tools\launch_client.py" --resource-library "%~dp0resources\v1649370\offline-image-library" --loose-library "%~dp0resources\v1649370\offline-loose-library" --local-profile --server-url http://%SERVER_IP%:%SERVER_PORT% %*
+python -B -X utf8 "%~dp0tools\launch_client.py" --native-library "%~dp0resources\v1649370\game" --local-profile --server-url http://%SERVER_IP%:%SERVER_PORT% %*
 set "CODOL_EXIT=%ERRORLEVEL%"
 if not "%CODOL_EXIT%"=="0" (
     echo Launch or runtime failed. Exit code: %CODOL_EXIT%. Please keep the log.

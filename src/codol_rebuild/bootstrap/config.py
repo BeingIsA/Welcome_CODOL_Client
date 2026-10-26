@@ -17,9 +17,9 @@ def parse_args(argv=None):
     parser.add_argument('--overlay',type=Path)
     parser.add_argument('--resource-library',type=Path)
     parser.add_argument('--loose-library',type=Path)
+    parser.add_argument('--native-library',type=Path,help='完整原生资源根，只联接顶层目录')
     parser.add_argument('--trace-files',action='store_true')
     parser.add_argument('--supply-resources',action='store_true')
-    parser.add_argument('--queue-main-menu',action='store_true')
     parser.add_argument('--offline-menu-preview',action='store_true')
     parser.add_argument('--local-profile',action='store_true',help='Experimental build-specific local profile bridge')
     parser.add_argument('--server-url',help='启用服务端登录与房间接口，例如 http://127.0.0.1:8080')
@@ -41,6 +41,8 @@ def parse_args(argv=None):
     if not 0.1 <= args.server_timeout <= 30:parser.error('业务请求超时须为 0.1～30 秒')
     if args.local_profile:args.offline_menu_preview=True
     if args.prewarm_run:args.supply_resources=True
+    if args.native_library and (args.overlay or args.resource_library or args.loose_library or args.supply_resources):
+        parser.error('--native-library 不能与旧分库、overlay 或按需补件混用')
     if args.supply_resources:args.trace_files=True
     if not 1<=args.seconds<=600:parser.error('单次观测时长必须在1至600秒之间')
     return args

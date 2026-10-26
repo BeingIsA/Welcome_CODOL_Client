@@ -10,6 +10,35 @@ from codol_rebuild.adapters.game.v1649370.image import prepare_runtime_image
 FORBIDDEN = {'codomp_client_shipretailbase.dll', 'tersafe.dll', 'tenslx.dll', 'tenproxy.dll', 'gamerpcs.dll', 'tenrpcs.dll', 'ace-ats32.dll', 'ace-drv32.dll', 'vsddrvdll.dll', 'policyprobe.dll', 'tp3helper.exe', 'gbspy.dll', 'tcj.dll'}
 DEPENDENCIES = ('GCloudVoice.dll', 'bink2w32.dll', 'dbghelp.dll', 'libcef.dll', 'mss32.dll', 'D3DX9_43.dll', 'd3dcompiler_43.dll', 'libEGL.dll', 'libGLESv2.dll', 'icudtl.dat', 'natives_blob.bin', 'snapshot_blob.bin', 'cef.pak', 'cef_100_percent.pak', 'cef_200_percent.pak', 'cef_extensions.pak', 'localization.txt', 'logo.bmp', 'splash.bmp')
 
+def prepare_native_library(library, stage, run_dir, log, force_verify):
+    """校验完整库，复制根级运行依赖；仅返回顶层挂载计划，ACL 完成后执行。"""
+    from codol_rebuild.resources.native_library import (
+        canonical_native_resource, manifest_path, read_manifest, MOUNT_DIRECTORIES,
+    )
+    library = library.resolve()
+    if not library.is_relative_to((ROOT / 'resources/v1649370').resolve()):
+        raise ValueError('完整原生库必须位于项目固定版本资源目录')
+    manifest_bytes, manifest = read_manifest(library)
+    validation_audit = {}
+    prepare_library(ROOT / 'workspaces/resource-library-verification', library,
+                    manifest_bytes, manifest['resources'], canonical_native_resource, protect_cache,
+                    audit=validation_audit, force_verify=force_verify, external_manifest=manifest_path(library))
+    for entry in manifest['resources']:
+        if '/' not in entry['game_path']:
+            destination = stage / entry['game_path']
+            shutil.copyfile(library / entry['game_path'], destination)
+            if digest(destination) != entry['sha256']:
+                raise ValueError('运行依赖副本摘要不符: ' + entry['game_path'])
+    reference = {'manifest_path': str(manifest_path(library)),
+                 'manifest_sha256': hashlib.sha256(manifest_bytes).hexdigest(),
+                 'resource_root': str(library), 'storage': 'top-level-directory-junctions',
+                 'mounted_directories': list(MOUNT_DIRECTORIES), 'validation': validation_audit,
+                 'resource_count': len(manifest['resources']),
+                 'total_bytes': manifest['summary']['validated_output_bytes']}
+    (run_dir / 'native-library-reference.json').write_text(json.dumps(reference, ensure_ascii=False, indent=2), encoding='utf-8')
+    log['native_library'] = reference
+    return [(library / directory, stage / directory, library) for directory in MOUNT_DIRECTORIES]
+
 def digest(path):
     """计算输入或候选的文件指纹。"""
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
@@ -20,6 +49,9 @@ def prepare(args, run_dir, stage, log, phase_done):
     pending_mounts = []
     shared_overlay = {}
     supplier = None
+    native_library = getattr(args, 'native_library', None)
+    if native_library and (args.overlay or args.resource_library or args.loose_library or args.supply_resources):
+        raise ValueError('完整原生库不能与旧分库、overlay 或按需补件混用')
     image = args.image.resolve()
     if (image != (ROOT / 'bin/v1649370/codol1649370-offline.exe').resolve()
             and not image.is_relative_to((ROOT / 'workspaces').resolve())):
@@ -27,18 +59,18 @@ def prepare(args, run_dir, stage, log, phase_done):
     # 运行时依赖（CEF/音频/图形 DLL 与语言包）已固化到项目固定资源目录，
     # 不再引用外部原客户端目录。
     deps_root = (ROOT / 'resources/v1649370/runtime-deps').resolve()
-    if not deps_root.is_dir():
+    if not native_library and not deps_root.is_dir():
         raise ValueError('缺少项目内运行时依赖目录：' + str(deps_root))
     exe = stage / 'codol1649370-offline.exe'
     shutil.copyfile(image, exe)
     log['input_image'] = {'path': str(image), 'sha256': digest(image)}
-    for name in DEPENDENCIES:
+    for name in (() if native_library else DEPENDENCIES):
         source = deps_root / name
         if not source.is_file():
             raise ValueError('项目内运行时依赖缺失：' + name)
         shutil.copyfile(source, stage / name)
     locales = []
-    for source in sorted((deps_root / 'locales').glob('*.pak')):
+    for source in ([] if native_library else sorted((deps_root / 'locales').glob('*.pak'))):
         if not source.is_file() or not source.resolve().is_relative_to(deps_root):
             raise ValueError('CEF语言包来源越界')
         destination = stage / 'locales' / source.name
@@ -51,8 +83,11 @@ def prepare(args, run_dir, stage, log, phase_done):
     (run_dir / 'cef-locales-manifest.json').write_text(json.dumps(locales, ensure_ascii=False, indent=2), encoding='utf-8')
     log['cef_locales'] = {'count': len(locales), 'total_bytes': sum((item['size'] for item in locales))}
     (stage / 'iips.ini').write_text('[IIPS]\nenable_iips=0\n', encoding='ascii')
-    for folder in ['players', 'main', 'localappdata', 'appdata', 'temp']:
+    for folder in ['players', 'localappdata', 'appdata', 'temp'] + ([] if native_library else ['main']):
         (stage / folder).mkdir()
+    if native_library:
+        pending_mounts.extend(prepare_native_library(native_library, stage, run_dir, log,
+                                                     getattr(args, 'verify_resources', False)))
     shared_folders = set()
     if not args.supply_resources:
         if args.resource_library:
