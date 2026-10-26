@@ -5,7 +5,7 @@ import struct
 import unittest
 from unittest.mock import Mock
 import pefile
-from codol_rebuild.adapters.game.v1649370 import room_list as listing
+from codol_rebuild.adapters.game.v1649370.rooms import room_list as listing
 from codol_rebuild.application.room.contracts import Completion
 
 

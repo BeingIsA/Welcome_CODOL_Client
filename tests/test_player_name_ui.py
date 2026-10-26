@@ -4,7 +4,7 @@ import struct
 import sys
 import unittest
 
-from codol_rebuild.adapters.game.v1649370 import ui_movie
+from codol_rebuild.adapters.game.v1649370.session import ui_movie
 
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'research'))

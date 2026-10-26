@@ -3,7 +3,8 @@ from pathlib import Path
 import struct
 import sys
 import unittest
-from codol_rebuild.adapters.game.v1649370 import movie_identity, ui_chat
+from codol_rebuild.adapters.game.v1649370 import movie_identity
+from codol_rebuild.adapters.game.v1649370.chat import ui_chat
 
 PROJECT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT/'research'))

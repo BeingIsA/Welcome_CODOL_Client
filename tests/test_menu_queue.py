@@ -3,7 +3,7 @@ import copy
 import struct
 import unittest
 
-from codol_rebuild.adapters.game.v1649370.menu_queue import build_queue_plan, EXPECTED_POINTER, EXPECTED_CAPACITY, COMMAND
+from codol_rebuild.adapters.game.v1649370.frontend.menu_queue import build_queue_plan, EXPECTED_POINTER, EXPECTED_CAPACITY, COMMAND
 
 
 class MenuQueueTests(unittest.TestCase):

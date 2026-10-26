@@ -4,7 +4,7 @@ import struct
 import sys
 import unittest
 
-from codol_rebuild.adapters.game.v1649370 import ui_movie
+from codol_rebuild.adapters.game.v1649370.session import ui_movie
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'research'))
@@ -36,7 +36,7 @@ def theme_method(movie):
 class ThemeTests(unittest.TestCase):
     def test_mini_client_warning_skips_only_popup_and_keeps_member_counter(self):
         """保留短路分支的落点及栈状态，仅移除整个零净栈变化的弹窗表达式。"""
-        from codol_rebuild.adapters.game.v1649370 import ui_theme
+        from codol_rebuild.adapters.game.v1649370.frontend import ui_theme
         original = (ROOT / 'research/client/ui-investigation/codo.gfx').read_bytes()
         patched = ui_movie.patch_movie(original)
         at = ui_theme.MINI_WARNING_OFFSET

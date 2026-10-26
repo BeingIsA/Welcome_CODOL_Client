@@ -3,7 +3,8 @@ from concurrent.futures import Future
 import unittest
 from unittest.mock import Mock
 
-from codol_rebuild.application.room.contracts import Completion, IdentityRecord
+from codol_rebuild.application.room.contracts import Completion
+from codol_rebuild.application.session.contracts import IdentityRecord
 from codol_rebuild.application.room.service import RoomSession
 
 
@@ -12,7 +13,7 @@ class RoomDepartureTests(unittest.TestCase):
         for operation in ('leave', 'room_kicked', 'room_closed'):
             with self.subTest(operation=operation):
                 gateway, store = Mock(), Mock()
-                session = RoomSession(gateway, store, 'http://localhost', 'test')
+                session = RoomSession(gateway, store, 'http://localhost')
                 session._record = IdentityRecord('pl_me', 'rm_current', uncertain_join=True)
                 session._is_owner = True
                 gateway.room_detail.return_value = {
@@ -38,7 +39,7 @@ class RoomDepartureTests(unittest.TestCase):
     def test_active_departure_save_failure_still_propagates(self):
         gateway, store = Mock(), Mock()
         store.save.side_effect = OSError('disk failure')
-        session = RoomSession(gateway, store, 'http://localhost', 'test')
+        session = RoomSession(gateway, store, 'http://localhost')
         session._record = IdentityRecord('pl_me', 'rm_current')
         session._is_owner = True
         try:
@@ -55,7 +56,7 @@ class RoomDepartureTests(unittest.TestCase):
         for event_type in ('room_kicked', 'room_closed'):
             with self.subTest(event_type=event_type):
                 gateway, store, realtime = Mock(), Mock(), Mock()
-                session = RoomSession(gateway, store, 'http://localhost', 'test', realtime)
+                session = RoomSession(gateway, store, 'http://localhost', realtime)
                 session._record = IdentityRecord('pl_me', 'rm_current')
                 session._is_owner = True
                 realtime.poll_event.return_value = {'type': event_type,
@@ -74,7 +75,7 @@ class RoomDepartureTests(unittest.TestCase):
                     session.close()
 
     def test_other_room_does_not_clear_current_membership(self):
-        session = RoomSession(Mock(), Mock(), 'http://localhost', 'test', Mock())
+        session = RoomSession(Mock(), Mock(), 'http://localhost', Mock())
         session._record = IdentityRecord('pl_me', 'rm_current')
         try:
             session._handle_room_departure('room_closed', {'roomId': 'rm_old'})
@@ -86,7 +87,7 @@ class RoomDepartureTests(unittest.TestCase):
             session.close()
 
     def test_pending_kick_and_settings_results_are_preserved(self):
-        session = RoomSession(Mock(), Mock(), 'http://localhost', 'test', Mock())
+        session = RoomSession(Mock(), Mock(), 'http://localhost', Mock())
         session._record = IdentityRecord('pl_me', 'rm_current')
         session._kick_pending = Future()
         session._settings_pending = Future()
@@ -105,7 +106,7 @@ class RoomDepartureTests(unittest.TestCase):
     def test_save_failure_still_delivers_departure_and_keeps_memory_cleared(self):
         store = Mock()
         store.save.side_effect = OSError('disk failure')
-        session = RoomSession(Mock(), store, 'http://localhost', 'test', Mock())
+        session = RoomSession(Mock(), store, 'http://localhost', Mock())
         session._record = IdentityRecord('pl_me', 'rm_current')
         session._is_owner = True
         try:

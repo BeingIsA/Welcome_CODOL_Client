@@ -8,8 +8,9 @@ import tempfile
 import unittest
 from unittest.mock import Mock
 
-from codol_rebuild.adapters.game.v1649370 import broadcast, profile, purchase
-from codol_rebuild.adapters.game.v1649370.profile_bridge import LocalProfileBridge
+from codol_rebuild.adapters.game.v1649370.chat import broadcast
+from codol_rebuild.adapters.game.v1649370.accounts import profile, purchase
+from codol_rebuild.adapters.game.v1649370.accounts.profile_bridge import LocalProfileBridge
 from codol_rebuild.adapters.persistence.sqlite_accounts import AccountRepository
 from codol_rebuild.application.accounts.service import AccountSession
 from test_broadcast import server_message
@@ -49,8 +50,7 @@ class BroadcastConsumptionTests(unittest.TestCase):
         self.profile_bridge._inventory = {'pool': hex(self.pool_address), 'items': 2}
         self.port = Mock(poll_sent=Mock(return_value=None), poll_message=Mock(return_value=None),
                          available=Mock(return_value=True))
-        self.bridge = broadcast.BroadcastBridge(
-            self.process, self.port, Mock(), self.profile_bridge.consume_item)
+        self.bridge = broadcast.BroadcastBridge(self.process, self.port, self.profile_bridge.consume_item)
         self.bridge.state = 0x21000000
         self.bridge.player_id = 'pl_sender'
         self.bridge.traps = {0x20000000: 'poll'}

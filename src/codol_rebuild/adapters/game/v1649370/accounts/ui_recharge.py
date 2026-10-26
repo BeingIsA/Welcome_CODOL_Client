@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import struct
-from codol_rebuild.adapters.game.v1649370.profile import currency_snapshot, publish_currency
+from codol_rebuild.adapters.game.v1649370.accounts.profile import currency_snapshot, publish_currency
 
 HANDLER_SLOT = 0xDC8218
 HANDLER = 0x5CC2F0

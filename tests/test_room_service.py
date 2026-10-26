@@ -5,8 +5,9 @@ import tempfile
 import threading
 import time
 import unittest
-from codol_rebuild.application.room.contracts import IdentityRecord
+from codol_rebuild.application.session.contracts import IdentityRecord
 from codol_rebuild.application.room.service import RoomSession
+from codol_rebuild.application.session.service import OnlineSession
 from codol_rebuild.adapters.persistence.server_identity import JsonIdentityStore
 from codol_rebuild.adapters.transport.http import normalize_server
 
@@ -122,7 +123,7 @@ class RoomTests(unittest.TestCase):
         self.assertEqual(self.result('leave').error.code, 'RECOVERY_PENDING')
         # 服务端最终可见成员后才确认离房，避免先离房后迟到加入形成幽灵成员。
         self.gateway.room_detail.return_value = {'roomId': 'rm_target', 'members': [{'playerId': 'pl_test'}]}
-        self.session.close()
+        self.online.close()
         self.assertIn(('leave', 'rm_target'), self.gateway.calls)
         self.assertIsNone(self.store.load('http://localhost:8080').room_id)
 
@@ -197,18 +198,31 @@ class RoomTests(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
         self.store = JsonIdentityStore(Path(self.directory.name)/'identity.json')
         self.gateway = Gateway()
-        self.session = RoomSession(self.gateway, self.store, 'http://localhost:8080', 'fp-test')
+        self.session = RoomSession(self.gateway, self.store, 'http://localhost:8080')
+        self.online = OnlineSession(self.gateway, self.store, 'http://localhost:8080', 'fp-test', self.session)
         self.addCleanup(self.close)
 
     def close(self):
         self.gateway.fail_leave = False
         if self.gateway.wait:
             self.gateway.wait.set()
-        self.session.close()
+        self.online.close()
 
     def result(self, operation, **kwargs):
+        if operation == 'login':
+            self.assertTrue(self.online.begin_login('测试玩家'))
+            return self.consume_login()
         self.assertTrue(self.session.begin(operation, '测试玩家', **kwargs))
         return self.consume()
+
+    def consume_login(self):
+        until = time.monotonic() + 3
+        while time.monotonic() < until:
+            result = self.online.poll_login()
+            if result is not None:
+                return result
+            time.sleep(.005)
+        self.fail('后台登录没有完成')
 
     def consume(self):
         until = time.monotonic()+3
@@ -228,19 +242,20 @@ class RoomTests(unittest.TestCase):
         self.assertIsNone(self.store.load('http://localhost:8080').room_id)
         second = self.result('create')
         self.assertNotEqual(first.data['roomId'], second.data['roomId'])
-        self.session.close()
+        self.online.close()
         self.assertEqual(self.gateway.rooms, {})
-        self.session = RoomSession(self.gateway, self.store, 'http://localhost:8080', 'fp-other')
+        self.session = RoomSession(self.gateway, self.store, 'http://localhost:8080')
+        self.online = OnlineSession(self.gateway, self.store, 'http://localhost:8080', 'fp-test', self.session)
         self.assertEqual(self.result('login').data['playerId'], 'pl_test')
         self.assertEqual(self.gateway.calls[-1], ('login', 'pl_test', '测试玩家'))
 
     def test_inflight_requests_do_not_block_or_duplicate(self):
         self.gateway.wait = threading.Event()
-        self.assertTrue(self.session.begin('login', '测试玩家'))
-        self.assertIsNone(self.session.poll())
-        self.assertFalse(self.session.begin('create', '测试玩家'))
+        self.assertTrue(self.online.begin_login('测试玩家'))
+        self.assertIsNone(self.online.poll_login())
+        self.assertFalse(self.online.begin_login('测试玩家'))
         self.gateway.wait.set()
-        self.assertIsNone(self.consume().error)
+        self.assertIsNone(self.consume_login().error)
         self.assertEqual(len(self.gateway.calls), 1)
 
     def test_lost_create_response_recovers_before_next_create(self):
@@ -388,6 +403,6 @@ class SettingsSyncTests(RoomTests):
         self.assertIsNone(self.result('login').error)
         self.assertTrue(self.session.begin('settings', '测试玩家', settings={'mode': 'sd'}))
         # 设置同步进行中，主流程仍可提交。
-        self.assertTrue(self.session.begin('login', '测试玩家'))
+        self.assertTrue(self.session.begin('create', '测试玩家'))
         self.consume()
         self.consume()

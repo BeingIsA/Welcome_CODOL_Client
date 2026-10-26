@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from codol_rebuild.adapters.game.v1649370 import player_name
+from codol_rebuild.adapters.game.v1649370.accounts import player_name
 
 
 class NativeRenameTests(unittest.TestCase):

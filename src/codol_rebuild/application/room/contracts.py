@@ -1,9 +1,9 @@
 """房间应用端口与数据契约；不包含 HTTP、原生内存或文件实现。"""
 from codol_rebuild.application.errors import OnlineError
 from dataclasses import dataclass
-from enum import Enum
 from typing import Protocol
 import re
+from codol_rebuild.application.session.contracts import IdentityRecord
 
 
 def valid_room_id(value) -> bool:
@@ -15,15 +15,6 @@ def valid_room_id(value) -> bool:
 
 
 @dataclass(frozen=True)
-class IdentityRecord:
-    """按服务器保存的身份及待恢复房间；不保存硬件原始信息或密码。"""
-    player_id: str
-    room_id: str | None = None
-    uncertain_create: bool = False
-    uncertain_join: bool = False
-
-
-@dataclass(frozen=True)
 class Completion:
     """后台用例完成快照，由调用线程消费一次。"""
     operation: str
@@ -31,14 +22,10 @@ class Completion:
     error: OnlineError | None = None
 
 
-class IdentityStore(Protocol):
-    """服务器身份的原子持久化端口。"""
-    def load(self, server: str) -> IdentityRecord | None:
-        """读取身份；损坏时拒绝自动创建新身份。"""
-        ...
-
+class RoomStateStore(Protocol):
+    """只持久化房间恢复记录；不提供身份加载或登录能力。"""
     def save(self, server: str, record: IdentityRecord) -> None:
-        """保存已确认身份及房间恢复标记。"""
+        """保存同一确认身份下的房间状态，沿用原身份文件格式。"""
         ...
 
 
@@ -61,10 +48,6 @@ class Gateway(Protocol):
     def join(self, player_id: str, room_id: str, username: str,
              password: str | None, profile: dict | None = None) -> dict:
         """加入指定房间并返回服务端权威成员与设置快照。"""
-        ...
-
-    def login(self, fingerprint: str, username: str, player_id: str | None) -> dict:
-        """获取或复用身份。"""
         ...
 
     def create(self, player_id: str, username: str, max_players: int,
@@ -94,42 +77,9 @@ class Gateway(Protocol):
         ...
 
 
-class RealtimeStatus(Enum):
-    """实时连接状态；供应用层感知断线与身份失效。"""
-    CONNECTED = 'connected'
-    RECONNECTING = 'reconnecting'
-    INVALIDATED = 'invalidated'
-    CLOSED = 'closed'
-
-
-class RealtimeConnection(Protocol):
-    """实时连接生命周期端口；实现负责接收、保活和断线重连。"""
-    def poll_event(self) -> dict | None:
-        """非阻塞消费一条已解码的下行消息。"""
-        ...
-
-    def start(self, player_id: str, fingerprint: str) -> None:
-        """建立首次连接，失败抛出联机错误；同一身份重复调用不重建连接。
-
-        身份失效（INVALIDATED）后线程痕迹已清理，再次调用会真正重建连接。
-        """
-        ...
-
-    def close(self) -> None:
-        """停止重连并释放连接及后台线程。"""
-        ...
-
-    def status(self) -> RealtimeStatus:
-        """返回当前连接状态；未启动或已关闭为 CLOSED。"""
-        ...
-
-
-# 权限类错误码：登录或鉴权被服务端以身份/权限理由拒绝。
-PERMISSION_ERROR_CODES = frozenset({'BANNED', 'FORBIDDEN', 'UNAUTHENTICATED'})
-
-
 class RoomPort(Protocol):
     """原生桥使用的异步用例接口；调用方不得直接访问工作线程状态。"""
+
     def begin_update_profile(self, room_id: str, profile: dict) -> bool:
         """异步上传当前档案；在途期间只保留最新待发送快照。"""
         ...
@@ -160,7 +110,7 @@ class RoomPort(Protocol):
     def begin(self, operation: str, username: str, *, max_players: int = 4,
               password: str | None = None, settings: dict | None = None,
               room_id: str | None = None, profile: dict | None = None) -> bool:
-        """发起登录、创建、加入、退出或同步设置；有未消费操作时返回 False。"""
+        """发起创建、加入、退出或同步设置；有未消费操作时返回 False。"""
         ...
 
     def poll(self) -> Completion | None:
@@ -185,8 +135,4 @@ class RoomPort(Protocol):
 
     def poll_kick(self) -> Completion | None:
         """非阻塞消费一次踢人完成结果。"""
-        ...
-
-    def close(self) -> None:
-        """串行收尾已提交请求并尝试离房，失败保留恢复记录。"""
         ...

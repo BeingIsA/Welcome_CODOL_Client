@@ -5,7 +5,8 @@ import os
 from pathlib import Path
 import re
 import tempfile
-from codol_rebuild.application.room.contracts import IdentityRecord, valid_room_id
+from codol_rebuild.application.room.contracts import valid_room_id
+from codol_rebuild.application.session.contracts import IdentityRecord
 
 
 class JsonIdentityStore:

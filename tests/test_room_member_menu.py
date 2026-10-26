@@ -7,9 +7,10 @@ import sys
 import unittest
 from unittest.mock import Mock
 
-from codol_rebuild.adapters.game.v1649370 import room_member_menu as menu, ui_movie
+from codol_rebuild.adapters.game.v1649370.rooms import room_member_menu as menu
+from codol_rebuild.adapters.game.v1649370.session import ui_movie
 from codol_rebuild.application.room.service import RoomSession
-from codol_rebuild.application.room.contracts import IdentityRecord
+from codol_rebuild.application.session.contracts import IdentityRecord
 from codol_rebuild.adapters.transport.http import HttpGateway
 from test_refactor_equivalence import MemoryProcess
 
@@ -180,7 +181,7 @@ class MenuTests(unittest.TestCase):
         gateway._request.assert_called_once_with('POST','/api/v1/rooms/rm_a/kick',{'targetPlayerId':'pl_other'},'pl_me')
 
     def test_service_delegates_permissions_without_readback_and_delivers_results(self):
-        gateway=Mock();session=RoomSession(gateway,Mock(),'http://localhost','test')
+        gateway=Mock();session=RoomSession(gateway, Mock(), 'http://localhost')
         session._record=IdentityRecord('pl_me','rm_a');session._is_owner=True
         data={'roomId':'rm_a','members':[{'playerId':'pl_me'}]}
         gateway.kick.side_effect=OnlineError('NETWORK','回包丢失',uncertain=True)

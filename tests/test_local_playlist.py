@@ -4,7 +4,7 @@ import struct
 import unittest
 import capstone
 import pefile
-from codol_rebuild.adapters.game.v1649370.playlist import build_local_playlist_adapter, validate_local_playlist_contract
+from codol_rebuild.adapters.game.v1649370.frontend.playlist import build_local_playlist_adapter, validate_local_playlist_contract
 
 
 class LocalPlaylistTests(unittest.TestCase):

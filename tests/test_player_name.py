@@ -11,7 +11,8 @@ import pefile
 from codol_rebuild.application.accounts.service import validate_display_name,load_display_name,change_display_name
 from codol_rebuild.application.accounts.contracts import RevisionConflict
 from codol_rebuild.adapters.persistence.sqlite_accounts import AccountRepository
-from codol_rebuild.adapters.game.v1649370 import player_name as n,ui_movie
+from codol_rebuild.adapters.game.v1649370.accounts import player_name as n
+from codol_rebuild.adapters.game.v1649370.session import ui_movie
 
 ROOT = Path(__file__).resolve().parents[2]
 

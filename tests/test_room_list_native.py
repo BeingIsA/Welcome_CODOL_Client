@@ -6,7 +6,7 @@ import tempfile
 import unittest
 import struct
 import capstone
-from codol_rebuild.adapters.game.v1649370.room_list import build_adapter, encode_rows
+from codol_rebuild.adapters.game.v1649370.rooms.room_list import build_adapter, encode_rows
 from test_room_list import room
 
 
@@ -23,8 +23,8 @@ def relocate_fixture_calls(code, entry):
 
 class NativeRoomListTests(unittest.TestCase):
     def test_join_callbacks_execute_with_native_stack_contract(self):
-        from codol_rebuild.adapters.game.v1649370.room import build_join_adapter
-        from codol_rebuild.adapters.game.v1649370.server_session_bridge import build_tick
+        from codol_rebuild.adapters.game.v1649370.rooms.room import build_join_adapter
+        from codol_rebuild.adapters.game.v1649370.session.session_tick import build_tick
         compiler = Path(os.environ.get('WINDIR', 'C:/Windows'))/'Microsoft.NET/Framework/v4.0.30319/csc.exe'
         if not compiler.exists():
             self.skipTest('需要 Windows .NET Framework x86 C# 编译器')

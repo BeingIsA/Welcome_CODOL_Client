@@ -4,9 +4,9 @@ from codol_rebuild.core.paths import REBUILD_ROOT as ROOT, accounts_dir
 from codol_rebuild.bootstrap.config import parse_args
 from codol_rebuild.bootstrap.resource_setup import prepare, FORBIDDEN
 from codol_rebuild.adapters.persistence.sqlite_accounts import AccountRepository
-from codol_rebuild.adapters.game.v1649370.profile_codec import AccountCodec
+from codol_rebuild.adapters.game.v1649370.accounts.profile_codec import AccountCodec
 from codol_rebuild.application.accounts.service import AccountSession
-from codol_rebuild.adapters.game.v1649370.session_bridge import GameSessionBridge
+from codol_rebuild.adapters.game.v1649370.session.session_bridge import GameSessionBridge
 from codol_rebuild.runtime.session import ProcessSession, SessionLog
 from codol_rebuild.runtime.debug_loop import DebugLoop
 
@@ -24,7 +24,9 @@ def run(args):
     process.settings_errors=(OSError,ValueError,sqlite3.Error)
     bridge=None
     multiplayer=None
+    online_session = None
     rename_session=None
+    chat_session = None
     broadcast_session = None
     realtime_dispatcher = None
     try:
@@ -34,6 +36,7 @@ def run(args):
             return log
         if getattr(args, 'server_url', None):
             from codol_rebuild.application.room.service import RoomSession
+            from codol_rebuild.application.session.service import OnlineSession
             from codol_rebuild.adapters.transport.http import HttpGateway
             from codol_rebuild.adapters.transport.websocket import WebSocketConnection
             from codol_rebuild.adapters.persistence.server_identity import JsonIdentityStore
@@ -42,25 +45,29 @@ def run(args):
             from codol_rebuild.application.accounts.rename import RenameSession
             rename_session = RenameSession(
                 HttpGateway(args.server_url, min(args.server_timeout, 5.0)))
+            from codol_rebuild.application.chat.service import ChatSession
             from codol_rebuild.application.broadcast.service import BroadcastSession
-            from codol_rebuild.application.realtime.dispatch import EventInbox, RealtimeDispatcher, RoutedConnection
+            from codol_rebuild.application.realtime.dispatch import EventInbox, RealtimeDispatcher
             realtime_connection = WebSocketConnection(gateway.server, args.server_timeout)
             realtime_dispatcher = RealtimeDispatcher(realtime_connection)
-            room_inbox, broadcast_inbox = EventInbox(), EventInbox()
+            room_inbox, broadcast_inbox, chat_inbox = EventInbox(), EventInbox(), EventInbox()
+            realtime_dispatcher.register(('chat_message',), chat_inbox)
             realtime_dispatcher.register(
                 ('room_settings_updated', 'room_members_updated', 'room_kicked', 'room_closed'), room_inbox)
             realtime_dispatcher.register(('broadcast',), broadcast_inbox)
             broadcast_session = BroadcastSession(
                 HttpGateway(args.server_url, args.server_timeout), broadcast_inbox,
                 lambda: realtime_connection.status().value == 'connected')
-            multiplayer = RoomSession(gateway, JsonIdentityStore(args.server_identity),
-                                             gateway.server, fingerprint(),
-                                             realtime=RoutedConnection(realtime_connection, room_inbox))
+            identity_store = JsonIdentityStore(args.server_identity)
+            multiplayer = RoomSession(gateway, identity_store, gateway.server, inbox=room_inbox)
+            online_session = OnlineSession(gateway, identity_store, gateway.server, fingerprint(),
+                                           multiplayer, realtime_connection)
+            chat_session = ChatSession(realtime_connection, chat_inbox, multiplayer.confirmed_room_id)
             record({'multiplayer_server': gateway.server})
         bridge=GameSessionBridge(args,run_dir,prepared['image'],prepared['pe'],log,record,phase_done,
                                  process,account_factory,(OSError,ValueError,sqlite3.Error), multiplayer=multiplayer,
                                  rename_session=rename_session, broadcast_session=broadcast_session,
-                                 realtime_dispatcher=realtime_dispatcher)
+                                 realtime_dispatcher=realtime_dispatcher, chat_session=chat_session, online_session=online_session)
         debugger=DebugLoop(process,bridge,prepared['pe'],prepared['supplier'],FORBIDDEN)
         process.start(prepared['exe'],prepared['settings'])
         debugger.run()
@@ -74,8 +81,8 @@ def run(args):
         finally:
             try:process.close()
             finally:
-                if multiplayer:
-                    try:multiplayer.close()
+                if online_session:
+                    try:online_session.close()
                     except Exception as error:
                         log['multiplayer_cleanup_error']=str(error)
                 if rename_session:

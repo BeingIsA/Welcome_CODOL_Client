@@ -2,12 +2,12 @@
 import hashlib, struct
 from codol_rebuild.runtime.contracts import ProcessAccess, DebugControl
 from codol_rebuild.adapters.game.v1649370 import layout
-from codol_rebuild.adapters.game.v1649370.menu_preview import PreviewActivationCycles
-from codol_rebuild.adapters.game.v1649370.profile_bridge import LocalProfileBridge
+from codol_rebuild.adapters.game.v1649370.frontend.menu_preview import PreviewActivationCycles
+from codol_rebuild.adapters.game.v1649370.accounts.profile_bridge import LocalProfileBridge
 
 class GameSessionBridge:
     """仅拥有版本状态；进程和账号实现由装配入口注入。"""
-    def __init__(self, args, run_dir, image, pe, log, record, phase_done, process: ProcessAccess, account_factory, account_errors, multiplayer=None, rename_session=None, broadcast_session=None, realtime_dispatcher=None):
+    def __init__(self, args, run_dir, image, pe, log, record, phase_done, process: ProcessAccess, account_factory, account_errors, multiplayer=None, rename_session=None, broadcast_session=None, realtime_dispatcher=None, chat_session=None, online_session=None):
         self.args=args; self.run_dir=run_dir; self.image=image; self.pe=pe
         self.log=log; self.record=record; self.phase_done=phase_done; self.process=process
         self.account_factory=account_factory; self.account_errors=account_errors
@@ -19,27 +19,39 @@ class GameSessionBridge:
         self.debug=None
         self.engine_ready=False; self.menu_queued=False; self.schema_captured=False
         self.preview_caller_return = 0x5EBFF8
+        self.session_traps = {}
+        self.online_session = online_session
+        self.online_bridge = None
+        self.realtime_dispatcher = realtime_dispatcher
         self.multiplayer = None
         self.rename_session = rename_session
         self.server_name_bridge = None
+        self.chat_bridge = None
         self.broadcast_bridge = None
         if broadcast_session is not None:
-            from codol_rebuild.adapters.game.v1649370.broadcast import BroadcastBridge
+            from codol_rebuild.adapters.game.v1649370.chat.broadcast import BroadcastBridge
             self.broadcast_bridge = BroadcastBridge(
-                process, broadcast_session, realtime_dispatcher, self.profiles.consume_item)
+                process, broadcast_session, self.profiles.consume_item)
         if multiplayer is not None:
-            from codol_rebuild.adapters.game.v1649370.server_session_bridge import ServerSessionBridge
-            self.multiplayer = ServerSessionBridge(process, multiplayer, record)
-            self.multiplayer.on_login = self._online_connected
+            from codol_rebuild.adapters.game.v1649370.rooms.room_session_bridge import RoomSessionBridge
+            self.multiplayer = RoomSessionBridge(process, multiplayer, record)
             if rename_session is not None:
                 self.multiplayer.account_ready = lambda: rename_session.ready
 
+        if chat_session is not None and self.multiplayer is not None:
+            from codol_rebuild.adapters.game.v1649370.chat.chat import ChatBridge
+            self.chat_bridge = ChatBridge(process, chat_session, self.multiplayer.displayed_room_id)
+
     def _online_connected(self, player_id, display_name):
         """把已有登录结果显式交给需要身份的适配，不重复登录。"""
+        if self.multiplayer is not None:
+            self.multiplayer.connected(player_id)
         if self.rename_session is not None:
             self.rename_session.connected(player_id, display_name)
         if self.broadcast_bridge is not None:
             self.broadcast_bridge.connected(player_id, display_name)
+        if self.chat_bridge is not None:
+            self.chat_bridge.connected(player_id, display_name)
 
     def checkpoint(self, force=False):
         self.profiles.save(force=force)
@@ -64,7 +76,7 @@ class GameSessionBridge:
 
     def install_lobby_adapters(self):
         """在 CRT 入口暂停点安装大厅原生适配；此处仅编排依赖和安装顺序。"""
-        from codol_rebuild.adapters.game.v1649370.menu_preview import validate_menu_preview_image
+        from codol_rebuild.adapters.game.v1649370.frontend.menu_preview import validate_menu_preview_image
         validate_menu_preview_image(self.image.read_bytes())
         # 保持大厅代码页最先分配，避免改变后续原生地址布局。
         lobby_entry = self.process.allocate(4096)
@@ -85,11 +97,11 @@ class GameSessionBridge:
     def _install_local_ui_hooks(self):
         """安装大厅资源加载观察点、局部 UI 补丁及角色查看事件。"""
         # 先验证全部补丁原字节，再依次写入，保留原有安装顺序。
-        from codol_rebuild.adapters.game.v1649370 import ui_movie
+        from codol_rebuild.adapters.game.v1649370.session import ui_movie
         if self.process.read(ui_movie.LOAD_SITE, len(ui_movie.LOAD_BYTES)) != ui_movie.LOAD_BYTES:
             raise ValueError('大厅 UI 加载调用边不匹配')
         self.debug.arm(ui_movie.LOAD_SITE, 'Local navigation resource')
-        from codol_rebuild.adapters.game.v1649370.local_ui_services import local_optional_service_patches, local_welcome_page_patch
+        from codol_rebuild.adapters.game.v1649370.frontend.local_ui_services import local_optional_service_patches, local_welcome_page_patch
         welcome_patch = local_welcome_page_patch()
         local_patches = local_optional_service_patches() + [welcome_patch]
         for patch_address, original_bytes, replacement_bytes in local_patches:
@@ -101,7 +113,7 @@ class GameSessionBridge:
                 raise ValueError(f'Local callback readback mismatch at {patch_address:#x}')
         self.record({'local_unsupported_services': ['WarGod credit rating'], 'behavior': 'void request ignored; no score fabricated'})
         self.record({'local_welcome_auto_popup_disabled': True, 'callback': 'IsWelcomePageShowed', 'patch_va': hex(welcome_patch[0]), 'behavior': 'report welcome already shown; manual MOTD entry unchanged'})
-        from codol_rebuild.adapters.game.v1649370.viewer import VIEW_TRACE_POINTS, VIEW_RESULT_POINTS
+        from codol_rebuild.adapters.game.v1649370.frontend.viewer import VIEW_TRACE_POINTS, VIEW_RESULT_POINTS
         for address, label in (VIEW_TRACE_POINTS | VIEW_RESULT_POINTS).items():
             self.debug.arm(address, label)
 
@@ -109,8 +121,8 @@ class GameSessionBridge:
         """分配档案和库存区域，安装初始化、就绪及角色查看适配。"""
         # 初始化页沿用原布局：主体占前 3072 字节，就绪适配占后续 256 字节，
         # 角色查看适配使用最后 768 字节；容量检查防止相互覆盖。
-        from codol_rebuild.adapters.game.v1649370.profile import build_initializer, inventory_relocations, CAPACITY, STRIDE, INITIALIZER_DATA_SIZE
-        from codol_rebuild.adapters.game.v1649370.profile import validate_account_native_contract
+        from codol_rebuild.adapters.game.v1649370.accounts.profile import build_initializer, inventory_relocations, CAPACITY, STRIDE, INITIALIZER_DATA_SIZE
+        from codol_rebuild.adapters.game.v1649370.accounts.profile import validate_account_native_contract
         validate_account_native_contract(self.process.read)
         initializer_address = self.process.allocate(4096)
         profile_data_address = self.process.allocate(INITIALIZER_DATA_SIZE)
@@ -127,7 +139,7 @@ class GameSessionBridge:
         initialization_plan = build_initializer(initializer_address, profile_data_address, inventory_pool_address)
         self.process.write(initializer_address, initialization_plan['code'])
         self.process.write(profile_data_address, initialization_plan['data'])
-        from codol_rebuild.adapters.game.v1649370.profile import build_stats_ready_adapter
+        from codol_rebuild.adapters.game.v1649370.accounts.profile import build_stats_ready_adapter
         stats_entry = initializer_address + 3072
         stats = build_stats_ready_adapter(stats_entry, profile_data_address)
         if len(initialization_plan['code']) > 3072 or self.process.read(stats['patch_va'], 5) != stats['before']:
@@ -136,7 +148,7 @@ class GameSessionBridge:
         self.process.write(stats['patch_va'], stats['after'])
         if self.process.read(stats_entry, len(stats['code'])) != stats['code'] or self.process.read(stats['patch_va'], 5) != stats['after']:
             raise ValueError('Local UI stats adapter readback mismatch')
-        from codol_rebuild.adapters.game.v1649370.viewer import build_local_viewer_adapter
+        from codol_rebuild.adapters.game.v1649370.frontend.viewer import build_local_viewer_adapter
         viewer_entry = initializer_address + 3328
         viewer = build_local_viewer_adapter(viewer_entry, profile_data_address + 72)
         if len(stats['code']) > 256 or len(viewer['code']) > 768 or self.process.read(viewer['patch_va'], len(viewer['gate_before'])) != viewer['gate_before']:
@@ -151,7 +163,7 @@ class GameSessionBridge:
 
     def _install_playlist_adapter(self, profile_data_address):
         """安装玩法列表适配，使用档案数据区的就绪标志。"""
-        from codol_rebuild.adapters.game.v1649370.playlist import build_local_playlist_adapter, validate_local_playlist_contract
+        from codol_rebuild.adapters.game.v1649370.frontend.playlist import build_local_playlist_adapter, validate_local_playlist_contract
         validate_local_playlist_contract(self.process.read)
         playlist_entry = self.process.allocate(4096)
         playlist = build_local_playlist_adapter(playlist_entry, profile_data_address + 72)
@@ -170,7 +182,7 @@ class GameSessionBridge:
 
     def _install_room_name_adapter(self, profile_data_address):
         """安装房间名适配，保留原生任务完成通知。"""
-        from codol_rebuild.adapters.game.v1649370.room_name import build_room_name_adapter, validate_room_name_contract
+        from codol_rebuild.adapters.game.v1649370.rooms.room_name import build_room_name_adapter, validate_room_name_contract
         validate_room_name_contract(self.process.read)
         room_name_entry = self.process.allocate(4096)
         room_name = build_room_name_adapter(room_name_entry, profile_data_address + 72)
@@ -185,7 +197,7 @@ class GameSessionBridge:
 
     def _install_room_adapter(self, profile_data_address):
         """安装房间适配；联机模式注入身份地址及成员档案采集入口。"""
-        from codol_rebuild.adapters.game.v1649370.room import build_room_adapter, validate_room_contract
+        from codol_rebuild.adapters.game.v1649370.rooms.room import build_room_adapter, validate_room_contract
         validate_room_contract(self.process.read)
         room_entry = self.process.allocate(4096)
         room_state = self.process.allocate(4096)
@@ -219,7 +231,7 @@ class GameSessionBridge:
         """安装昵称适配，返回包裹档案初始化的昵称恢复入口。"""
         # 先恢复已保存昵称，再继续原档案初始化；大厅入口使用返回的新入口。
         # 联机改名另接主线程轮询，HTTP 仍由注入的应用会话执行。
-        from codol_rebuild.adapters.game.v1649370 import player_name
+        from codol_rebuild.adapters.game.v1649370.accounts import player_name
         player_name.validate_contract(self.process.read)
         name_entry = self.process.allocate(4096)
         name_state = self.process.allocate(4096)
@@ -245,7 +257,7 @@ class GameSessionBridge:
 
     def _install_recharge_adapter(self):
         """安装充值专用 GFx 回调。"""
-        from codol_rebuild.adapters.game.v1649370 import ui_recharge
+        from codol_rebuild.adapters.game.v1649370.accounts import ui_recharge
         ui_recharge.validate_contract(self.process.read)
         recharge_entry = self.process.allocate(4096)
         self.recharge_adapter = ui_recharge.build_adapter(recharge_entry)
@@ -261,7 +273,7 @@ class GameSessionBridge:
 
     def _install_purchase_adapter(self, profile_data_address):
         """安装购买和库存刷新回调，初始化首次刷新所需的通信状态。"""
-        from codol_rebuild.adapters.game.v1649370 import purchase
+        from codol_rebuild.adapters.game.v1649370.accounts import purchase
         purchase.validate_contract(self.process.read)
         purchase_entry = self.process.allocate(4096)
         purchase_state = self.process.allocate(4096)
@@ -280,7 +292,7 @@ class GameSessionBridge:
         """连接大厅预览入口与联机帧轮询，最后发布原生调用边。"""
         # 所有被调用的适配先安装完成，再替换大厅调用边。
         # 联机帧轮询依赖房间适配和昵称轮询入口；离线直接进入预览辅助代码。
-        from codol_rebuild.adapters.game.v1649370.menu_preview import build_menu_preview_helper
+        from codol_rebuild.adapters.game.v1649370.frontend.menu_preview import build_menu_preview_helper
         plan = build_menu_preview_helper(lobby_entry, initializer_va=initializer_address,
                                          initializer_ready_va=profile_data_address + 72 if self.args.local_profile else None,
                                          activation_ready_va=self.multiplayer.state+20 if self.multiplayer else None)
@@ -295,8 +307,25 @@ class GameSessionBridge:
         self.process.executable(lobby_entry, 4096)
         if self.multiplayer:
             broadcast_poll = self.broadcast_bridge.install() if self.broadcast_bridge is not None else None
-            tick = self.multiplayer.install_tick(profile_data_address+72, lobby_entry, room_plan,
-                                                self.name_adapter.get('poll'), broadcast_poll=broadcast_poll)
+            chat_poll = self.chat_bridge.install() if self.chat_bridge is not None else None
+            from codol_rebuild.adapters.game.v1649370.session.session_tick import build_tick
+            from codol_rebuild.adapters.game.v1649370.session.online_session import OnlineSessionBridge
+            from codol_rebuild.adapters.game.v1649370.native_state import checked_write
+            room_publication = self.multiplayer.install_adapters(room_plan)
+            self.online_bridge = OnlineSessionBridge(
+                self.process, self.online_session, room_publication['state'], self._online_connected, self.record)
+            tick = self.process.allocate(4096)
+            tick_plan = build_tick(tick, room_publication['state'], profile_data_address + 72,
+                                   lobby_entry, room_publication['entries'], room_publication['list_publish'],
+                                   self.name_adapter.get('poll'), broadcast_poll=broadcast_poll, chat_poll=chat_poll)
+            if len(tick_plan['code']) > 4096:
+                raise ValueError('会话帧桥超出代码页')
+            checked_write(self.process, tick, tick_plan['code'])
+            self.process.executable(tick, 4096)
+            self.session_traps = {address: phase for address, phase in tick_plan['traps'].items()
+                                  if phase == 'session_poll'}
+            self.multiplayer.register_frame_traps({address: phase for address, phase in tick_plan['traps'].items()
+                                                  if phase != 'session_poll'})
             self.multiplayer.install_settings_detours()
             self.record({'multiplayer_settings_detours': True})
             self.preview_caller_return = tick+9
@@ -330,7 +359,7 @@ class GameSessionBridge:
 
     def install_navigation_resource(self):
         """在原版主电影解析前安装已校验的会话内资源补丁，并回读数据及长度。"""
-        from codol_rebuild.adapters.game.v1649370.ui_movie import find_resource_patch
+        from codol_rebuild.adapters.game.v1649370.session.ui_movie import find_resource_patch
         plan = find_resource_patch(self.process.read, self.process.regions())
         if self.process.read(plan['header_address'], 16) != plan['header_before']:
             raise ValueError('大厅资源头在安装前改变')
@@ -367,6 +396,21 @@ class GameSessionBridge:
         return result
 
     def handle_exception(self, event, code, address, row):
+        if code in (2147483651, 1073741855) and address in self.session_traps:
+            if event.tid != self.process.main_thread_id:
+                raise ValueError('公共会话调度必须在主线程执行')
+            thread, context = self.process.context(event.tid)
+            try:
+                self.online_bridge.poll()
+                self.realtime_dispatcher.poll()
+                struct.pack_into('<I', context, 184, address + 1)
+                self.process.set_context(thread, context)
+            finally:
+                self.process.close_thread(thread)
+            return True
+        if code in (2147483651, 1073741855) and self.chat_bridge and address in self.chat_bridge.traps:
+            self.chat_bridge.handle(event, address)
+            return True
         if code in (2147483651, 1073741855) and self.broadcast_bridge and address in self.broadcast_bridge.traps:
             self.broadcast_bridge.handle(event, address)
             return True
@@ -374,7 +418,7 @@ class GameSessionBridge:
             self.multiplayer.handle(event, address)
             return True
         if code in (2147483651, 1073741855) and self.purchase_adapter and address in self.purchase_adapter['traps']:
-            from codol_rebuild.adapters.game.v1649370 import purchase
+            from codol_rebuild.adapters.game.v1649370.accounts import purchase
             if event.tid != self.process.main_thread_id or self.observe_state()['dw_enabled'] != 0:
                 raise ValueError('本地购买必须在离线主线程执行')
             phase = self.purchase_adapter['traps'][address]
@@ -409,7 +453,7 @@ class GameSessionBridge:
                 self.process.close_thread(thread)
             self.record(row)
         elif code in (2147483651, 1073741855) and self.recharge_adapter and address == self.recharge_adapter['trap']:
-            from codol_rebuild.adapters.game.v1649370 import ui_recharge
+            from codol_rebuild.adapters.game.v1649370.accounts import ui_recharge
             if event.tid != self.process.main_thread_id or self.observe_state()['dw_enabled'] != 0:
                 raise ValueError('本地充值必须在离线主线程执行')
             thread, ctx = self.process.context(event.tid)
@@ -439,7 +483,7 @@ class GameSessionBridge:
                 self.process.close_thread(thread)
             self.record(row)
         elif code in (2147483651, 1073741855) and self.name_adapter and (address in self.name_adapter['traps']):
-            from codol_rebuild.adapters.game.v1649370 import player_name
+            from codol_rebuild.adapters.game.v1649370.accounts import player_name
             if event.tid != self.process.main_thread_id or self.observe_state()['dw_enabled'] != 0:
                 raise ValueError('本地改名必须在离线主线程执行')
             phase = self.name_adapter['traps'][address]
@@ -527,7 +571,7 @@ class GameSessionBridge:
                     raise ValueError('离线UI helper调用栈或原getter结果不符')
                 if phase == 'before':
                     if self.args.local_profile:
-                        from codol_rebuild.adapters.game.v1649370.viewer import view_state
+                        from codol_rebuild.adapters.game.v1649370.frontend.viewer import view_state
                         row['local_view_state'] = view_state(self.process.read)
                         if row['local_view_state']['viewer_initialized'] != 1 or row['local_view_state']['weapon_definition_count'] <= 0:
                             raise ValueError('Local UI activation preceded native weapon/viewer readiness')
@@ -564,14 +608,14 @@ class GameSessionBridge:
                 except OSError:
                     pass
         if label.startswith('view-result:'):
-            from codol_rebuild.adapters.game.v1649370.viewer import view_result, view_state
+            from codol_rebuild.adapters.game.v1649370.frontend.viewer import view_result, view_state
             row['local_view_state'] = view_state(self.process.read)
             try:
                 row['view_result'] = view_result(self.process.read, struct.unpack_from('<I', ctx, 180)[0])
             except (OSError, ValueError) as error:
                 row['view_result_error'] = str(error)
         if label.startswith('view:'):
-            from codol_rebuild.adapters.game.v1649370.viewer import view_state
+            from codol_rebuild.adapters.game.v1649370.frontend.viewer import view_state
             row['local_view_state'] = view_state(self.process.read)
             if label != 'view:UIViewerFrame':
                 try:
@@ -594,7 +638,7 @@ class GameSessionBridge:
             if self.args.queue_main_menu:
                 self.debug.arm(layout.COMMAND_QUEUE, 'Menu command queue')
         if label == 'Menu command queue':
-            from codol_rebuild.adapters.game.v1649370.menu_queue import build_queue_plan
+            from codol_rebuild.adapters.game.v1649370.frontend.menu_queue import build_queue_plan
             values = struct.unpack('<3I', self.process.read(esp, 12))
             pointer, capacity, length = struct.unpack('<3I', self.process.read(layout.COMMAND_DESCRIPTOR, 12))
             state = {**row['observed_state'], 'thread_id': event.tid, 'main_thread_id': self.process.main_thread_id, 'return_address': values[0], 'local_client_index': values[1], 'controller_index': values[2], 'engine_returned': self.engine_ready, 'already_queued': self.menu_queued}

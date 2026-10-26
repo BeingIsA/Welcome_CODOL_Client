@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from codol_rebuild.adapters.persistence.sqlite_accounts import AccountRepository, RevisionConflict
 from codol_rebuild.adapters.game.profile_format.fields import Fields
-from codol_rebuild.adapters.game.v1649370.profile_codec import progression
+from codol_rebuild.adapters.game.v1649370.accounts.profile_codec import progression
 
 ROOT=Path(__file__).resolve().parents[2]
 

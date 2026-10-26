@@ -13,7 +13,7 @@ class BroadcastFixture {
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)] delegate void Run();
     static List<Delegate> callbacks = new List<Delegate>();
     static Dictionary<string, object> fields = new Dictionary<string, object>();
-    static int confirmations, messages, allocations, expectedSpeakerType;
+    static int confirmations, messages, allocations, expectedSpeakerType, expectedChannel;
     const int State = 0x21000000;
     static int Read(int address) { return Marshal.ReadInt32(new IntPtr(address)); }
     static void Write(int address, int value) { Marshal.WriteInt32(new IntPtr(address), value); }
@@ -66,7 +66,7 @@ class BroadcastFixture {
     static int Dispatch(int method, int output, int arguments, int count, int controller) {
         if (method != 0xdd601c || output != 0 || arguments != State + 32 || count != 1 || controller != 3)
             throw new Exception("wrong receive ABI");
-        if ((int)fields["channelID"] != 0 || (int)fields["loudSpeakerType"] != expectedSpeakerType
+        if ((int)fields["channelID"] != expectedChannel || (int)fields["loudSpeakerType"] != expectedSpeakerType
             || (string)fields["senderID"] != "12345" || (string)fields["senderName"] != "中文玩家"
             || (string)fields["message"] != "一起玩吗？") throw new Exception("wrong message");
         messages++;
@@ -75,6 +75,7 @@ class BroadcastFixture {
     static int Main(string[] arguments) {
         try {
             expectedSpeakerType = int.Parse(arguments[3]);
+            expectedChannel = arguments.Length > 4 ? int.Parse(arguments[4]) : 0;
             Map(0x20000000, 65536); Map(State, 65536); Map(0x28000000, 65536);
             Callback(0x2800fd70, new One(Create), new byte[]{0xff,0x74,0x24,4}, new byte[]{0x83,0xc4,4,0xc3});
             Callback(0x28006750, new Three(Set), new byte[]{0xff,0x74,0x24,8,0xff,0x74,0x24,8,0x51}, new byte[]{0x83,0xc4,12,0xc2,8,0});
@@ -84,6 +85,17 @@ class BroadcastFixture {
             Bytes(0x20000000, File.ReadAllBytes(arguments[0]));
             Run run = (Run)Marshal.GetDelegateForFunctionPointer(new IntPtr(int.Parse(arguments[1])), typeof(Run));
             run();
+            if (expectedSpeakerType == -1) {
+                Bytes(State, File.ReadAllBytes(arguments[2])); run(); run();
+                if (confirmations != 0 || messages != 1 || allocations != 0)
+                    throw new Exception("ordinary chat did not dispatch exactly once");
+                Bytes(State, File.ReadAllBytes(arguments[2])); run(); run();
+                if (confirmations != 0 || messages != 2 || allocations != 0)
+                    throw new Exception("ordinary chat leaked or called speaker completion");
+                GC.KeepAlive(callbacks);
+                Console.WriteLine("native x86 chat: channel, receive ABI, ownership, repeated ticks passed");
+                return 0;
+            }
             Write(State + 12, expectedSpeakerType); Write(State, 1); run(); run();
             if (confirmations != 1 || messages != 0) throw new Exception("HTTP inserted a message");
             Bytes(State, File.ReadAllBytes(arguments[2])); run(); run();

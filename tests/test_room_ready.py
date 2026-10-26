@@ -4,10 +4,10 @@ import struct
 from concurrent.futures import Future
 from unittest.mock import Mock
 
-from codol_rebuild.application.room.contracts import IdentityRecord
+from codol_rebuild.application.session.contracts import IdentityRecord
 from codol_rebuild.application.room.service import RoomSession
 from codol_rebuild.adapters.transport.http import HttpGateway
-from codol_rebuild.adapters.game.v1649370.room import RoomReadyBridge
+from codol_rebuild.adapters.game.v1649370.rooms.room import RoomReadyBridge
 from codol_rebuild.application.room.contracts import Completion
 from test_refactor_equivalence import MemoryProcess
 
@@ -15,7 +15,7 @@ from test_refactor_equivalence import MemoryProcess
 class ReadySessionTests(unittest.TestCase):
     def test_earlier_member_snapshot_is_consumed_before_ready_result(self):
         realtime = Mock()
-        session = RoomSession(Mock(), Mock(), 'http://server', 'fingerprint', realtime)
+        session = RoomSession(Mock(), Mock(), 'http://server', realtime)
         self.addCleanup(session._executor.shutdown)
         session._record = IdentityRecord('pl_me', 'rm_test')
         session._members_pending = Future()
@@ -29,7 +29,7 @@ class ReadySessionTests(unittest.TestCase):
 
     def test_ready_cancel_deliver_confirmed_snapshot_once(self):
         gateway = Mock()
-        session = RoomSession(gateway, Mock(), 'http://server', 'fingerprint')
+        session = RoomSession(gateway, Mock(), 'http://server')
         self.addCleanup(session._executor.shutdown)
         session._record = IdentityRecord('pl_me', 'rm_test')
         for ready in (True, False):

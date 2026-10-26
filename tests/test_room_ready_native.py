@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock
 
-from codol_rebuild.adapters.game.v1649370.room import RoomReadyBridge, build_ready_notifications
+from codol_rebuild.adapters.game.v1649370.rooms.room import RoomReadyBridge, build_ready_notifications
 from test_refactor_equivalence import MemoryProcess
 from test_room_list_native import relocate_fixture_calls
 

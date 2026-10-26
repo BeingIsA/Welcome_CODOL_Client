@@ -4,7 +4,7 @@ import unittest
 import struct
 import capstone
 import pefile
-from codol_rebuild.adapters.game.v1649370.room import build_room_adapter,validate_room_contract
+from codol_rebuild.adapters.game.v1649370.rooms.room import build_room_adapter,validate_room_contract
 
 
 class RoomTests(unittest.TestCase):
@@ -22,7 +22,7 @@ class RoomTests(unittest.TestCase):
             self.assertEqual(pe.get_string_at_rva(text-base), key)
 
     def test_join_image_contract_and_generated_branches(self):
-        from codol_rebuild.adapters.game.v1649370.room import build_join_adapter, validate_join_contract
+        from codol_rebuild.adapters.game.v1649370.rooms.room import build_join_adapter, validate_join_contract
         image = Path(__file__).resolve().parents[1]/'bin/v1649370/codol1649370-offline.exe'
         pe = pefile.PE(str(image))
         validate_join_contract(lambda a, n: pe.get_data(a-0x400000, n))

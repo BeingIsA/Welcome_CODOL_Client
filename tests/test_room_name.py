@@ -3,7 +3,7 @@ from pathlib import Path
 import unittest
 import capstone
 import pefile
-from codol_rebuild.adapters.game.v1649370.room_name import (
+from codol_rebuild.adapters.game.v1649370.rooms.room_name import (
     build_room_name_adapter, validate_room_name_contract, ORIGINAL_VA, CALLBACK_VA,
 )
 

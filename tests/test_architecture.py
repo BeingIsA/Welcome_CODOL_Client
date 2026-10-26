@@ -25,6 +25,54 @@ ALLOWED={
 }
 
 class ArchitectureTests(unittest.TestCase):
+    def test_version_packages_keep_dependencies_acyclic(self):
+        """版本公共机制不反向依赖功能，功能不依赖会话装配，模块间不形成循环。"""
+        version_root = PACKAGE/'adapters/game/v1649370'
+        prefix = 'codol_rebuild.adapters.game.v1649370'
+        module_paths = {
+            prefix + '.' + '.'.join(path.relative_to(version_root).with_suffix('').parts): path
+            for path in version_root.rglob('*.py') if path.name != '__init__.py'
+        }
+        dependencies = {module: set() for module in module_paths}
+        for module, path in module_paths.items():
+            source_group = path.relative_to(version_root).parts[0]
+            for node in ast.walk(ast.parse(path.read_text(encoding='utf-8-sig'))):
+                targets = []
+                if isinstance(node, ast.Import):
+                    targets = [alias.name for alias in node.names]
+                elif isinstance(node, ast.ImportFrom):
+                    self.assertEqual(node.level, 0, str(path))
+                    targets = [node.module or ''] + [f'{node.module}.{alias.name}' for alias in node.names]
+                for target in targets:
+                    if target not in module_paths:
+                        continue
+                    dependencies[module].add(target)
+                    target_group = module_paths[target].relative_to(version_root).parts[0]
+                    if path.parent == version_root:
+                        self.assertEqual(module_paths[target].parent, version_root, f'{module} -> {target}')
+                    if source_group != 'session':
+                        self.assertNotEqual(target_group, 'session', f'{module} -> {target}')
+
+        visited = set()
+        def visit(module, chain):
+            self.assertNotIn(module, chain, ' -> '.join((*chain, module)))
+            if module in visited:
+                return
+            for target in sorted(dependencies[module]):
+                visit(target, (*chain, module))
+            visited.add(module)
+        for module in sorted(dependencies):
+            visit(module, ())
+
+    def test_version_package_initializers_have_no_import_side_effects(self):
+        """职责包只声明用途，导入包不能隐式装配其他模块或提供旧路径别名。"""
+        for path in (PACKAGE/'adapters/game/v1649370').rglob('__init__.py'):
+            statements = ast.parse(path.read_text(encoding='utf-8-sig')).body
+            self.assertEqual(len(statements), 1, str(path))
+            self.assertIsInstance(statements[0], ast.Expr, str(path))
+            self.assertIsInstance(statements[0].value, ast.Constant, str(path))
+            self.assertIsInstance(statements[0].value.value, str, str(path))
+
     def test_production_dependency_direction(self):
         files=list(PACKAGE.rglob('*.py'))
         self.assertGreater(len(files),40,'扫描目录错误，禁止空扫描通过')
@@ -78,7 +126,7 @@ class ArchitectureTests(unittest.TestCase):
 
     def test_session_bridge_respects_profile_state_owner(self):
         """会话桥通过档案桥的生命周期接口协作，不能越过接口修改其状态。"""
-        path = PACKAGE/'adapters/game/v1649370/session_bridge.py'
+        path = PACKAGE/'adapters/game/v1649370/session/session_bridge.py'
         tree = ast.parse(path.read_text(encoding='utf-8'))
         for node in ast.walk(tree):
             if not isinstance(node, ast.Attribute):

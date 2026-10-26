@@ -9,7 +9,7 @@ from urllib.parse import urlencode
 from websockets.exceptions import ConnectionClosed, InvalidHandshake, InvalidStatus
 from websockets.sync.client import connect
 
-from codol_rebuild.application.room.contracts import RealtimeStatus
+from codol_rebuild.application.realtime.contracts import RealtimeStatus
 from codol_rebuild.adapters.transport.http import normalize_server
 
 LOGGER = logging.getLogger(__name__)
@@ -26,6 +26,25 @@ class WebSocketConnection:
         self._machine_code = None
         self._status = RealtimeStatus.CLOSED
         self._events = queue.Queue(maxsize=256)
+        self._send_lock = threading.Lock()
+        self._outgoing = None
+
+    def send_message(self, message: dict) -> None:
+        """仅交给当前连接的发送队列；网络线程发送一次，断线不补发。"""
+        encoded = json.dumps(message, ensure_ascii=False)
+        with self._send_lock:
+            if self._outgoing is None or self._stop.is_set():
+                return
+            try:
+                self._outgoing.put_nowait(encoded)
+            except queue.Full:
+                pass
+
+    def _activate_sender(self):
+        """每次握手创建独立队列，重连不继承旧连接的未发送内容。"""
+        with self._send_lock:
+            self._outgoing = queue.Queue(maxsize=256)
+            return self._outgoing
 
     def poll_event(self) -> dict | None:
         """非阻塞取出一条下行消息；内容语义由应用层解释。"""
@@ -60,7 +79,8 @@ class WebSocketConnection:
         self._player_id = player_id
         self._machine_code = fingerprint
         self._status = RealtimeStatus.CONNECTED
-        self._thread = threading.Thread(target=self._run, args=(connection,),
+        outgoing = self._activate_sender()
+        self._thread = threading.Thread(target=self._run, args=(connection, outgoing),
                                         name='codol-websocket', daemon=True)
         self._thread.start()
 
@@ -72,12 +92,14 @@ class WebSocketConnection:
         self._machine_code = None
         self._status = RealtimeStatus.INVALIDATED
 
-    def _run(self, connection):
+    def _run(self, connection, outgoing):
         delay = 1
         while not self._stop.is_set():
             try:
                 # 只解码并交接消息，不在网络线程访问游戏对象。
                 while not self._stop.is_set():
+                    for message_index in range(outgoing.qsize()):
+                        connection.send(outgoing.get_nowait())
                     try:
                         message = json.loads(connection.recv(timeout=.25))
                     except TimeoutError:
@@ -96,10 +118,14 @@ class WebSocketConnection:
                 if not self._stop.is_set():
                     self._status = RealtimeStatus.RECONNECTING
             finally:
+                with self._send_lock:
+                    if self._outgoing is outgoing:
+                        self._outgoing = None
                 connection.close()
             while not self._stop.wait(delay):
                 try:
                     connection = self._connect(self._player_id, self._machine_code)
+                    outgoing = self._activate_sender()
                     self._status = RealtimeStatus.CONNECTED
                     break
                 except InvalidStatus as error:

@@ -6,7 +6,9 @@ import sys
 import unittest
 import zlib
 
-from codol_rebuild.adapters.game.v1649370 import movie_identity, ui_chat, ui_movie
+from codol_rebuild.adapters.game.v1649370 import movie_identity
+from codol_rebuild.adapters.game.v1649370.chat import ui_chat
+from codol_rebuild.adapters.game.v1649370.session import ui_movie
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / 'research'))

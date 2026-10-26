@@ -14,9 +14,10 @@ from codol_rebuild.application.accounts.rename import RenameSession, RenameCompl
 from codol_rebuild.application.accounts.service import AccountSession
 
 from codol_rebuild.application.room.service import RoomSession
+from codol_rebuild.application.session.service import OnlineSession
 from codol_rebuild.adapters.persistence.sqlite_accounts import AccountRepository
 from codol_rebuild.adapters.transport.http import HttpGateway
-from codol_rebuild.adapters.game.v1649370 import player_name
+from codol_rebuild.adapters.game.v1649370.accounts import player_name
 from test_purchase import Codec, Memory
 
 
@@ -107,11 +108,12 @@ class DeferredNameBridgeTests(unittest.TestCase):
         gateway.login.return_value = {'playerId': 'pl_test', 'displayName': '服务端昵称'}
         store = Mock()
         store.load.return_value = None
-        session = RoomSession(gateway, store, 'http://localhost', 'fingerprint')
+        rooms = RoomSession(gateway, store, 'http://localhost')
+        session = OnlineSession(gateway, store, 'http://localhost', 'fingerprint', rooms)
         self.addCleanup(session.close)
-        self.assertTrue(session.begin('login', '旧本地昵称'))
+        self.assertTrue(session.begin_login('旧本地昵称'))
         session._pending.result(timeout=3)
-        self.assertEqual(session.poll().data['displayName'], '服务端昵称')
+        self.assertEqual(session.poll_login().data['displayName'], '服务端昵称')
 
     def test_http_returns_response_without_matching_fields(self):
         gateway = HttpGateway('http://localhost')

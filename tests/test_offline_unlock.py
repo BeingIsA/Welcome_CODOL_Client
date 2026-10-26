@@ -13,9 +13,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'client' / 'src'))
 
-from codol_rebuild.adapters.game.v1649370 import profile_unlock as ou
+from codol_rebuild.adapters.game.v1649370.accounts import profile_unlock as ou
 from codol_rebuild.adapters.persistence.profile_archive import ProfileStore
-from codol_rebuild.adapters.game.v1649370.profile_codec import SecureArchiveFormat
+from codol_rebuild.adapters.game.v1649370.accounts.profile_codec import SecureArchiveFormat
 
 EVIDENCE_SECURE = ROOT / 'client/workspaces/offline-runs/offline-20261020-040037-7938274a/local-profile/playersecuredata/playerdata-schema.json'
 

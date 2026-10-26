@@ -3,7 +3,7 @@ import struct
 import unittest
 from unittest.mock import Mock
 
-from codol_rebuild.adapters.game.v1649370.notifications import NativeNotifications
+from codol_rebuild.adapters.game.v1649370.frontend.notifications import NativeNotifications
 
 
 class NativeNotificationTests(unittest.TestCase):

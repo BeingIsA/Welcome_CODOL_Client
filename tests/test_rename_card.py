@@ -12,7 +12,7 @@ from pathlib import Path
 from codol_rebuild.application.accounts.service import AccountSession
 from codol_rebuild.application.accounts.contracts import RevisionConflict
 from codol_rebuild.adapters.persistence.sqlite_accounts import AccountRepository
-from codol_rebuild.adapters.game.v1649370 import player_name, purchase
+from codol_rebuild.adapters.game.v1649370.accounts import player_name, purchase
 from test_purchase import Memory, Codec
 
 class RenameCardFixture(unittest.TestCase):

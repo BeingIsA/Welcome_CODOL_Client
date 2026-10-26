@@ -5,10 +5,13 @@ SendLoudSpeaker 的 GFx 参数取法来自 0x7273B0；接管类型 0（大）和
 0x72F563 的控制器 3 / cppOnMessageReceived(Object) 约定发布。
 所有进程访问均发生在主线程暂停点；网络结果由应用端口交接。
 """
-import hashlib
 import struct
-from datetime import datetime
 from codol_rebuild.application.broadcast.contracts import BroadcastPort
+from codol_rebuild.adapters.game.v1649370.chat.chat_message import (
+    CAPACITY, MESSAGE_READY, MESSAGE_OBJECT, FIELDS, MESSAGE_FIELDS,
+    CONTRACT as MESSAGE_CONTRACT, read_word, native_sender_id, build_message_dispatch,
+    encode_message as encode_chat_message,
+)
 
 SEND_HANDLER = 0x7273B0
 # 原版 ChatSpeakerType 与 ChattingController 的大小喇叭类型和库存物品。
@@ -16,30 +19,17 @@ SPEAKER_TYPES = {0: 'large', 1: 'small'}
 NATIVE_SPEAKER_TYPES = {speaker_type: native_type for native_type, speaker_type in SPEAKER_TYPES.items()}
 SPEAKER_ITEM_IDS = {'large': 50003, 'small': 50002}
 SENT_SPEAKER_TYPE = 12
-CAPACITY = 65536
-SEND_COMPLETE, MESSAGE_READY, MESSAGE_OBJECT, FIELDS = 0, 4, 32, 64
+SEND_COMPLETE = 0
 BROADCAST_AVAILABLE = 8
 # IsInBigSpeakerChannel 只替换读取来源，保留原 GFx 布尔返回及对象释放逻辑。
 AVAILABILITY_SOURCE = 0x5D2DE9
-MESSAGE_FIELDS = ('channelID', 'senderID', 'senderName', 'message',
-                  'formatedTime', 'loudSpeakerType')
 CONTRACT = {
+    **MESSAGE_CONTRACT,
     0x5D2DE7: bytes.fromhex('8a1df44a2c08'),
     SEND_HANDLER: bytes.fromhex('558bec83e4f8'),
     0x7C4AB0: bytes.fromhex('558bec83ec64'),
     0x7C4B67: bytes.fromhex('c20c00'),
-    0x72FD70: bytes.fromhex('558beca198bb770c53'),
-    0x436750: bytes.fromhex('558bec518bc1'),
-    0x436660: bytes.fromhex('568bf18b460c'),
-    0x730570: bytes.fromhex('558bec83e4f883ec50'),
-    0xDD601C: b'cppOnMessageReceived\0',
-    0xB9A0F0: bytes.fromhex('8d81d8000000c3'),
 }
-
-
-def read_word(read, address):
-    """读取已核对 ABI 的 32 位指针或整数。"""
-    return struct.unpack('<I', read(address, 4))[0]
 
 
 def read_request(read, stack_address):
@@ -61,42 +51,10 @@ def read_request(read, stack_address):
     raise ValueError('原生喇叭字符串超过适配缓冲区')
 
 
-def native_sender_id(read, sender_id, local_player_id):
-    """本人复用 GetPlayerID 的实际来源，其他玩家沿现有房间的显示 ID 映射。"""
-    if sender_id == local_player_id:
-        identity_object = read_word(read, 0x84ABB08) or read_word(read, 0x84ABB14)
-        # GetPlayerID 在两指针均为空时返回十进制字符串 0。
-        identity_number = struct.unpack('<Q', read(identity_object + 0xF8, 8))[0] if identity_object else 0
-    else:
-        identity_number = int.from_bytes(hashlib.sha256(sender_id.encode('utf-8')).digest()[:8], 'little') or 1
-    return str(identity_number)
-
-
 def encode_message(message, sender_id, state):
-    """转换原生既有字段；服务端消息 ID 不伪装成原生玩家 ID。"""
-    time_text = datetime.fromisoformat(message['sentAt']).astimezone().strftime('%H:%M')
-    values = (0, sender_id, message['senderName'], message['text'],
-              time_text, NATIVE_SPEAKER_TYPES[message['speakerType']])
-    data = bytearray(FIELDS + len(MESSAGE_FIELDS) * 36)
-    struct.pack_into('<II', data, MESSAGE_OBJECT, 0xFFFFFFFF, 0xFFFFFFFF)
-
-    def append_string(text):
-        if '\0' in text:
-            raise ValueError('原生 GFx 字符串不能包含空字符')
-        pointer = state + len(data)
-        data.extend(text.encode('utf-8') + b'\0')
-        return pointer
-
-    for field_index, (field_name, value) in enumerate(zip(MESSAGE_FIELDS, values)):
-        field_pointer = append_string(field_name)
-        value_kind = 6 if isinstance(value, str) else 3
-        payload = append_string(value) if value_kind == 6 else value
-        struct.pack_into('<IIIIII', data, FIELDS + field_index * 36,
-                         field_pointer, 0xFFFFFFFF, 0xFFFFFFFF, 0, value_kind, payload)
-    if len(data) > CAPACITY:
-        raise ValueError('广播内容超过原生发布缓冲区')
-    struct.pack_into('<I', data, MESSAGE_READY, 1)
-    return bytes(data)
+    """大小喇叭只负责选择原生类型，字段编码与普通聊天共用。"""
+    return encode_chat_message(message, sender_id, state, 0,
+                               NATIVE_SPEAKER_TYPES[message['speakerType']])
 
 
 def build_adapter(entry, state):
@@ -118,10 +76,6 @@ def build_adapter(entry, state):
         emit(opcode)
         branches.append((len(instructions), name))
         word(0)
-
-    def push(address):
-        emit('68')
-        word(address)
 
     def clear(offset):
         emit('c705')
@@ -150,41 +104,8 @@ def build_adapter(entry, state):
     emit('6a00 6a01')
     call(0x7C4AB0)
     labels['message'] = len(instructions)
-    emit('833d')
-    word(state + MESSAGE_READY)
-    emit('00')
-    branch('0f84', 'done')
-    clear(MESSAGE_READY)
-    push(state + MESSAGE_OBJECT)
-    call(0x72FD70)
-    emit('83c404 84c0')
-    branch('0f84', 'cleanup')
-    emit('be')
-    word(state + FIELDS)
-    emit('bf')
-    word(len(MESSAGE_FIELDS))
-    labels['field'] = len(instructions)
-    emit('8d4604 50 ff36 b9')
-    word(state + MESSAGE_OBJECT)
-    call(0x436750)
-    emit('84c0')
-    branch('0f84', 'cleanup')
-    emit('83c624 4f')
-    branch('0f85', 'field')
-    emit('6a01')
-    push(state + MESSAGE_OBJECT)
-    emit('6a00')
-    push(0xDD601C)
-    emit('bf')
-    word(3)
-    call(0x730570)
-    emit('83c410')
-    labels['cleanup'] = len(instructions)
-    emit('b9')
-    word(state + MESSAGE_OBJECT)
-    call(0x436660)
-    labels['done'] = len(instructions)
-    emit('8be5 619d c3')
+    emit('8be5 619d')
+    instructions.extend(build_message_dispatch(entry + len(instructions), state))
     for offset, target in branches:
         struct.pack_into('<i', instructions, offset, labels[target] - offset - 4)
     patch = b'\xe9' + struct.pack('<i', entry - SEND_HANDLER - 5) + b'\x90'
@@ -195,10 +116,9 @@ def build_adapter(entry, state):
 class BroadcastBridge:
     """游戏线程执行原生操作，应用端口负责后台发送与推送交接。"""
 
-    def __init__(self, process, port: BroadcastPort, dispatcher, consume_item):
+    def __init__(self, process, port: BroadcastPort, consume_item):
         self.process = process
         self.port = port
-        self.dispatcher = dispatcher
         self.consume_item = consume_item
         self.state = None
         self.plan = None
@@ -249,7 +169,6 @@ class BroadcastBridge:
                         self.port.begin(*request)
                         next_instruction = self.plan['return']
             else:
-                self.dispatcher.poll()
                 message = self.port.poll_message() if self.player_id is not None else None
                 if message is not None:
                     sender_id = native_sender_id(self.process.read, message['senderId'], self.player_id)

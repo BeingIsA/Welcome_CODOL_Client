@@ -4,7 +4,7 @@ import struct
 import unittest
 import zlib
 import pefile
-from codol_rebuild.adapters.game.v1649370 import ui_navigation as nav
+from codol_rebuild.adapters.game.v1649370.frontend import ui_navigation as nav
 
 ROOT = Path(__file__).resolve().parents[2]
 

@@ -11,7 +11,7 @@ import capstone
 from codol_rebuild.application.accounts.purchase import permanent_purchase
 from codol_rebuild.application.accounts.service import AccountSession
 from codol_rebuild.adapters.persistence.sqlite_accounts import AccountRepository
-from codol_rebuild.adapters.game.v1649370 import purchase
+from codol_rebuild.adapters.game.v1649370.accounts import purchase
 
 ROOT = Path(__file__).resolve().parents[2]
 STATE = {'version': 1, 'owned_ids': [545], 'gp': 1000, 'cp': 100}
@@ -231,7 +231,7 @@ class PurchaseTests(unittest.TestCase):
 
     def test_success_popup_calls_existing_parent_method(self):
         import sys
-        from codol_rebuild.adapters.game.v1649370 import ui_movie
+        from codol_rebuild.adapters.game.v1649370.session import ui_movie
         sys.path.insert(0, str(ROOT/'research'))
         from trace_matchmaking_debugline import Reader, abc_parse, disassemble
         movie=ui_movie.patch_movie((ROOT/'research/client/ui-investigation/codo.gfx').read_bytes())

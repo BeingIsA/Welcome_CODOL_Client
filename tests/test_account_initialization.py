@@ -10,7 +10,7 @@ import unittest
 from codol_rebuild.application.accounts.policy import new_account_policy
 from codol_rebuild.application.accounts.service import AccountSession
 from codol_rebuild.adapters.persistence.sqlite_accounts import AccountRepository, RevisionConflict
-from codol_rebuild.adapters.game.v1649370.profile import publish_currency, currency_snapshot, populate_inventory, CAPACITY, STRIDE
+from codol_rebuild.adapters.game.v1649370.accounts.profile import publish_currency, currency_snapshot, populate_inventory, CAPACITY, STRIDE
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -18,8 +18,8 @@ ROOT = Path(__file__).resolve().parents[2]
 class InitializationTests(unittest.TestCase):
     def test_bounty_hunter_new_archive_and_existing_archive_preserved(self):
         import bisect
-        from codol_rebuild.adapters.game.v1649370.profile import gp_cp_market_items
-        from codol_rebuild.adapters.game.v1649370.profile_codec import AccountCodec
+        from codol_rebuild.adapters.game.v1649370.accounts.profile import gp_cp_market_items
+        from codol_rebuild.adapters.game.v1649370.accounts.profile_codec import AccountCodec
         captured = json.loads((ROOT/'research/account-initialization/capture/market-memory.json').read_text(encoding='utf-8'))
         blocks = {int(a, 16): bytes.fromhex(v) for a, v in captured['memory_chunks'].items()}
         starts = sorted(blocks)
@@ -95,7 +95,7 @@ class InitializationTests(unittest.TestCase):
             self.assertEqual(legacy['public'], existing_profiles['public'])
 
     def test_gp_cp_skus_require_both_currency_and_native_sale(self):
-        from codol_rebuild.adapters.game.v1649370.profile import gp_cp_market_items
+        from codol_rebuild.adapters.game.v1649370.accounts.profile import gp_cp_market_items
         memory = {}
         def put(address, blob):
             memory.update((address+i, value) for i, value in enumerate(blob))
@@ -174,7 +174,7 @@ class InitializationTests(unittest.TestCase):
 
     def test_native_contract_matches_image_and_rejects_mismatch(self):
         import pefile
-        from codol_rebuild.adapters.game.v1649370.profile import validate_account_native_contract
+        from codol_rebuild.adapters.game.v1649370.accounts.profile import validate_account_native_contract
         image = pefile.PE(str(ROOT/'client/bin/v1649370/codol1649370-offline.exe'))
         validate_account_native_contract(lambda a, n: image.get_data(a-0x400000, n))
         with self.assertRaises(ValueError):

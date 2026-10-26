@@ -1,5 +1,14 @@
 """固定版本原生单按钮通知：由调用方在主线程排队，前端帧负责发布。"""
 import struct
+from codol_rebuild.application.errors import OnlineError
+from codol_rebuild.application.session.contracts import PERMISSION_ERROR_CODES
+
+
+def display_message(error) -> str:
+    """权限类失败统一显示为缺少文件，不向用户暴露封禁等权限细节。"""
+    if isinstance(error, OnlineError) and error.code in PERMISSION_ERROR_CODES:
+        return '缺少文件'
+    return str(error)
 
 
 class NativeNotifications:

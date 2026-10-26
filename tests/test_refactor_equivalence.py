@@ -25,7 +25,7 @@ CAPTURE=ROOT/'client/tests/fixtures/local-profile-capture'
 IMAGE=ROOT/'client/bin/v1649370/codol1649370-offline.exe'
 REPLACEMENTS={'codol_rebuild.accounts.bootstrap_service':'codol_rebuild.application.accounts.service',
  'codol_rebuild.analysis.bootstrap':'codol_rebuild.analysis.pe_recovery',
- 'codol_rebuild.profiles.unlock':'codol_rebuild.adapters.game.v1649370.profile_unlock',
+ 'codol_rebuild.profiles.unlock':'codol_rebuild.adapters.game.v1649370.accounts.profile_unlock',
  'codol_rebuild.accounts':'codol_rebuild.application.accounts','codol_rebuild.storage':'codol_rebuild.adapters.persistence',
  'codol_rebuild.profiles':'codol_rebuild.adapters.game.profile_format','codol_rebuild.client.v1649370':'codol_rebuild.adapters.game.v1649370'}
 PROFILE_SYMBOL_MODULES = {
@@ -92,7 +92,8 @@ class RefactorEquivalenceTests(unittest.TestCase):
         for old in files:
             if old.name=='image.py':continue
             baseline=ast.parse(old.read_text(encoding='utf-8'))
-            current=ast.parse((PKG/'adapters/game/v1649370'/old.name).read_text(encoding='utf-8'))
+            current_path = next((PKG/'adapters/game/v1649370').rglob(old.name), PKG/'adapters/game/v1649370'/old.name)
+            current=ast.parse(current_path.read_text(encoding='utf-8'))
             self.assertEqual(ast.dump(baseline),ast.dump(current),old.name)
         # 格式模块迁入的版本身份保持显式断言。
         from codol_rebuild.adapters.game.v1649370 import layout
@@ -109,7 +110,7 @@ class RefactorEquivalenceTests(unittest.TestCase):
         旧单体基线不含改名卡消费回写钩子（额外的代码页、指针修补与跳转），
         与当前行为的有意差异已固化为本夹具；后续改动偏离轨迹时应先更新此基线并说明原因。
         """
-        from codol_rebuild.adapters.game.v1649370.session_bridge import GameSessionBridge
+        from codol_rebuild.adapters.game.v1649370.session.session_bridge import GameSessionBridge
         def enc(value):
             if isinstance(value,bytes):return {'hex':value.hex()}
             if isinstance(value,(tuple,list)):return [enc(item) for item in value]
@@ -129,7 +130,7 @@ class RefactorEquivalenceTests(unittest.TestCase):
 
     def test_real_profile_bootstrap_equivalent(self):
         from codol_rebuild.application.accounts.service import bootstrap
-        from codol_rebuild.adapters.game.v1649370.profile_codec import AccountCodec
+        from codol_rebuild.adapters.game.v1649370.accounts.profile_codec import AccountCodec
         captured=json.loads((CAPTURE/'capture.json').read_text(encoding='utf-8'))
         schemas={kind:json.loads((CAPTURE/label/'playerdata-schema.json').read_text(encoding='utf-8'))
                  for kind,label in [('public','playerdata'),('secure','playersecuredata')]}

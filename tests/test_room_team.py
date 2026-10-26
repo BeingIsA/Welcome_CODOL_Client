@@ -4,8 +4,9 @@ import struct
 import unittest
 from unittest.mock import Mock
 
-from codol_rebuild.adapters.game.v1649370.room import RoomTeamBridge
-from codol_rebuild.application.room.contracts import Completion, IdentityRecord
+from codol_rebuild.adapters.game.v1649370.rooms.room import RoomTeamBridge
+from codol_rebuild.application.room.contracts import Completion
+from codol_rebuild.application.session.contracts import IdentityRecord
 from codol_rebuild.application.room.service import RoomSession
 from codol_rebuild.adapters.transport.http import HttpGateway
 from test_refactor_equivalence import MemoryProcess
@@ -72,7 +73,7 @@ class TeamSessionTests(unittest.TestCase):
     def test_member_snapshot_consumption_keeps_request_order(self):
         from concurrent.futures import Future
         realtime = Mock()
-        session = RoomSession(Mock(), Mock(), 'http://server', 'fingerprint', realtime)
+        session = RoomSession(Mock(), Mock(), 'http://server', realtime)
         self.addCleanup(session._executor.shutdown)
         session._members_pending = Future()
         self.assertFalse(session.begin_change_team('rm_test', 'spectator'))
@@ -88,7 +89,7 @@ class TeamSessionTests(unittest.TestCase):
     def test_failure_once_and_channel_released(self):
         gateway = Mock()
         gateway.change_team.side_effect = OnlineError('ROOM_TEAM_FULL', '满员')
-        session = RoomSession(gateway, Mock(), 'http://server', 'fingerprint')
+        session = RoomSession(gateway, Mock(), 'http://server')
         self.addCleanup(session._executor.shutdown)
         session._record = IdentityRecord('pl_me', 'rm_test')
         self.assertTrue(session.begin_change_team('rm_test', 'spectator'))

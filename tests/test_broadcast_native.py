@@ -4,7 +4,7 @@ import os
 import subprocess
 import tempfile
 import unittest
-from codol_rebuild.adapters.game.v1649370.broadcast import build_adapter, encode_message
+from codol_rebuild.adapters.game.v1649370.chat.broadcast import build_adapter, encode_message
 from test_broadcast import server_message
 from test_room_list_native import relocate_fixture_calls
 

@@ -2,7 +2,8 @@
 import tempfile
 import unittest
 from pathlib import Path
-from codol_rebuild.application.room.contracts import IdentityRecord, valid_room_id
+from codol_rebuild.application.room.contracts import valid_room_id
+from codol_rebuild.application.session.contracts import IdentityRecord
 from codol_rebuild.adapters.transport.http import _identifier
 from codol_rebuild.adapters.persistence.server_identity import JsonIdentityStore
 

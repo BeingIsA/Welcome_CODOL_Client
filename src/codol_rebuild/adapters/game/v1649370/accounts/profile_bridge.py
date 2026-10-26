@@ -6,8 +6,8 @@ import struct
 import time
 
 from codol_rebuild.adapters.game.v1649370 import layout
-from codol_rebuild.adapters.game.v1649370.profile import PUBLIC, SECURE, CAPACITY, STRIDE
-from codol_rebuild.adapters.game.v1649370.viewer import view_state
+from codol_rebuild.adapters.game.v1649370.accounts.profile import PUBLIC, SECURE, CAPACITY, STRIDE
+from codol_rebuild.adapters.game.v1649370.frontend.viewer import view_state
 
 
 class LocalProfileBridge:
@@ -64,12 +64,12 @@ class LocalProfileBridge:
 
     def prepare_native(self, profile_data, pool, capture_dir, name_state):
         """在准备暂停点捕获并初始化账号，按原顺序恢复昵称、档案和库存。"""
-        from codol_rebuild.adapters.game.v1649370.profile import capture
-        from codol_rebuild.adapters.game.v1649370.profile import populate_inventory
+        from codol_rebuild.adapters.game.v1649370.accounts.profile import capture
+        from codol_rebuild.adapters.game.v1649370.accounts.profile import populate_inventory
         captured = capture(self.process.read, profile_data, capture_dir, pool)
         schemas = {kind: json.loads(Path(captured['schemas'][label]['schema']).read_text(encoding='utf-8')) for kind, label in [('public', 'playerdata'), ('secure', 'playersecuredata')]}
         account = self._initialize(schemas, captured['tables'], captured['catalog'])
-        from codol_rebuild.adapters.game.v1649370 import player_name
+        from codol_rebuild.adapters.game.v1649370.accounts import player_name
         if self._service.name_snapshot['value'] is not None:
             player_name.stage_name(self.process.read, self.process.write, name_state, self._service.name_snapshot['value'])
         for kind, base in [('public', PUBLIC), ('secure', SECURE)]:
@@ -107,12 +107,12 @@ class LocalProfileBridge:
         self._inventory['selected_character_cache'] = cached_character
         if cached_character != expected_character or cached_character <= 0:
             raise ValueError('Native selected-character cache not initialized for inventory UI')
-        from codol_rebuild.adapters.game.v1649370.profile import publish_empty_local_store
+        from codol_rebuild.adapters.game.v1649370.accounts.profile import publish_empty_local_store
         self.log['local_store'] = publish_empty_local_store(self.process.read, self.process.write, native_count)
         self.log['local_store']['purchases_supported'] = purchases_supported
         state = self._account.get('initialization')
         if state:
-            from codol_rebuild.adapters.game.v1649370.profile import publish_currency
+            from codol_rebuild.adapters.game.v1649370.accounts.profile import publish_currency
             self.log['local_currency'] = publish_currency(self.process.read, self.process.write, state)
         self.process.write(profile_data + 72, struct.pack('<I', 1))
         if self.process.read(profile_data + 72, 4) != struct.pack('<I', 1):
@@ -125,7 +125,7 @@ class LocalProfileBridge:
 
     def quote(self, state):
         """使用本桥目录快照解释原生报价，不向会话桥暴露可变目录。"""
-        from codol_rebuild.adapters.game.v1649370.purchase import quote
+        from codol_rebuild.adapters.game.v1649370.accounts.purchase import quote
         return quote(self.process.read, state, self._catalog)
 
     def _initialize(self, schemas, tables, catalog):
@@ -139,7 +139,7 @@ class LocalProfileBridge:
         return self._service.validate_name(value)
 
     def rename(self, value):
-        from codol_rebuild.adapters.game.v1649370.player_name import consume_card, NAME_CARD
+        from codol_rebuild.adapters.game.v1649370.accounts.player_name import consume_card, NAME_CARD
         self.save(force=True)
         return consume_card(self.process.read, self.process.write, self._inventory,
                             self._service.consume_state(NAME_CARD),
@@ -147,7 +147,7 @@ class LocalProfileBridge:
 
     def consume_item(self, item_id):
         """在游戏暂停点发布并保存单件消耗；调用方提交成功通知以触发原生刷新。"""
-        from codol_rebuild.adapters.game.v1649370.profile import publish_consumption
+        from codol_rebuild.adapters.game.v1649370.accounts.profile import publish_consumption
         if not self._ready or not self._account:
             raise ValueError('本地档案尚未就绪')
         return publish_consumption(
@@ -157,7 +157,7 @@ class LocalProfileBridge:
 
     def check_name_card(self):
         """发送前确认本地档案有一张可消耗改名卡。"""
-        from codol_rebuild.adapters.game.v1649370.player_name import NAME_CARD
+        from codol_rebuild.adapters.game.v1649370.accounts.player_name import NAME_CARD
         self._service.consume_state(NAME_CARD)
 
     def synchronize_name(self, value):
@@ -179,7 +179,7 @@ class LocalProfileBridge:
 
     def purchase(self, offer, quantity=1):
         """通过应用服务规划交易，版本适配暂存原生库存，单事务持久化。"""
-        from codol_rebuild.adapters.game.v1649370.purchase import publish_transaction
+        from codol_rebuild.adapters.game.v1649370.accounts.purchase import publish_transaction
         if not self._ready or not self._account:
             raise ValueError('本地档案尚未就绪')
         self.save(force=True)
@@ -210,7 +210,7 @@ class LocalProfileBridge:
             raise ValueError('Inventory boundary changed')
         balances = None
         if self._account.get('initialization') is not None:
-            from codol_rebuild.adapters.game.v1649370.profile import currency_snapshot
+            from codol_rebuild.adapters.game.v1649370.accounts.profile import currency_snapshot
             balances = currency_snapshot(mem)
             if currency_snapshot(mem) != balances:
                 return

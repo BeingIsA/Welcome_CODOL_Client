@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import struct
+from codol_rebuild.adapters.game.v1649370.native_state import MESSAGE as JOIN_ERROR_MESSAGE_OFFSET
 
 CREATE = 0x62CCEA
 VALID = 0x62FDE0
@@ -404,7 +405,6 @@ JOIN_INPUT = 0x5D3216
 JOIN_ERROR_OFFSET = 40
 # 禁入专用码不占用原版 0..47；文本沿用现有失败任务的展示流程。
 JOIN_BLOCKED_ERROR = 0x10000
-JOIN_ERROR_MESSAGE_OFFSET = 128
 JOIN_ERROR_TEXT_CALL = 0x7C46EB
 # 设置回显独立于建房、入房、离房任务槽，避免完成通知互相覆盖。
 SETTINGS_READY_OFFSET, SETTINGS_ROOM_OFFSET = 44, 48

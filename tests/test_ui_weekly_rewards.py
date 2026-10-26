@@ -15,7 +15,8 @@ def disasm(method,names,strings):
   if row['op'].startswith('branch_'):
    at=row['offset'];row['args']=[at+4+int.from_bytes(code[at+1:at+4],'little',signed=True)]
  return rows
-from codol_rebuild.adapters.game.v1649370 import ui_movie,ui_weekly_rewards
+from codol_rebuild.adapters.game.v1649370.session import ui_movie
+from codol_rebuild.adapters.game.v1649370.frontend import ui_weekly_rewards
 
 def board(movie):
  r=Reader(movie);r.p=8+(5+4*(movie[8]>>3)+7)//8+4

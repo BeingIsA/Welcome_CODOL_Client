@@ -4,14 +4,14 @@ import unittest
 from pathlib import Path
 import pefile
 from capstone import Cs, CS_ARCH_X86, CS_MODE_32
-from codol_rebuild.adapters.game.v1649370.profile import build_initializer,inventory_relocations,CAPACITY,STRIDE,populate_inventory,publish_empty_local_store
+from codol_rebuild.adapters.game.v1649370.accounts.profile import build_initializer,inventory_relocations,CAPACITY,STRIDE,populate_inventory,publish_empty_local_store
 
 ROOT=Path(__file__).resolve().parents[2]
 
 
 class BridgeTests(unittest.TestCase):
     def test_local_welcome_patch_preserves_gfx_boolean_cleanup_and_callback_abi(self):
-        from codol_rebuild.adapters.game.v1649370.local_ui_services import local_welcome_page_patch
+        from codol_rebuild.adapters.game.v1649370.frontend.local_ui_services import local_welcome_page_patch
         pe=pefile.PE(str(ROOT/'client/bin/v1649370/codol1649370-offline.exe'))
         # Verify the registered callback and its entire fixed-build body, not
         # merely that six plausible bytes happen to occur at the patch site.
@@ -42,7 +42,7 @@ class BridgeTests(unittest.TestCase):
                           ('pop','esi'),('pop','ebx'),('pop','ebp'),('ret','4')])
 
     def test_optional_credit_request_keeps_void_callback_stack_cleanup(self):
-        from codol_rebuild.adapters.game.v1649370.local_ui_services import local_optional_service_patches
+        from codol_rebuild.adapters.game.v1649370.frontend.local_ui_services import local_optional_service_patches
         pe=pefile.PE(str(ROOT/'client/bin/v1649370/codol1649370-offline.exe'))
         patches=local_optional_service_patches()
         self.assertEqual(len(patches),1)
@@ -53,7 +53,7 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual([(r.mnemonic,r.op_str) for r in rows],[('nop','')]*5+[('ret','4')])
 
     def test_stats_provider_is_scoped_and_fail_closed(self):
-        from codol_rebuild.adapters.game.v1649370.profile import build_stats_ready_adapter
+        from codol_rebuild.adapters.game.v1649370.accounts.profile import build_stats_ready_adapter
         entry,data=0x20000c00,0x21000000
         plan=build_stats_ready_adapter(entry,data)
         pe=pefile.PE(str(ROOT/'client/bin/v1649370/codol1649370-offline.exe'))
@@ -85,7 +85,7 @@ class BridgeTests(unittest.TestCase):
                 self.assertEqual(eax,int(published==1 and inventory==1))
 
     def test_view_results_use_frame_params_and_preserve_gfx_type(self):
-        from codol_rebuild.adapters.game.v1649370.viewer import view_result
+        from codol_rebuild.adapters.game.v1649370.frontend.viewer import view_result
         raw=bytearray(32)
         struct.pack_into('<III',raw,8,0x123400,0x48,0x567800)
         memory={(0x1008,4):struct.pack('<I',0x2000),

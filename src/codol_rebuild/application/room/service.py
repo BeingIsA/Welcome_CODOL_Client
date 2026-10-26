@@ -1,4 +1,4 @@
-"""房间用例编排：后台串行请求、身份保存和不确定写入恢复。"""
+"""房间用例编排：后台串行请求、房间状态保存和不确定写入恢复。"""
 from codol_rebuild.application.errors import OnlineError
 import threading
 import logging
@@ -7,21 +7,24 @@ from copy import deepcopy
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from codol_rebuild.application.room.contracts import (
-    Completion, Gateway, IdentityRecord, IdentityStore, RealtimeConnection, valid_room_id,
+    Completion, Gateway, RoomStateStore, valid_room_id,
 )
+from codol_rebuild.application.session.contracts import IdentityRecord
+from codol_rebuild.application.realtime.contracts import EventSource
 
 
 class RoomSession:
-    """原生线程只提交与消费结果；身份、房间状态只在单个工作线程中改变。"""
-    def __init__(self, gateway: Gateway, store: IdentityStore, server: str, fingerprint: str,
-                 realtime: RealtimeConnection | None = None):
+    """原生线程只提交与消费结果；房间状态只在单个工作线程中改变。"""
+    def __init__(self, gateway: Gateway, store: RoomStateStore, server: str,
+                 inbox: EventSource | None = None):
         self._gateway, self._store = gateway, store
-        self._server, self._fingerprint = server, fingerprint
+        self._server = server
         self._record = None
+        self._restoring = False
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='codol-http')
         self._pending = None
         self._closed = False
-        self._realtime = realtime
+        self._inbox = inbox
         self._is_owner = None
         # 设置同步与主流程互不阻塞，但共用单工作线程保证串行。
         self._settings_pending = None
@@ -36,6 +39,15 @@ class RoomSession:
         self._profile_upload_enabled = True
         self._profile_pending = None
         self._profile_latest = None
+
+    def confirmed_room_id(self) -> str | None:
+        """仅返回当前身份已确认且没有入离房操作在途的房间。"""
+        identity = self._record
+        if (self._closed or self._restoring or self._pending is not None or self._departure_pending is not None
+                or identity is None
+                or identity.uncertain_create or identity.uncertain_join):
+            return None
+        return identity.room_id
 
     def begin_update_profile(self, room_id, profile):
         """复制原生已采集资料，在途时合并为最新快照，不阻塞调用线程。"""
@@ -169,7 +181,7 @@ class RoomSession:
               room_id: str | None = None, profile: dict | None = None) -> bool:
         """提交单个用例，重复点击不会重复发送请求。
 
-        设置同步与主流程（登录/创建/退出）互不阻塞：原生改设置在本地
+        设置同步与主流程（创建/退出）互不阻塞：原生改设置在本地
         立即生效，这里只做异步补交，失败不影响房间状态。
         """
         if self._closed or self._departure_pending is not None:
@@ -182,7 +194,7 @@ class RoomSession:
             return True
         if self._pending is not None:
             return False
-        if operation not in ('login', 'create', 'join', 'leave'):
+        if operation not in ('create', 'join', 'leave'):
             raise ValueError('未知联机用例')
         self._discard_profile_updates()
         self._pending = self._executor.submit(self._execute, operation, username,
@@ -214,7 +226,7 @@ class RoomSession:
     def poll_event(self) -> Completion | None:
         """统一消费实时消息，按类型交给对应业务处理函数。"""
         # 换队回包先消费，随后才读取事件快照，避免较旧回包覆盖较新成员列表。
-        if (self._closed or self._realtime is None or self._pending is not None
+        if (self._closed or self._inbox is None or self._pending is not None
                 or self._team_pending is not None
                 or (self._ready_pending is not None and self._members_pending is None)):
             return None
@@ -234,7 +246,7 @@ class RoomSession:
                     and result.data['roomId'] == self._record.room_id):
                 return result
             return None
-        event = self._realtime.poll_event()
+        event = self._inbox.poll_event()
         if event is None:
             return None
         handlers = {'room_settings_updated': self._handle_room_settings_updated,
@@ -306,7 +318,7 @@ class RoomSession:
                 self._execute_list, username, self._list_cancel)
 
     def cancel_list(self) -> None:
-        """使在途列表失效；不取消建房、离房、设置或登录请求。"""
+        """使在途列表失效；不取消建房、离房或设置请求。"""
         self._list_cancel.set()
         self._list_request = None
 
@@ -353,16 +365,22 @@ class RoomSession:
         except (OSError, ValueError) as error:
             return Completion('list', error=OnlineError('LOCAL_IDENTITY_ERROR', str(error)))
 
-    def _login(self, username):
-        if self._record is None:
-            self._record = self._store.load(self._server)
-        data = self._gateway.login(self._fingerprint, username,
-                                   self._record.player_id if self._record else None)
-        self._save(replace(self._record, player_id=data['playerId']) if self._record
-                   else IdentityRecord(data['playerId']))
-        if self._realtime is not None:
-            self._realtime.start(self._record.player_id, self._fingerprint)
-        return data
+    def bind_identity(self, identity: IdentityRecord) -> None:
+        """由会话后台交接确认身份；写入仍在房间工作线程执行。"""
+        self._executor.submit(self._bind_identity, identity).result()
+
+    def _bind_identity(self, identity):
+        self._record = identity
+        # 持久化恢复记录不代表当前已确认归属；替代此前登录任务在途的门控。
+        self._restoring = True
+
+    def restore(self) -> None:
+        """会话启动等待旧房间恢复完成；不登录、不启动连接。"""
+        self._executor.submit(self._restore).result()
+
+    def _restore(self):
+        self._leave()
+        self._restoring = False
 
     def _recover_create(self):
         if not self._record.uncertain_create:
@@ -435,14 +453,9 @@ class RoomSession:
 
     def _execute(self, operation, username, max_players, password, settings=None, room_id=None, profile=None):
         try:
-            if operation == 'login':
-                login_result = self._login(username)
-            elif self._record is None:
+            if self._record is None:
                 raise OnlineError('NO_IDENTITY', '尚未完成启动登录')
-            if operation == 'login':
-                self._leave()  # 重启后清理上次未正常退出的房间。
-                data = {'playerId': self._record.player_id, 'displayName': login_result['displayName']}
-            elif operation == 'leave':
+            if operation == 'leave':
                 data = self._leave()
             elif operation == 'join':
                 data = self._join(room_id, username, password, profile)
@@ -503,8 +516,4 @@ class RoomSession:
         try:
             future.result()
         finally:
-            try:
-                if self._realtime is not None:
-                    self._realtime.close()
-            finally:
-                self._executor.shutdown(wait=True)
+            self._executor.shutdown(wait=True)

@@ -3,7 +3,7 @@ from pathlib import Path
 import struct,sys,unittest,zlib
 ROOT=Path(__file__).resolve().parents[2];sys.path.insert(0,str(ROOT/'research'))
 from trace_matchmaking_debugline import Reader,abc_parse,disassemble
-from codol_rebuild.adapters.game.v1649370 import ui_movie
+from codol_rebuild.adapters.game.v1649370.session import ui_movie
 
 def parse(movie,tag):
  r=Reader(movie);r.p=8+(5+4*(movie[8]>>3)+7)//8+4

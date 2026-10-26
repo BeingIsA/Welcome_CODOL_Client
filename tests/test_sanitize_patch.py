@@ -4,7 +4,9 @@ import struct
 import unittest
 import zlib
 
-from codol_rebuild.adapters.game.v1649370 import player_name, sanitize, ui_movie, ui_navigation
+from codol_rebuild.adapters.game.v1649370.accounts import player_name
+from codol_rebuild.adapters.game.v1649370.frontend import sanitize, ui_navigation
+from codol_rebuild.adapters.game.v1649370.session import ui_movie
 
 ROOT = Path(__file__).resolve().parents[2]
 

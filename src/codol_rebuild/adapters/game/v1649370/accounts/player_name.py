@@ -26,7 +26,7 @@ REFRESH_PREVIEW = 0x5E72B0
 
 def consume_card(read, write, inventory, next_state, commit):
     """按应用层计算的剩余数量发布消费；归零才清空槽位，提交失败恢复原槽。"""
-    from codol_rebuild.adapters.game.v1649370.profile import CAPACITY, STRIDE
+    from codol_rebuild.adapters.game.v1649370.accounts.profile import CAPACITY, STRIDE
     pool, count = int(inventory['pool'], 16), inventory['items']
     if not 0 < count <= CAPACITY or _u32(read, 0x82C4A8C) != count:
         raise ValueError('改名库存数量不一致')
@@ -361,3 +361,12 @@ def replacements() -> list:
             (COMPLETE_OFFSET, COMPLETE_BEFORE, COMPLETE_AFTER),
             (MESSAGE_OFFSET, MESSAGE_BEFORE, MESSAGE_AFTER),
             (PLAYER_OFFSET, PLAYER_BEFORE, PLAYER_AFTER)]
+
+
+def username(read):
+    """沿用昵称显示编码，转为业务接口使用的 Unicode。"""
+    language = _u32(read, LANGUAGE)
+    if language < 0x10000:
+        raise ValueError('昵称语言信息未就绪')
+    encoding = 'utf-8' if _u32(read, DIRECT_STRING_MODE) == 1 or _u32(read, language+12) == 0 else 'gbk'
+    return native_name(read).decode(encoding)

@@ -1,46 +1,27 @@
-"""1649370 联机桥：原生异步任务、主线程完成投递和服务端身份显示映射。
+"""1649370 房间桥：原生房间请求、成员展示和主线程完成投递。
 
 HTTP 不在暂停点等待；帧陷阱只提交或消费已完成结果。字符串 playerId 仅在
 业务端使用，原生64位显示标识由其稳定摘要映射，不用作服务端认证。
 """
-from codol_rebuild.application.errors import OnlineError
 import hashlib
 import struct
-from codol_rebuild.application.room.contracts import RoomPort, PERMISSION_ERROR_CODES
-from codol_rebuild.adapters.game.v1649370.player_name import native_name, LANGUAGE, DIRECT_STRING_MODE
-from codol_rebuild.adapters.game.v1649370.room import (
+from codol_rebuild.application.room.contracts import RoomPort
+from codol_rebuild.adapters.game.v1649370.accounts.player_name import LANGUAGE, DIRECT_STRING_MODE
+from codol_rebuild.adapters.game.v1649370.rooms.room import (
     JOIN_ERROR_OFFSET, JOIN_BLOCKED_ERROR, JOIN_ERROR_MESSAGE_OFFSET,
     SETTINGS_READY_OFFSET, SETTINGS_ROOM_OFFSET,
 )
-from codol_rebuild.adapters.game.v1649370 import member_profile
+from codol_rebuild.adapters.game.v1649370.rooms import member_profile
+from codol_rebuild.adapters.game.v1649370.native_state import POLL, ACTION, ROOM, SESSION, LEAVE_ARG, UNDEFINED, MESSAGE, u32, checked_write
+from codol_rebuild.adapters.game.v1649370.frontend.notifications import display_message
+from codol_rebuild.adapters.game.v1649370.accounts.player_name import username
 
 ROOM_POINTER = 0x82E13FC
-POLL, ACTION, ROOM, SESSION, LEAVE_ARG, LOGIN, IDENTITY = 0, 4, 8, 12, 16, 20, 24
-UNDEFINED, MESSAGE = 64, JOIN_ERROR_MESSAGE_OFFSET
 # 房间设置提交方法本体（房间管理器 vtable+0x7C，构造 0x62C000 写 vtable
 # 0xDC7274 得出）。所有配置变更——建房、规则设置页应用、单项改地图/模式
 # 及管理器内部路径——最终都经此处把新配置拷入管理器 +0x105F0，拦入口
 # 一处即可覆盖全部调用方（0x6300BD/0x6300C6 的两次 637AB0 拷贝之前）。
 SETTINGS_SUBMIT = 0x6300A0
-
-
-def display_message(error) -> str:
-    """权限类失败统一显示为缺少文件，不向用户暴露封禁等权限细节。"""
-    if isinstance(error, OnlineError) and error.code in PERMISSION_ERROR_CODES:
-        return '缺少文件'
-    return str(error)
-
-
-def u32(read, address):
-    """按固定 ABI 读取一个小端整数。"""
-    return struct.unpack('<I', read(address, 4))[0]
-
-
-def checked_write(process, address, value):
-    """仅由调试暂停点写入并回读通信区。"""
-    process.write(address, value)
-    if process.read(address, len(value)) != value:
-        raise ValueError('联机桥状态回读失败')
 
 
 def room_options(read, room):
@@ -129,15 +110,6 @@ def read_settings(read, config):
     return settings
 
 
-def username(read):
-    """沿用昵称显示编码，转为业务接口使用的 Unicode。"""
-    language = u32(read, LANGUAGE)
-    if language < 0x10000:
-        raise ValueError('昵称语言信息未就绪')
-    encoding = 'utf-8' if u32(read, DIRECT_STRING_MODE) == 1 or u32(read, language+12) == 0 else 'gbk'
-    return native_name(read).decode(encoding)
-
-
 def validate_contract(read):
     """新增调用边的固定字节验证；不依赖旧版本地址。"""
     for address, expected in {
@@ -177,113 +149,17 @@ def build_settings_detours(entry):
     return {'code': bytes(code), 'patches': patches, 'traps': traps}
 
 
-def build_tick(entry, state, ready, preview_entry, room_entries, list_publish=None, name_poll=None, broadcast_poll=None):
-    """包装既有前端帧；网络等待时立即返回，仅就绪结果进入原生回调。"""
-    code, labels, refs, traps = bytearray(), {}, [], {}
-    def emit(value): code.extend(bytes.fromhex(value))
-    def word(value): code.extend(struct.pack('<I', value))
-    def label(name): labels[name] = len(code)
-    def branch(op, name):
-        emit(op); refs.append((len(code), name)); word(0)
-    def call(address):
-        emit('e8'); word((address-entry-len(code)-4) & 0xffffffff)
-    def trap(name):
-        emit('8be5'); traps[entry+len(code)] = name; emit('cc')
-    emit('8d6424f4'); call(preview_entry); emit('8d64240c 9c60 8bec')
-    emit('833d'); word(ready); emit('01'); branch('0f85', 'done')
-    # 按前端帧节流，避免每帧跨进程暂停。开始请求时重置计数。
-    emit('ff05'); word(state+36)
-    emit('833d'); word(state+36); emit('06'); branch('0f82', 'done')
-    emit('c705'); word(state+36); word(0)
-    if broadcast_poll is not None:
-        # 独立于房间请求锁轮询；原生操作仍由游戏主线程执行。
-        emit('83e4f0'); call(broadcast_poll); emit('8be5')
-    if name_poll is not None:
-        emit('83e4f0'); call(name_poll); emit('8be5')
-    if 'settings_apply' in room_entries:
-        trap('realtime')
-        if 'notifications' in room_entries:
-            emit('83e4f0'); call(room_entries['notifications']); emit('8be5')
-        if 'members_apply' in room_entries:
-            emit('833d'); word(state+52); emit('00')
-            branch('0f84', 'members_done')
-            emit('c705'); word(state+52); word(0)
-            emit('83e4f0'); call(room_entries['members_apply']); emit('8be5')
-            if 'ready_notify' in room_entries:
-                emit('83e4f0'); call(room_entries['ready_notify']); emit('8be5')
-            trap('members_applied')
-            label('members_done')
-        if 'ready_notify' in room_entries:
-            emit('833d'); word(state+56); emit('00')
-            branch('0f84', 'ready_done')
-            emit('c705'); word(state+56); word(0)
-            emit('83e4f0'); call(room_entries['ready_notify']); emit('8be5')
-            label('ready_done')
-        emit('833d'); word(state+SETTINGS_READY_OFFSET); emit('00')
-        branch('0f84', 'poll_command')
-        emit('c705'); word(state+SETTINGS_READY_OFFSET); word(0)
-        emit('83e4f0'); call(room_entries['settings_apply']); emit('8be5')
-        trap('settings_applied')
-        label('poll_command')
-    emit('833d'); word(state+POLL); emit('00'); branch('0f84', 'done')
-    trap('poll')
-    if list_publish is not None:
-        emit('83e4f0'); call(list_publish); emit('8be5')
-    emit('a1'); word(state+ACTION)
-    actions = [(1, 'created'), (2, 'create_failed'), (3, 'left'), (4, 'leave_failed'),
-               (7, 'departed')]
-    if 'join_complete' in room_entries:
-        actions += [(5, 'joined'), (6, 'join_failed')]
-    for value, target in actions:
-        emit('83f8'+f'{value:02x}'); branch('0f84', target)
-    branch('e9', 'done')
-    if 'join_complete' in room_entries:
-        label('joined')
-        emit('83e4f0'); call(room_entries['join_complete'])
-        branch('e9', 'completed')
-        label('join_failed')
-        emit('83e4f0'); call(room_entries['join_failed'])
-        branch('e9', 'completed')
-    label('created')
-    emit('8b1d'); word(state+ROOM); emit('8b3d'); word(state+SESSION)
-    emit('83e4f0'); call(room_entries['create_complete'])
-    branch('e9', 'completed')
-    label('create_failed')
-    emit('83e4f0 83ec08 6a00 ff35'); word(state+SESSION); call(0x633FE0)
-    branch('e9', 'completed')
-    label('left')
-    emit('83e4f0 83ec0c ff35'); word(state+LEAVE_ARG); call(room_entries['leave_complete'])
-    emit('83c404 83ec0c 6a00 b9'); word(0xE69CB0); call(0x7CB7A0)
-    branch('e9', 'completed')
-    label('departed')
-    # 被动离房没有等待中的任务；原生 listener+0x4C 已投递成功通知，不能重复投递。
-    emit('83e4f0 83ec0c 6a00'); call(room_entries['leave_complete'])
-    branch('e9', 'completed')
-    label('leave_failed')
-    # 仅完成离房任务的失败响应，不能调用会清空界面的成功通知。
-    emit('83e4f0 68'); word(state+UNDEFINED)
-    emit('68'); word(state+MESSAGE); emit('6a00 6a64'); call(0x730280)
-    label('completed'); trap('completed')
-    label('done'); emit('8be5 619d c3')
-    for offset, target in refs:
-        struct.pack_into('<i', code, offset, labels[target]-offset-4)
-    return {'code': bytes(code), 'traps': traps}
-
-
-class ServerSessionBridge:
+class RoomSessionBridge:
     """版本适配只拥有原生请求快照，通过联机端口触发业务。"""
     def __init__(self, process, port: RoomPort, record):
         self.process, self.port, self.record = process, port, record
         self.state = None
         self.traps = {}
         self.pending = None
-        self.login_started = False
-        self.login_done = False
+        self.identity_ready = False
         # 已提交但尚未被 _poll 消费的设置补交；主流程收尾时据此保持轮询，
         # 否则设置结果会被搁浅、通道永久占用。
         self._settings_outstanding = False
-        # 失效后丢弃迟到完成结果的窗口，重新鉴权成功后关闭。
-        self.discard_results = False
         self.room_list = None
         self.join_snapshot = None
         self.join_scratch = None
@@ -305,7 +181,6 @@ class ServerSessionBridge:
         self.ready_bridge = None
         self.notifications = None
         self.departure_message = None
-        self.on_login = None
         self.account_ready = lambda: True
 
     def allocate(self):
@@ -335,14 +210,25 @@ class ServerSessionBridge:
                       member_profile.build_member_publish(self.members_apply, self.members_buffer))
         self.process.executable(self.members_apply, 4096)
 
-    def install_tick(self, ready, preview_entry, room_plan, name_poll=None, broadcast_poll=None):
-        """安装主线程完成调度；返回替换原预览 CALL 的新入口。"""
-        entry = self.process.allocate(4096)
-        from codol_rebuild.adapters.game.v1649370.room_list import RoomListBridge
+    def displayed_room_id(self) -> str | None:
+        """查询原生展示就绪且成员快照包含本人的房间；不承担聊天归属判断。"""
+        if (not self.identity_ready or self.pending is not None or self.join_cleanup
+                or self.applying_members or self.join_snapshot is None
+                or self.player_id is None or self.current_room_id is None):
+            return None
+        snapshot, members, identity_values, names, scalars = self.join_snapshot
+        if (snapshot['roomId'] != self.current_room_id
+                or not any(member['playerId'] == self.player_id for member in members)):
+            return None
+        return self.current_room_id
+
+    def install_adapters(self, room_plan):
+        """安装房间原生入口，返回公共调度需要的显式发布接口。"""
+        from codol_rebuild.adapters.game.v1649370.rooms.room_list import RoomListBridge
         self.room_list = RoomListBridge(self.process, self.port, self.record,
                                        lambda: username(self.process.read), display_message)
         publisher = self.room_list.install()
-        from codol_rebuild.adapters.game.v1649370.room import build_join_adapter, validate_join_contract
+        from codol_rebuild.adapters.game.v1649370.rooms.room import build_join_adapter, validate_join_contract
         validate_join_contract(self.process.read)
         self.ownership = room_plan['ownership']
         self.join_scratch = self.process.allocate(4096)
@@ -354,8 +240,8 @@ class ServerSessionBridge:
             checked_write(self.process, patch['va'], patch['after'])
         room_plan = {**room_plan, 'entries': {**room_plan['entries'], **join_plan['entries'],
                                             'members_apply': self.members_apply}}
-        from codol_rebuild.adapters.game.v1649370.room_member_menu import RoomMemberMenu
-        from codol_rebuild.adapters.game.v1649370.notifications import NativeNotifications
+        from codol_rebuild.adapters.game.v1649370.rooms.room_member_menu import RoomMemberMenu
+        from codol_rebuild.adapters.game.v1649370.frontend.notifications import NativeNotifications
         self.notifications = NativeNotifications(self.process)
         room_plan['entries']['notifications'] = self.notifications.install()
         self.member_menu = RoomMemberMenu(self.process, self.port,
@@ -363,10 +249,10 @@ class ServerSessionBridge:
                      [m['playerId'] for m in self.join_snapshot[1]] if self.join_snapshot else []),
             self.record, self.notifications.message)
         menu_traps = self.member_menu.install()
-        from codol_rebuild.adapters.game.v1649370.room import RoomTeamBridge
+        from codol_rebuild.adapters.game.v1649370.rooms.room import RoomTeamBridge
         self.team_bridge = RoomTeamBridge(self.process, self.port, self._team_room_state)
         team_traps = self.team_bridge.install()
-        from codol_rebuild.adapters.game.v1649370.room import RoomReadyBridge, build_ready_notifications
+        from codol_rebuild.adapters.game.v1649370.rooms.room import RoomReadyBridge, build_ready_notifications
         self.ready_bridge = RoomReadyBridge(self.process, self.port, self._team_room_state,
                                            lambda: self.applying_members)
         ready_traps = self.ready_bridge.install()
@@ -375,13 +261,7 @@ class ServerSessionBridge:
                       build_ready_notifications(ready_notify, self.members_buffer))
         self.process.executable(ready_notify, 4096)
         room_plan['entries']['ready_notify'] = ready_notify
-        plan = build_tick(entry, self.state, ready, preview_entry, room_plan['entries'], publisher, name_poll,
-                          broadcast_poll=broadcast_poll)
-        if len(plan['code']) > 4096:
-            raise ValueError('联机帧桥超出代码页')
-        checked_write(self.process, entry, plan['code'])
-        self.process.executable(entry, 4096)
-        self.traps = {**room_plan['traps'], **plan['traps'], **self.room_list.traps, **join_plan['traps']}
+        self.traps = {**room_plan['traps'], **self.room_list.traps, **join_plan['traps']}
         self.traps.update(menu_traps)
         self.traps.update(team_traps)
         self.traps.update(ready_traps)
@@ -392,7 +272,18 @@ class ServerSessionBridge:
             self.process, lambda: {hashlib.sha256(key.encode('utf-8')).digest()[:8]: value
                                    for key, value in self.member_profiles.items()})
         self.traps.update(self.profile_query.install())
-        return entry
+        return {'state': self.state, 'entries': room_plan['entries'], 'list_publish': publisher}
+
+    def register_frame_traps(self, traps):
+        """接收公共帧中属于房间的暂停点，不接管公共会话暂停点。"""
+        self.traps.update(traps)
+
+    def connected(self, player_id):
+        """接收会话已确认身份；房间桥不发起登录或控制实时连接。"""
+        self.player_id = player_id
+        self.identity_ready = True
+        if self.pending is None:
+            self._word(POLL, int(self._listing()))
 
     def install_settings_detours(self):
         """安装房内改设置两处提交调用的重定向桩；原生行为不变。"""
@@ -512,7 +403,7 @@ class ServerSessionBridge:
             elif phase.startswith('room_list_'):
                 if phase == 'room_list_cancel' and self.pending and self.pending[0] == 'join':
                     self.join_cancelled = True
-                self.room_list.handle(phase, ctx, self.login_done)
+                self.room_list.handle(phase, ctx, self.identity_ready)
                 if self.room_list.active:
                     self._word(POLL, 1)
                     self._word(36, 0)
@@ -556,10 +447,8 @@ class ServerSessionBridge:
                     self.record({'multiplayer_native_completed': operation, 'success': action in (1, 3, 5, 7)})
                 self.pending = None
                 self._word(ACTION, 0)
-                # 重新鉴权或设置补交仍在等待时保持轮询，两者都由 _poll 清零；
-                # 否则设置结果会被主流程收尾搁浅，通道被永久占用。
-                self._word(POLL, 1 if (self.login_started and not self.login_done)
-                           or self._settings_outstanding or self._listing() or self.join_cleanup else 0)
+                # 房间主流程收尾后继续消费尚未完成的设置或清理结果。
+                self._word(POLL, int(self._settings_outstanding or self._listing() or self.join_cleanup))
             struct.pack_into('<I', ctx, 184, address+1)
             self.process.set_context(thread, ctx)
         finally:
@@ -580,7 +469,7 @@ class ServerSessionBridge:
         self._word(POLL, 1)
         self._word(36, 0)
         try:
-            if not self.login_done:
+            if not self.identity_ready:
                 raise ValueError('服务端登录尚未成功')
             if not self.account_ready():
                 raise ValueError('昵称同步或改名尚未完成')
@@ -598,7 +487,7 @@ class ServerSessionBridge:
     def _prepare_join_snapshot(self, data, joining=True):
         """先校验整个快照与原生容量，再允许主线程创建会话。"""
         import math
-        from codol_rebuild.adapters.game.v1649370.room import MEMBER_CAPACITY
+        from codol_rebuild.adapters.game.v1649370.rooms.room import MEMBER_CAPACITY
         read = self.process.read
         room = self.pending[1]
         if u32(read, ROOM_POINTER) != room or (joining and u32(read, room+0x1C)):
@@ -740,7 +629,7 @@ class ServerSessionBridge:
         if operation == 'leave':
             self._word(LEAVE_ARG, u32(read, frame+40))
         try:
-            if not self.login_done and not self.login_started:
+            if not self.identity_ready:
                 raise ValueError('服务端登录尚未成功')
             if operation == 'create':
                 if not self.account_ready():
@@ -766,7 +655,7 @@ class ServerSessionBridge:
             if self.pending is not None:
                 # 建房/离房期间保留原有生命周期保护，不另提交房内设置请求。
                 return
-            if not (self.login_done or self.login_started):
+            if not self.identity_ready:
                 self.record({'multiplayer_settings': 'skipped', 'reason': 'login not ready'})
                 return
             if not self.port.begin('settings', username(self.process.read), settings=settings):
@@ -891,19 +780,12 @@ class ServerSessionBridge:
         self._word(SETTINGS_ROOM_OFFSET, room)
         self._word(SETTINGS_READY_OFFSET, 1)
 
-    def _drop_pending(self):
-        """丢弃仍在等待的原生请求结果，进入失效后丢弃窗口。"""
-        self.pending = None
-        self.discard_results = True
-
     def _poll(self):
         if self.room_list is not None:
             self.room_list.poll()
-            if (self.login_done and self.pending is None and not self._settings_outstanding
+            if (self.identity_ready and self.pending is None and not self._settings_outstanding
                     and not self._listing() and not self.join_cleanup):
                 self._word(POLL, 0)
-        if not self.login_started:
-            self.login_started = self.port.begin('login', username(self.process.read))
         if self.pending and self.pending[2] and not self._valid_room(*self.pending[1:]):
             # 不向回收后的对象投递迟到回调；宿主关闭时通过业务端口清理服务端房间。
             raise ValueError('等待服务端响应期间原生房间已改变')
@@ -920,28 +802,7 @@ class ServerSessionBridge:
                 self._word(POLL, int(self.join_cleanup or self._listing()))
                 self.record({'multiplayer_join_cancelled': True})
                 return
-        if result.operation == 'login':
-            if result.error:
-                if self.pending is not None:
-                    self._drop_pending()
-                self._failure('login', display_message(result.error))
-                # 启动登录失败只投递错误，不在后续帧自动重试。
-                self.login_started = True
-                return
-            identity = hashlib.sha256(result.data['playerId'].encode('utf-8')).digest()[:8]
-            if identity == bytes(8):
-                identity = b'\x01' + bytes(7)
-            checked_write(self.process, self.state+IDENTITY, identity)
-            self.login_done = True
-            self.player_id = result.data['playerId']
-            if self.on_login is not None:
-                self.on_login(result.data['playerId'], result.data['displayName'])
-            self.discard_results = False
-            self._word(LOGIN, 1)
-            if self.pending is None:
-                self._word(POLL, int(self._listing()))
-            self.record({'multiplayer': 'login', 'success': True})
-        elif result.operation == 'settings':
+        if result.operation == 'settings':
             # 原生界面已本地生效，这里只确认服务端落库结果；失败不回滚。
             self.record({'multiplayer_settings': 'done', 'success': result.error is None,
                          **({'error': str(result.error)} if result.error else {})})
@@ -953,9 +814,6 @@ class ServerSessionBridge:
             self.join_cleanup = False
             self.record({'multiplayer_join_cleanup': result.error is None})
             self._word(POLL, int(self._listing()))
-        elif self.discard_results:
-            # 失效窗口内迟到的创建/退出结果只记录，不再投递原生回调。
-            self.record({'multiplayer_discarded': result.operation, 'success': result.error is None})
         elif self.pending is None or result.operation != self.pending[0]:
             raise ValueError('联机完成结果没有匹配的原生请求')
         elif result.error:

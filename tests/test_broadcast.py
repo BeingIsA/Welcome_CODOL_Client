@@ -8,9 +8,9 @@ from unittest.mock import Mock, patch
 import pefile
 import capstone
 from codol_rebuild.application.broadcast.service import BroadcastSession
-from codol_rebuild.application.realtime.dispatch import EventInbox, RealtimeDispatcher, RoutedConnection
+from codol_rebuild.application.realtime.dispatch import EventInbox, RealtimeDispatcher
 from codol_rebuild.adapters.transport.http import HttpGateway
-from codol_rebuild.adapters.game.v1649370 import broadcast
+from codol_rebuild.adapters.game.v1649370.chat import broadcast
 
 
 def server_message(speaker_type='large'):
@@ -43,7 +43,7 @@ class BroadcastTests(unittest.TestCase):
         process.read.side_effect = lambda address, size: bytes(
             memory[address - 0x1000:address - 0x1000 + size])
         port = Mock(available=Mock(return_value=True))
-        bridge = broadcast.BroadcastBridge(process, port, Mock(), Mock())
+        bridge = broadcast.BroadcastBridge(process, port, Mock())
         bridge.state = 0x1000
         bridge.connected('pl_sender', '玩家')
         port.connected.assert_called_once_with('pl_sender', '玩家')
@@ -109,7 +109,7 @@ class BroadcastTests(unittest.TestCase):
         dispatcher = RealtimeDispatcher(transport)
         dispatcher.register(('room_members_updated', 'room_settings_updated'), rooms)
         dispatcher.register(('broadcast',), broadcasts)
-        routed = RoutedConnection(transport, rooms)
+        routed = rooms
         # 房间没有取消息，模拟等待请求完成；广播仍被独立分派。
         for dispatch_index in range(3):
             dispatcher.poll()
@@ -117,10 +117,8 @@ class BroadcastTests(unittest.TestCase):
         self.assertEqual(routed.poll_event(), first)
         self.assertEqual(routed.poll_event(), last)
         self.assertIsNone(routed.poll_event())
-        routed.start('pl_sender', 'machine')
-        routed.close()
-        transport.start.assert_called_once_with('pl_sender', 'machine')
-        transport.close.assert_called_once_with()
+        transport.start.assert_not_called()
+        transport.close.assert_not_called()
 
     def test_native_object_fields_match_existing_chat_contract(self):
         base = 0x21000000
@@ -171,7 +169,7 @@ class BroadcastTests(unittest.TestCase):
                 process = Mock(main_thread_id=1)
                 process.context.return_value = (100, context)
                 port = Mock()
-                bridge = broadcast.BroadcastBridge(process, port, Mock(), Mock())
+                bridge = broadcast.BroadcastBridge(process, port, Mock())
                 bridge.player_id = player_id
                 bridge.traps = {0x2000: 'send'}
                 bridge.plan = {'return': 0x3000}

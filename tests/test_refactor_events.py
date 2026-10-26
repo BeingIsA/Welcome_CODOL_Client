@@ -8,10 +8,11 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch, Mock
 
-from codol_rebuild.adapters.game.v1649370.session_bridge import GameSessionBridge
-from codol_rebuild.adapters.game.v1649370 import player_name
-from codol_rebuild.adapters.game.v1649370 import layout, profile
-from codol_rebuild.adapters.game.v1649370.profile_bridge import LocalProfileBridge
+from codol_rebuild.adapters.game.v1649370.session.session_bridge import GameSessionBridge
+from codol_rebuild.adapters.game.v1649370.accounts import player_name
+from codol_rebuild.adapters.game.v1649370 import layout
+from codol_rebuild.adapters.game.v1649370.accounts import profile
+from codol_rebuild.adapters.game.v1649370.accounts.profile_bridge import LocalProfileBridge
 from codol_rebuild.bootstrap import launch
 from codol_rebuild.runtime.scheduler import PeriodicTask
 from codol_rebuild.runtime.session import ProcessSession
@@ -207,7 +208,7 @@ class ProfileLifecycleTests(unittest.TestCase):
                               'schemas', 'name_snapshot', 'profile_identities'):
                 with self.assertRaises(AttributeError):
                     setattr(bridge, attribute, None)
-            with patch('codol_rebuild.adapters.game.v1649370.purchase.quote', return_value={'sku': 1}) as quote:
+            with patch('codol_rebuild.adapters.game.v1649370.accounts.purchase.quote', return_value={'sku': 1}) as quote:
                 self.assertEqual(bridge.quote(0x24000000), {'sku': 1})
                 self.assertEqual(quote.call_args.args[2][545]['type_bytes'][0], 0)
 

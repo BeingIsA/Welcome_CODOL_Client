@@ -1,4 +1,6 @@
 """联机原生桥回归：ABI、分支边界、配置提取与失败时状态保留。"""
+from codol_rebuild.adapters.game.v1649370.session.session_tick import build_tick
+from codol_rebuild.adapters.game.v1649370.native_state import IDENTITY
 from codol_rebuild.application.errors import OnlineError
 from pathlib import Path
 import struct
@@ -8,8 +10,8 @@ from unittest import mock
 from unittest.mock import Mock
 import capstone
 import pefile
-from codol_rebuild.adapters.game.v1649370 import server_session_bridge as bridge
-from codol_rebuild.adapters.game.v1649370.room import build_room_adapter
+from codol_rebuild.adapters.game.v1649370.rooms import room_session_bridge as bridge
+from codol_rebuild.adapters.game.v1649370.rooms.room import build_room_adapter
 from codol_rebuild.application.room.contracts import Completion
 
 
@@ -27,7 +29,8 @@ class Memory:
 
 def prepare_profile(memory, adapter):
     """为房间请求提供合法的固定版本双档案及已采集展示包。"""
-    from codol_rebuild.adapters.game.v1649370 import member_profile, layout
+    from codol_rebuild.adapters.game.v1649370.rooms import member_profile
+    from codol_rebuild.adapters.game.v1649370 import layout
     adapter.profile_buffer = 0x28000000
     memory.write(adapter.profile_buffer, bytes(0x140))
     for address, identity in ((member_profile.PUBLIC, layout.PUBLIC_IDENTITY),
@@ -139,13 +142,13 @@ class MultiplayerBridgeTests(unittest.TestCase):
 
     def test_join_hook_is_installed_against_fixed_image(self):
         from test_refactor_equivalence import MemoryProcess
-        from codol_rebuild.adapters.game.v1649370.room import JOIN_INPUT
+        from codol_rebuild.adapters.game.v1649370.rooms.room import JOIN_INPUT
         process = MemoryProcess()
-        adapter = bridge.ServerSessionBridge(process, Mock(), Mock())
+        adapter = bridge.RoomSessionBridge(process, Mock(), Mock())
         adapter.allocate()
         room_plan = build_room_adapter(0x30000000, 0x31000000, 0x32000000, deferred=True,
-                                       identity_address=adapter.state+bridge.IDENTITY)
-        adapter.install_tick(0x32000000, 0x33000000, room_plan)
+                                       identity_address=adapter.state+IDENTITY)
+        adapter.install_adapters(room_plan)
         patch = next(capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32).disasm(
             process.read(JOIN_INPUT, 5), JOIN_INPUT))
         target = int(patch.op_str, 16)
@@ -168,12 +171,12 @@ class MultiplayerBridgeTests(unittest.TestCase):
         memory.word(bridge.DIRECT_STRING_MODE, 1)
         port = Mock()
         port.begin.return_value = True
-        adapter = bridge.ServerSessionBridge(memory, port, Mock())
+        adapter = bridge.RoomSessionBridge(memory, port, Mock())
         prepare_profile(memory, adapter)
         adapter.state = state
         adapter.join_scratch = 0x26000000
         adapter.player_id = 'pl_me'
-        adapter.login_done = True
+        adapter.identity_ready = True
         adapter.pending = ('join', room, 0)
         settings = {key: (0.0 if form == '<f' else 0)
                     for key, (offset, form) in bridge.SETTING_SCALARS.items()}
@@ -186,7 +189,6 @@ class MultiplayerBridgeTests(unittest.TestCase):
 
     def test_join_failure_preserves_password_reason_and_resets_for_next_failure(self):
         memory, adapter, data, room, session = self.join_fixture()
-        adapter.login_started = True
         for code, expected in (('INVALID_ROOM_PASSWORD', 5), ('ROOM_NOT_FOUND', 3),
                                ('ROOM_JOIN_BLOCKED', bridge.JOIN_BLOCKED_ERROR),
                                ('INVALID_ROOM_PASSWORD', 5), ('ROOM_CLOSED', 3)):
@@ -285,7 +287,7 @@ class MultiplayerBridgeTests(unittest.TestCase):
         """首次遇到观众也发布模型资料，不依赖其曾加入参战阵营留下的缓存。"""
         import hashlib
         from test_member_profile import sample_profile
-        from codol_rebuild.adapters.game.v1649370.member_profile import decode_snapshot
+        from codol_rebuild.adapters.game.v1649370.rooms.member_profile import decode_snapshot
         memory, adapter, data, room, session = self.join_fixture()
         owner_profile = sample_profile()
         data['members'][0].update(team='spectator', profile=owner_profile)
@@ -356,7 +358,7 @@ class MultiplayerBridgeTests(unittest.TestCase):
 
     def test_cancelled_join_cleans_remote_membership_without_native_callback(self):
         memory, adapter, data, room, session = self.join_fixture()
-        adapter.login_done = adapter.login_started = True
+        adapter.identity_ready = True
         adapter.join_cancelled = True
         adapter.port.poll.return_value = Completion('join', data=data)
         with mock.patch.object(bridge, 'username', return_value='队友'):
@@ -366,7 +368,7 @@ class MultiplayerBridgeTests(unittest.TestCase):
         adapter.port.begin.assert_called_once_with('leave', '队友')
 
     def test_offline_generators_remain_byte_identical_to_baseline(self):
-        from codol_rebuild.adapters.game.v1649370.menu_preview import build_menu_preview_helper
+        from codol_rebuild.adapters.game.v1649370.frontend.menu_preview import build_menu_preview_helper
         root = Path(__file__).resolve().parent/'fixtures/refactor-20261020/client/v1649370'
         for name, function, arguments, keys in (
             ('room.py', build_room_adapter, (0x20000000, 0x21000000, 0x22000000), ('code', 'patches', 'entries')),
@@ -586,10 +588,10 @@ class MultiplayerBridgeTests(unittest.TestCase):
         decoder = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
         for entry in (0x20000000, 0xf0000000):
             room = build_room_adapter(entry, 0x21000000, 0x22000000, deferred=True, identity_address=0x23000018)
-            from codol_rebuild.adapters.game.v1649370.room import build_join_adapter
+            from codol_rebuild.adapters.game.v1649370.rooms.room import build_join_adapter
             joined = build_join_adapter(entry+8192, 0x23000000, 0x25000000)
             entries = {**room['entries'], **joined['entries']}
-            tick = bridge.build_tick(entry+4096, 0x23000000, 0x22000000, 0x24000000, entries)
+            tick = build_tick(entry+4096, 0x23000000, 0x22000000, 0x24000000, entries)
             for plan, base, externals in (
                 (room, entry, {0x633fe0, 0x801600, 0x7e7e30, 0x62fde6, 0x63e620, 0x62f640,
                                0x62af10, 0x67ec54, 0x7cad60, 0x7c64c0, 0x7c6581, 0x7c64b5, 0x77ffb0}),
@@ -608,7 +610,7 @@ class MultiplayerBridgeTests(unittest.TestCase):
 
     def setup_bridge(self):
         process, port = Memory(), Mock()
-        value = bridge.ServerSessionBridge(process, port, Mock())
+        value = bridge.RoomSessionBridge(process, port, Mock())
         prepare_profile(process, value)
         value.player_id = 'pl_me'
         value.join_scratch = 0x29000000
@@ -616,7 +618,7 @@ class MultiplayerBridgeTests(unittest.TestCase):
         process.word(bridge.DIRECT_STRING_MODE, 1)
         value.state = 0x20000000
         process.write(value.state, bytes(4096))
-        value.login_started = value.login_done = True
+        value.identity_ready = True
         room, session = 0x21000000, 0x22000000
         process.word(bridge.ROOM_POINTER, room)
         process.word(room+0x1C, session)
@@ -673,23 +675,24 @@ class MultiplayerBridgeTests(unittest.TestCase):
 
     def test_completed_login_does_not_request_reauthentication(self):
         value, process, port, room, session = self.setup_bridge()
-        value.login_started, value.login_done = True, True
+        value.identity_ready = True
         port.poll.return_value = None
         for _ in range(3):
             value._poll()
         port.begin.assert_not_called()
 
     def test_login_permission_failure_shows_popup_without_retry(self):
+        from codol_rebuild.adapters.game.v1649370.session import online_session
+        from codol_rebuild.application.session.contracts import LoginCompletion
         value, process, port, room, session = self.setup_bridge()
-        value.login_started, value.login_done = False, False
-        port.begin.return_value = True
-        port.poll.return_value = Completion('login', error=OnlineError('BANNED', '身份已封禁'))
-        with mock.patch.object(bridge, 'username', return_value='测试'):
-            value._poll()
-        self.assertTrue(value.login_started)
+        port.begin_login.return_value = True
+        port.poll_login.side_effect = [LoginCompletion(error=OnlineError('BANNED', '身份已封禁')), None, None]
+        login_bridge = online_session.OnlineSessionBridge(process, port, value.state, Mock(), Mock())
+        with mock.patch.object(online_session, 'username', return_value='测试'):
+            login_bridge.poll()
+            login_bridge.poll()
+            login_bridge.poll()
+        self.assertTrue(login_bridge.started)
         self.assertEqual(process.read(value.state+bridge.MESSAGE, 64).split(b'\0')[0], '缺少文件'.encode('utf-8'))
         self.assertEqual(bridge.u32(process.read, value.state+bridge.ACTION), 4)
-        port.poll.return_value = None
-        value._poll()
-        value._poll()
-        port.begin.assert_called_once()
+        port.begin_login.assert_called_once()

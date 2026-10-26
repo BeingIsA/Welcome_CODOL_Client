@@ -11,8 +11,9 @@ from websockets.sync.server import serve
 from websockets.exceptions import ConnectionClosed
 
 from codol_rebuild.adapters.transport.websocket import WebSocketConnection
-from codol_rebuild.application.room.contracts import RealtimeStatus
+from codol_rebuild.application.realtime.contracts import RealtimeStatus
 from codol_rebuild.application.room.service import RoomSession
+from codol_rebuild.application.session.service import OnlineSession
 
 
 def wait_for(predicate):
@@ -25,10 +26,85 @@ def wait_for(predicate):
 
 
 class RealtimeTests(unittest.TestCase):
+    def test_chat_uplink_and_push_use_existing_authenticated_connection(self):
+        from codol_rebuild.application.chat.service import ChatSession
+        from codol_rebuild.application.realtime.dispatch import EventInbox, RealtimeDispatcher
+        received = []
+        def handler(connection):
+            try:
+                for encoded in connection:
+                    frame = json.loads(encoded)
+                    received.append(frame)
+                    connection.send(json.dumps({'type': 'chat_result', 'payload': {
+                        'requestId': frame['requestId'], 'data': {'messageId': 'chat_one'}}}))
+                    connection.send(json.dumps({'type': 'chat_message', 'payload': frame['payload']}))
+            except ConnectionClosed:
+                pass
+        with serve(handler, '127.0.0.1', 0) as server:
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            client = WebSocketConnection('http://127.0.0.1:' + str(server.socket.getsockname()[1]))
+            inbox = EventInbox()
+            dispatcher = RealtimeDispatcher(client)
+            dispatcher.register(('chat_message',), inbox)
+            session = ChatSession(client, inbox, lambda: '10')
+            try:
+                session.begin('连接前不补发', 'lobby', None)
+                client.start('pl_test', 'fp')
+                session.begin('大厅中文', 'lobby', None)
+                session.begin('房间中文', 'room', '10')
+                displayed = []
+                def done():
+                    dispatcher.poll()
+                    message = session.poll_message('10')
+                    if message is not None:
+                        displayed.append(message)
+                    return len(displayed) == 2
+                wait_for(done)
+                self.assertEqual(displayed, [{'scope': 'lobby', 'text': '大厅中文'},
+                                             {'scope': 'room', 'roomId': '10', 'text': '房间中文'}])
+                self.assertEqual(len(received), 2)
+                self.assertTrue(all(frame['type'] == 'chat_send' for frame in received))
+            finally:
+                client.close()
+                server.shutdown()
+                thread.join(3)
+
+    def test_connection_loss_discards_old_queue_and_offline_sends(self):
+        from websockets.exceptions import ConnectionClosedOK
+        client = WebSocketConnection('http://localhost')
+        entered, release = threading.Event(), threading.Event()
+        first_connection, second_connection = Mock(), Mock()
+        def first_receive(timeout):
+            entered.set()
+            if not release.wait(3):
+                raise AssertionError('测试接收未释放')
+            raise ConnectionClosedOK(None, None)
+        first_connection.recv.side_effect = first_receive
+        second_connection.recv.side_effect = TimeoutError
+        client._connect = Mock(side_effect=[first_connection, second_connection])
+        try:
+            client.start('pl_test', 'fp')
+            self.assertTrue(entered.wait(2))
+            client.send_message({'text': '旧连接队列'})
+            release.set()
+            wait_for(lambda: first_connection.close.called)
+            client.send_message({'text': '离线消息'})
+            wait_for(lambda: client._connect.call_count == 2)
+            wait_for(lambda: client.status() == RealtimeStatus.CONNECTED)
+            client.send_message({'text': '新连接消息'})
+            wait_for(lambda: second_connection.send.called)
+            first_connection.send.assert_not_called()
+            self.assertEqual([json.loads(call.args[0]) for call in second_connection.send.call_args_list],
+                             [{'text': '新连接消息'}])
+        finally:
+            release.set()
+            client.close()
+
     def test_application_dispatch_separates_receiving_from_settings_handling(self):
-        from codol_rebuild.application.room.contracts import IdentityRecord
+        from codol_rebuild.application.session.contracts import IdentityRecord
         realtime = Mock()
-        session = RoomSession(Mock(), Mock(), 'http://localhost', 'fp', realtime)
+        session = RoomSession(Mock(), Mock(), 'http://localhost', realtime)
         payload = {'roomId': 'rm_test', 'settings': {'mode': 'td'}}
         try:
             session._record = IdentityRecord('pl_test', room_id='rm_test')
@@ -48,7 +124,7 @@ class RealtimeTests(unittest.TestCase):
             session.close()
 
     def test_idle_connection_delivers_settings_in_received_order(self):
-        from codol_rebuild.application.room.contracts import IdentityRecord
+        from codol_rebuild.application.session.contracts import IdentityRecord
         messages = [{'type': 'room_settings_updated', 'payload': {
             'roomId': 'rm_test', 'revision': revision, 'settings': {'mode': mode}}}
             for revision, mode in ((7, 'td'), (6, 'dm'))]
@@ -64,7 +140,7 @@ class RealtimeTests(unittest.TestCase):
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
             client = WebSocketConnection('http://127.0.0.1:' + str(server.socket.getsockname()[1]))
-            session = RoomSession(Mock(), Mock(), 'http://localhost', 'fp', client)
+            session = RoomSession(Mock(), Mock(), 'http://localhost', client)
             session._record = IdentityRecord('pl_test', room_id='rm_test')
             try:
                 client.start('pl_test', 'fp')
@@ -84,6 +160,7 @@ class RealtimeTests(unittest.TestCase):
             finally:
                 session._record = None
                 session.close()
+                client.close()
                 server.shutdown()
                 thread.join(3)
 
@@ -196,12 +273,13 @@ class RealtimeTests(unittest.TestCase):
         store.load.return_value = None
         gateway.login.return_value = {'playerId': 'pl_test', 'displayName': '测试'}
         realtime.start.side_effect = [OnlineError('WS_CONNECT_FAILED', '失败'), None]
-        session = RoomSession(gateway, store, 'http://localhost', 'fp', realtime)
+        rooms = RoomSession(gateway, store, 'http://localhost')
+        session = OnlineSession(gateway, store, 'http://localhost', 'fp', rooms, realtime)
         def login():
-            session.begin('login', '测试')
+            session.begin_login('测试')
             result = []
             def done():
-                item = session.poll()
+                item = session.poll_login()
                 if item is not None:
                     result.append(item)
                 return bool(result)
@@ -212,7 +290,7 @@ class RealtimeTests(unittest.TestCase):
             self.assertIsNone(login().error)
             self.assertEqual(gateway.login.call_args.args[-1], 'pl_test')
             gateway.leave.side_effect = OnlineError('NETWORK_ERROR', '失败')
-            session._record = replace(session._record, room_id='rm_test')
+            rooms._record = replace(rooms._record, room_id='rm_test')
             with self.assertRaises(OnlineError):
                 session.close()
             realtime.close.assert_called_once()

@@ -4,7 +4,7 @@ import unittest
 
 import capstone
 import pefile
-from codol_rebuild.adapters.game.v1649370.viewer import (
+from codol_rebuild.adapters.game.v1649370.frontend.viewer import (
     build_local_viewer_adapter, PATCH_VA, BODY_VA, EXIT_VA, GATE_BYTES,
     VIEWER, INVENTORY_READY, INVENTORY_COUNT, WEAPON_COUNT, DW_POINTER,
 )

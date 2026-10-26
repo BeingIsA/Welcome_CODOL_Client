@@ -12,9 +12,10 @@ import unittest
 from pathlib import Path
 
 V1649370 = Path(__file__).resolve().parents[1] / 'src' / 'codol_rebuild' / 'adapters' / 'game' / 'v1649370'
-# 规则提供者模块：只允许依赖 movie_identity，不得导入 ui_movie。
-RULE_PROVIDERS = ['ui_navigation', 'sanitize', 'player_name', 'ui_theme',
-                  'ui_weekly_rewards', 'ui_recharge', 'purchase']
+# 规则跟随所属功能，不得反向依赖会话目录的聚合编排。
+RULE_PROVIDERS = ['frontend.ui_navigation', 'frontend.sanitize', 'accounts.player_name',
+                  'frontend.ui_theme', 'frontend.ui_weekly_rewards', 'accounts.ui_recharge',
+                  'accounts.purchase', 'rooms.room_member_menu', 'chat.ui_chat']
 
 
 def _imported_v1649370_modules(path: Path) -> set:
@@ -26,10 +27,11 @@ def _imported_v1649370_modules(path: Path) -> set:
             parts = node.module.split('.')
             if 'v1649370' in parts:
                 index = parts.index('v1649370')
-                if index + 1 < len(parts):
-                    names.add(parts[index + 1])
-                elif node.names:
-                    names.update(alias.name for alias in node.names)
+                module = '.'.join(parts[index + 1:])
+                if (V1649370 / (module.replace('.', '/') + '.py')).is_file():
+                    names.add(module)
+                else:
+                    names.update('.'.join(filter(None, (module, alias.name))) for alias in node.names)
     return names
 
 
@@ -39,17 +41,18 @@ class MoviePatchDependencyTests(unittest.TestCase):
     def test_rule_providers_do_not_import_ui_movie(self):
         # 规则提供者不得（含函数内延迟导入）依赖聚合层 ui_movie。
         for name in RULE_PROVIDERS:
-            self.assertNotIn('ui_movie', _imported_v1649370_modules(V1649370 / f'{name}.py'),
+            self.assertNotIn('session.ui_movie', _imported_v1649370_modules(V1649370 / (name.replace('.', '/') + '.py')),
                              f'{name} 反向依赖 ui_movie')
 
     def test_movie_identity_imports_no_rule_modules(self):
         # 执行器模块必须保持底层，不导入任何规则提供者或聚合层。
         imports = _imported_v1649370_modules(V1649370 / 'movie_identity.py')
-        self.assertFalse(imports & (set(RULE_PROVIDERS) | {'ui_movie'}))
+        self.assertFalse(imports & (set(RULE_PROVIDERS) | {'session.ui_movie'}))
 
     def test_ui_movie_reexports_identity(self):
         # 兼容既有调用：常量与执行函数经 ui_movie 转发后指向同一对象。
-        from codol_rebuild.adapters.game.v1649370 import movie_identity, ui_movie
+        from codol_rebuild.adapters.game.v1649370 import movie_identity
+        from codol_rebuild.adapters.game.v1649370.session import ui_movie
         for attr in ('LOAD_SITE', 'LOAD_BYTES', 'RESOURCE_NAME', 'RESOURCE_SIZE',
                      'COMPRESSED_SIZE', 'RESOURCE_SHA256'):
             self.assertIs(getattr(ui_movie, attr), getattr(movie_identity, attr))

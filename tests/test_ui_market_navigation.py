@@ -3,7 +3,8 @@ from pathlib import Path
 import unittest
 import zlib
 
-from codol_rebuild.adapters.game.v1649370 import ui_movie, ui_navigation as nav
+from codol_rebuild.adapters.game.v1649370.session import ui_movie
+from codol_rebuild.adapters.game.v1649370.frontend import ui_navigation as nav
 
 
 class MarketNavigationTests(unittest.TestCase):

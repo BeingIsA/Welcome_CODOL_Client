@@ -1,7 +1,7 @@
 """1649370 账号格式适配：游戏表解析、DDL 编码、快照校验与归档验证。"""
 import struct
 from codol_rebuild.adapters.game.v1649370.layout import BUFFER_CAPACITY, PUBLIC_IDENTITY, SECURE_IDENTITY
-from codol_rebuild.adapters.game.v1649370.profile_unlock import apply_full_unlock, UnlockError
+from codol_rebuild.adapters.game.v1649370.accounts.profile_unlock import apply_full_unlock, UnlockError
 from codol_rebuild.adapters.game.profile_format.fields import Fields
 
 IDENTITIES={'public':PUBLIC_IDENTITY,'secure':SECURE_IDENTITY}

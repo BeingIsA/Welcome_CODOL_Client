@@ -3,7 +3,7 @@ import unittest
 
 from capstone import Cs, CS_ARCH_X86, CS_MODE_32, CS_AC_WRITE
 from capstone.x86_const import X86_OP_MEM
-from codol_rebuild.adapters.game.v1649370.menu_preview import (
+from codol_rebuild.adapters.game.v1649370.frontend.menu_preview import (
     ACTIVATE_VA, GETTER_VA, PATCH_VA, RETURN_VA, FIELDS,
     build_menu_preview_helper, validate_menu_preview_image,
     PreviewActivationCycles,

@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 import unittest
 import pefile
-from codol_rebuild.adapters.game.v1649370.member_profile import build_member_publish
+from codol_rebuild.adapters.game.v1649370.rooms.member_profile import build_member_publish
 from test_room_list_native import relocate_fixture_calls
 
 

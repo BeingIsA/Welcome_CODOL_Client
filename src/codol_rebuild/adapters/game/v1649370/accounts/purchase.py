@@ -1,7 +1,7 @@
 """1649370 商品购买桥；复用原生报价、条件和任务完成接口。"""
 import math
 import struct
-from codol_rebuild.adapters.game.v1649370.profile import CAPACITY, STRIDE, currency_snapshot, publish_currency
+from codol_rebuild.adapters.game.v1649370.accounts.profile import CAPACITY, STRIDE, currency_snapshot, publish_currency
 
 HANDLER_SLOT = 0xDDD428
 HANDLER = 0x7CD430

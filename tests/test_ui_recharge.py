@@ -7,8 +7,9 @@ import sys
 import tempfile
 import unittest
 
-from codol_rebuild.adapters.game.v1649370 import ui_movie, ui_recharge
-from codol_rebuild.adapters.game.v1649370.profile import currency_snapshot, publish_currency
+from codol_rebuild.adapters.game.v1649370.session import ui_movie
+from codol_rebuild.adapters.game.v1649370.accounts import ui_recharge
+from codol_rebuild.adapters.game.v1649370.accounts.profile import currency_snapshot, publish_currency
 from codol_rebuild.adapters.persistence.sqlite_accounts import AccountRepository, RevisionConflict
 from codol_rebuild.application.accounts.purchase import RECHARGE_AMOUNT, credit_currency
 from codol_rebuild.application.accounts.service import AccountSession

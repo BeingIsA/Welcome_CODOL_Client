@@ -10,7 +10,8 @@ from unittest.mock import Mock
 import capstone
 import pefile
 
-from codol_rebuild.adapters.game.v1649370 import member_profile as profile, layout
+from codol_rebuild.adapters.game.v1649370.rooms import member_profile as profile
+from codol_rebuild.adapters.game.v1649370 import layout
 
 
 def sample_profile():
@@ -81,14 +82,14 @@ class MemberProfileTests(unittest.TestCase):
         self.assertEqual(pe.get_data(0x7F8F3D-0x400000, 3), bytes.fromhex('c20800'))
 
     def test_background_member_refresh_loads_each_available_profile(self):
-        from codol_rebuild.application.room.contracts import IdentityRecord
+        from codol_rebuild.application.session.contracts import IdentityRecord
         from codol_rebuild.application.room.service import RoomSession
         gateway = Mock()
         gateway.room_detail.return_value = {'roomId': 'rm_test', 'members': [
             {'playerId': 'pl_a'},
             {'playerId': 'pl_b'}]}
         gateway.member_profile.side_effect = [sample_profile(), sample_profile()]
-        session = RoomSession(gateway, Mock(), 'http://localhost', 'fingerprint', Mock())
+        session = RoomSession(gateway, Mock(), 'http://localhost', Mock())
         try:
             result = session._refresh_members(IdentityRecord('pl_a', 'rm_test'))
             self.assertIsNone(result.error)
@@ -101,9 +102,10 @@ class MemberProfileTests(unittest.TestCase):
             session.close()
 
     def test_other_room_membership_refresh_is_discarded(self):
-        from codol_rebuild.application.room.contracts import Completion, IdentityRecord
+        from codol_rebuild.application.room.contracts import Completion
+        from codol_rebuild.application.session.contracts import IdentityRecord
         from codol_rebuild.application.room.service import RoomSession
-        session = RoomSession(Mock(), Mock(), 'http://localhost', 'fingerprint', Mock())
+        session = RoomSession(Mock(), Mock(), 'http://localhost', Mock())
         try:
             session._record = IdentityRecord('pl_a', 'rm_test')
             session._members_pending = Future()

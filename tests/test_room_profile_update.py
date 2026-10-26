@@ -13,9 +13,9 @@ from unittest.mock import Mock
 import capstone
 
 from codol_rebuild.application.room.service import RoomSession
-from codol_rebuild.application.room.contracts import IdentityRecord
+from codol_rebuild.application.session.contracts import IdentityRecord
 from codol_rebuild.adapters.transport.http import HttpGateway
-from codol_rebuild.adapters.game.v1649370 import member_profile
+from codol_rebuild.adapters.game.v1649370.rooms import member_profile
 from test_refactor_equivalence import MemoryProcess
 from test_member_profile import sample_profile
 
@@ -23,7 +23,7 @@ from test_member_profile import sample_profile
 class ProfileUpdateSessionTests(unittest.TestCase):
     def setUp(self):
         self.gateway = Mock()
-        self.session = RoomSession(self.gateway, Mock(), 'http://localhost', 'fingerprint')
+        self.session = RoomSession(self.gateway, Mock(), 'http://localhost')
         self.session._record = IdentityRecord('pl_me', 'rm_test')
 
     def tearDown(self):
@@ -152,12 +152,12 @@ class ProfileUpdateBridgeTests(unittest.TestCase):
 
     def test_host_dispatches_captured_snapshot_and_suppresses_member_echo(self):
         from types import SimpleNamespace
-        from codol_rebuild.adapters.game.v1649370.server_session_bridge import ServerSessionBridge
+        from codol_rebuild.adapters.game.v1649370.rooms.room_session_bridge import RoomSessionBridge
         self.process.context = Mock(return_value=('thread_handle', self.context))
         self.process.set_context = Mock()
         self.process.close_thread = Mock()
         port = Mock()
-        host = ServerSessionBridge(self.process, port, Mock())
+        host = RoomSessionBridge(self.process, port, Mock())
         host.notifications = Mock()
         host.profile_update = self.bridge
         host.traps = self.traps

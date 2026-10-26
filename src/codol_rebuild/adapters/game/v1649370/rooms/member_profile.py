@@ -8,7 +8,7 @@ import binascii
 import struct
 
 from codol_rebuild.adapters.game.v1649370 import layout
-from codol_rebuild.adapters.game.v1649370.profile import PUBLIC, SECURE
+from codol_rebuild.adapters.game.v1649370.accounts.profile import PUBLIC, SECURE
 
 VERSION = 'codol-1649370'
 SIZES = {'public': layout.BUFFER_CAPACITY, 'secure': layout.BUFFER_CAPACITY,
