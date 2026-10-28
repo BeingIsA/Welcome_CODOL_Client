@@ -7,7 +7,7 @@ from codol_rebuild.adapters.game.v1649370.accounts.profile_bridge import LocalPr
 
 class GameSessionBridge:
     """仅拥有版本状态；进程和账号实现由装配入口注入。"""
-    def __init__(self, args, run_dir, image, pe, log, record, phase_done, process: ProcessAccess, account_factory, account_errors, multiplayer=None, rename_session=None, broadcast_session=None, realtime_dispatcher=None, chat_session=None, online_session=None):
+    def __init__(self, args, run_dir, image, pe, log, record, phase_done, process: ProcessAccess, account_factory, account_errors, multiplayer=None, rename_session=None, broadcast_session=None, realtime_dispatcher=None, chat_session=None, online_session=None, match_session=None):
         self.args=args; self.run_dir=run_dir; self.image=image; self.pe=pe
         self.log=log; self.record=record; self.phase_done=phase_done; self.process=process
         self.account_factory=account_factory; self.account_errors=account_errors
@@ -27,6 +27,12 @@ class GameSessionBridge:
         self.rename_session = rename_session
         self.server_name_bridge = None
         self.chat_bridge = None
+        self.match_session = match_session
+        self.match_bridge = None
+        if match_session is not None and multiplayer is not None:
+            from codol_rebuild.adapters.game.v1649370.matches.session_bridge import MatchBridge
+            self.match_bridge = MatchBridge(process, match_session, multiplayer.confirmed_room_id,
+                (args.game_server_ip, args.game_server_port), record)
         self.broadcast_bridge = None
         if broadcast_session is not None:
             from codol_rebuild.adapters.game.v1649370.chat.broadcast import BroadcastBridge
@@ -46,6 +52,8 @@ class GameSessionBridge:
         """把已有登录结果显式交给需要身份的适配，不重复登录。"""
         if self.multiplayer is not None:
             self.multiplayer.connected(player_id)
+        if self.match_session is not None:
+            self.match_session.connected(player_id)
         if self.rename_session is not None:
             self.rename_session.connected(player_id, display_name)
         if self.broadcast_bridge is not None:
@@ -201,6 +209,8 @@ class GameSessionBridge:
         room_state = self.process.allocate(4096)
         if self.multiplayer:
             self.multiplayer.allocate()
+            if self.match_bridge is not None:
+                self.match_bridge.install(self.multiplayer.state+24)
         room_plan = build_room_adapter(room_entry, room_state, profile_data_address + 72,
                                   deferred=self.multiplayer is not None,
                                   identity_address=self.multiplayer.state+24 if self.multiplayer else None,
@@ -394,6 +404,9 @@ class GameSessionBridge:
         return result
 
     def handle_exception(self, event, code, address, row):
+        if code in (2147483651, 1073741855) and self.match_bridge and address in self.match_bridge.traps:
+            self.match_bridge.handle(event, address)
+            return True
         if code in (2147483651, 1073741855) and address in self.session_traps:
             if event.tid != self.process.main_thread_id:
                 raise ValueError('公共会话调度必须在主线程执行')
@@ -401,7 +414,8 @@ class GameSessionBridge:
             try:
                 self.online_bridge.poll()
                 self.realtime_dispatcher.poll()
-                struct.pack_into('<I', context, 184, address + 1)
+                resume_address = self.match_bridge.poll(address+1) if self.match_bridge else address+1
+                struct.pack_into('<I', context, 184, resume_address)
                 self.process.set_context(thread, context)
             finally:
                 self.process.close_thread(thread)
@@ -632,6 +646,10 @@ class GameSessionBridge:
         if label == 'Engine init returned':
             self.log['engine_init_returned'] = True
             self.phase_done('engine-init')
+        if label == 'CRT entry' and getattr(self.args, 'game_network_mode', None) == 'local':
+            from codol_rebuild.adapters.game.v1649370.matches.network_initialization import install
+            self.log['native_network_initialization'] = install(self.process)
+            self.record({'native_network_initialization': self.log['native_network_initialization']})
         if label == 'CRT entry' and self.args.trace_files:
             self.debug.install_file_trace()
         if label == 'CRT entry' and self.args.offline_menu_preview:

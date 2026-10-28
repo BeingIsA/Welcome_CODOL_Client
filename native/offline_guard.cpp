@@ -29,6 +29,18 @@ static const GUID CODOL_CONNECT_V6 = {0x4a72393b, 0x319f, 0x44bc, {0x84,0xc3,0xb
 static const GUID CODOL_RECEIVE_V4 = {0xe1cd9fe7, 0xf4b5, 0x4273, {0x96,0xc0,0x59,0x2e,0x48,0x7b,0x86,0x50}};
 static const GUID CODOL_RECEIVE_V6 = {0xa3b42c97, 0x9f04, 0x4672, {0xb8,0x7e,0xce,0xe9,0xc4,0x83,0x25,0x7f}};
 
+// 端点条件GUID来自同版本Windows SDK fwpmu.h。
+static const GUID CODOL_REMOTE_ADDRESS = {0xb235ae9a,0x1d64,0x49b8,{0xa4,0x4c,0x5f,0xf3,0xd9,0x09,0x50,0x45}};
+static const GUID CODOL_REMOTE_PORT = {0xc35a604d,0xd22b,0x4e1a,{0x91,0xb4,0x68,0xf6,0x74,0xee,0x67,0x4b}};
+static const GUID CODOL_PROTOCOL = {0x3971ef2b,0x623e,0x4f9a,{0x8c,0xb1,0x6e,0x79,0xb8,0x06,0xb9,0xa7}};
+static UINT32 parse_loopback(const wchar_t* text) {
+    unsigned octets[4]; wchar_t trailing;
+    if (swscanf(text,L"%u.%u.%u.%u%c",&octets[0],&octets[1],&octets[2],&octets[3],&trailing)!=4 ||
+        octets[0]!=127 || octets[1]>255 || octets[2]>255 || octets[3]>255)
+        throw std::runtime_error("Game endpoint must be loopback IPv4");
+    return (octets[0]<<24)|(octets[1]<<16)|(octets[2]<<8)|octets[3];
+}
+
 static void require(bool ok, const char* what) {
     if (!ok) throw std::runtime_error(std::string(what) + " win32=" + std::to_string(GetLastError()));
 }
@@ -108,8 +120,10 @@ static void write_new(const fs::path& path, const std::string& text) {
 int wmain(int argc, wchar_t** argv) {
     // 参数：run_directory pid absolute_exe_path creation_FILETIME [bound_seconds]。
     // 时限 0 表示等待宿主 done 标记或子进程退出；有限时限允许 1..3660 秒。
-    if (argc != 5 && argc != 6) return 2;
+    if (argc != 5 && argc != 6 && argc != 8) return 2;
     fs::path run, target;
+    UINT32 game_address=0; UINT16 game_port=0;
+    std::string game_ip;
     DWORD pid = 0;
     uint64_t creation = 0, bound_seconds = 120;
     try {
@@ -118,8 +132,16 @@ int wmain(int argc, wchar_t** argv) {
         pid = static_cast<DWORD>(parsed_pid);
         creation = parse_unsigned(argv[4], "Invalid creation FILETIME");
         if (!creation) throw std::runtime_error("Invalid creation FILETIME");
-        if (argc == 6) bound_seconds = parse_unsigned(argv[5], "Invalid time bound");
+        if (argc >= 6) bound_seconds = parse_unsigned(argv[5], "Invalid time bound");
         if (bound_seconds > 3660) throw std::runtime_error("Invalid time bound");
+        if (argc == 8) {
+            game_address=parse_loopback(argv[6]);
+            const uint64_t port_value=parse_unsigned(argv[7],"Invalid game UDP port");
+            if (!port_value || port_value>65535) throw std::runtime_error("Invalid game UDP port");
+            game_port=static_cast<UINT16>(port_value);
+            game_ip=std::to_string(game_address>>24)+"."+std::to_string((game_address>>16)&255)+"."+
+                std::to_string((game_address>>8)&255)+"."+std::to_string(game_address&255);
+        }
         run = fs::canonical(fs::path(argv[1]));
         target = fs::canonical(fs::path(argv[3]));
         wchar_t guard_filename[32768];
@@ -189,13 +211,44 @@ int wmain(int argc, wchar_t** argv) {
             filter.layerKey = layer;
             filter.subLayerKey = sub_key;
             filter.weight.type = FWP_UINT8;
-            filter.weight.uint8 = 15;
+            filter.weight.uint8 = game_port ? 14 : 15;
             filter.numFilterConditions = 1;
             filter.filterCondition = &condition;
             filter.action.type = FWP_ACTION_BLOCK;
             UINT64 id = 0;
             wfp(FwpmFilterAdd0(engine, &filter, nullptr, &id), "Add offline block filter");
             filter_ids.push_back(id);
+        }
+        // 同一子层优先匹配精确UDP端点；其余流量继续命中下方全阻断。
+        if (game_port) {
+            FWPM_FILTER_CONDITION0 endpoint_conditions[4]{};
+            endpoint_conditions[0]=condition;
+            endpoint_conditions[1].fieldKey=CODOL_REMOTE_ADDRESS;
+            endpoint_conditions[1].matchType=FWP_MATCH_EQUAL;
+            endpoint_conditions[1].conditionValue.type=FWP_UINT32;
+            endpoint_conditions[1].conditionValue.uint32=game_address;
+            endpoint_conditions[2].fieldKey=CODOL_REMOTE_PORT;
+            endpoint_conditions[2].matchType=FWP_MATCH_EQUAL;
+            endpoint_conditions[2].conditionValue.type=FWP_UINT16;
+            endpoint_conditions[2].conditionValue.uint16=game_port;
+            endpoint_conditions[3].fieldKey=CODOL_PROTOCOL;
+            endpoint_conditions[3].matchType=FWP_MATCH_EQUAL;
+            endpoint_conditions[3].conditionValue.type=FWP_UINT8;
+            endpoint_conditions[3].conditionValue.uint8=17;
+            for (const GUID& endpoint_layer : {CODOL_CONNECT_V4,CODOL_RECEIVE_V4}) {
+                FWPM_FILTER0 endpoint_filter{};
+                endpoint_filter.displayData.name=const_cast<wchar_t*>(L"CODOL configured local game UDP");
+                endpoint_filter.layerKey=endpoint_layer;
+                endpoint_filter.subLayerKey=sub_key;
+                endpoint_filter.weight.type=FWP_UINT8;
+                endpoint_filter.weight.uint8=15;
+                endpoint_filter.numFilterConditions=4;
+                endpoint_filter.filterCondition=endpoint_conditions;
+                endpoint_filter.action.type=FWP_ACTION_PERMIT;
+                UINT64 endpoint_filter_id=0;
+                wfp(FwpmFilterAdd0(engine,&endpoint_filter,nullptr,&endpoint_filter_id),"Add local UDP endpoint filter");
+                filter_ids.push_back(endpoint_filter_id);
+            }
         }
         wfp(FwpmTransactionCommit0(engine), "Commit all four offline filters");
         // ready 只包含数值和固定字符串，避免路径转义或编码问题。
@@ -205,7 +258,7 @@ int wmain(int argc, wchar_t** argv) {
         for (size_t i = 0; i < filter_ids.size(); ++i)
             ready += (i ? "," : "") + std::to_string(filter_ids[i]);
         ready += "],\"dynamic\":true,\"job_kill_on_close\":true,\"max_processes\":1,\"bound_seconds\":" +
-            std::to_string(bound_seconds) + ",\"scope\":\"offline-deny-all\",\"identity_verified\":true}";
+            std::to_string(bound_seconds) + ",\"scope\":\"" + (game_port ? "local-game-udp" : "offline-deny-all") + "\",\"identity_verified\":true,\"game_ip\":\"" + game_ip + "\",\"game_port\":" + std::to_string(game_port) + "}";
         write_new(run / L"guard-ready.json", ready);
         const ULONGLONG deadline = GetTickCount64() + bound_seconds * 1000;
         while ((bound_seconds == 0 || GetTickCount64() < deadline) &&

@@ -181,3 +181,9 @@ resources/v1649370/offline-loose-library/
 | [固定版本运行资源](resources/v1649370/README.md) | 资源内容、准备流程与清单约定 |
 | [离线运行基底](bin/v1649370/README.md) | 固定镜像来源、指纹与使用方式 |
 | [客户端自动化测试](tests/README.md) | 测试范围、夹具与环境依赖 |
+
+### 本机游戏服务器配置
+
+`start_client.cmd` 通过 Python 按分节读取 `config/server.ini`。`[server]` 的 ip/port 用于大厅HTTP；`[game_server]` 的 enabled/ip/port 控制原生进程的本机UDP例外。游戏端点必须是回环IPv4和1～65535端口；缺少分节或enabled=false时保持全部断网。当前配置允许127.0.0.2:27760，其他端点、TCP及IPv6仍阻断。
+
+配置只声明网络许可，不自动启动游戏服务端，不生成分配/预订记录，也不代表进图已接通。守卫仍保留进程身份核对和动态规则清理；普通客户端启动需要UAC。已提升的独立验收工具可直接启动守卫，避免重复请求UAC。

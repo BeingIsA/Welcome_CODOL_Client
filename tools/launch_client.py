@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import argparse
+import configparser
 import ast
 from datetime import datetime
 import hashlib
@@ -100,6 +101,15 @@ def build_plan(options: argparse.Namespace) -> dict:
     for point in BREAKPOINTS:
         arguments += ['--breakpoint', point]
     arguments += ['--', '+set', '2439', '0']
+    if getattr(options, 'game_server_ip', None):
+        delimiter = arguments.index('--')
+        arguments[delimiter:delimiter] = ['--game-server-ip', options.game_server_ip, '--game-server-port', str(options.game_server_port)]
+        required.update(('--game-server-ip', '--game-server-port'))
+    if getattr(options, 'game_network_mode', None):
+        delimiter = arguments.index('--')
+        arguments[delimiter:delimiter] = ['--game-network-mode', options.game_network_mode,
+            '--game-bind-ip', options.game_bind_ip, '--game-bind-port', str(options.game_bind_port)]
+        required.update(('--game-network-mode', '--game-bind-ip', '--game-bind-port'))
     missing = sorted(required - host_options(ROOT / 'src/codol_rebuild/bootstrap/config.py'))
     return {'scope': ('server login/create/leave; gameplay not implemented' if getattr(options,'server_url',None) else 'local profile; offline room' if getattr(options,'local_profile',False) else 'offline character-selection preview; lobby and gameplay not verified'),
             'local_profile': getattr(options,'local_profile',False),
@@ -127,6 +137,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--capture-schema', action='store_true',
                         help='在前端帧只读扫描档案 DDL 指纹并导出结构定义（不写目标进程）')
     parser.add_argument('--local-profile', action='store_true', help='启用本地档案适配（实验验证中）')
+    parser.add_argument('--server-config', type=Path, help='大厅与游戏服务器INI配置')
     parser.add_argument('--server-url', help='连接业务服务器，例如 http://127.0.0.1:8080')
     parser.add_argument('--server-timeout', type=float, default=5.0, help='业务请求超时秒数（0.1～30）')
     parser.add_argument('--server-identity', type=Path, help='覆盖身份文件路径，供隔离验证使用')
@@ -140,6 +151,12 @@ def main(argv: list[str] | None = None) -> int:
     if options.seconds is not None and not 1 <= options.seconds <= 600:
         parser.error('--seconds 必须在 1 至 600 秒之间')
     try:
+        if options.server_config:
+            from codol_rebuild.bootstrap.config import read_server_config
+            configured_url, endpoint, network = read_server_config(options.server_config)
+            if not options.server_url: options.server_url = configured_url
+            if endpoint: options.game_server_ip, options.game_server_port = endpoint
+            if network: options.game_network_mode, options.game_bind_ip, options.game_bind_port = network
         plan = build_plan(options)
         print(json.dumps(plan, ensure_ascii=False, indent=2), flush=True)
         if plan['missing_host_options']:
@@ -150,7 +167,7 @@ def main(argv: list[str] | None = None) -> int:
         sys.path.insert(0, str(ROOT / 'src'))
         from codol_rebuild.bootstrap.launch import main as debug_main
         return debug_main(plan['arguments'])
-    except (OSError, ValueError, SyntaxError) as error:
+    except (OSError, ValueError, SyntaxError, configparser.Error) as error:
         print(json.dumps({'error': str(error), 'main_menu_verified': False}, ensure_ascii=False), file=sys.stderr)
         return 1
 

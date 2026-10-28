@@ -13,6 +13,9 @@ from codol_rebuild.runtime.debug_loop import DebugLoop
 
 def run(args):
     """装配单次运行；所有失败均由会话清理并生成结果。"""
+    if getattr(args, 'game_network_mode', None) == 'local':
+        from codol_rebuild.adapters.game.v1649370.matches.network_initialization import native_arguments
+        args.argument += native_arguments(args.game_bind_ip, args.game_bind_port)
     reporter=SessionLog(ROOT/'workspaces/offline-runs',args.name)
     run_dir,stage,log=reporter.run_dir,reporter.stage,reporter.data
     record,phase_done=reporter.record,reporter.phase_done
@@ -25,6 +28,7 @@ def run(args):
     bridge=None
     multiplayer=None
     online_session = None
+    match_session = None
     rename_session=None
     chat_session = None
     broadcast_session = None
@@ -65,6 +69,9 @@ def run(args):
                 lambda: realtime_connection.status().value == 'connected')
             identity_store = JsonIdentityStore(args.server_identity)
             multiplayer = RoomSession(gateway, identity_store, gateway.server, inbox=room_inbox)
+            if getattr(args, 'game_server_ip', None):
+                from codol_rebuild.application.matches.service import MatchSession
+                match_session = MatchSession(HttpGateway(args.server_url, 30), multiplayer.confirmed_room_id)
             online_session = OnlineSession(gateway, identity_store, gateway.server, fingerprint(),
                                            multiplayer, realtime_connection)
             chat_session = ChatSession(realtime_connection, chat_inbox, multiplayer.confirmed_room_id)
@@ -72,7 +79,8 @@ def run(args):
         bridge=GameSessionBridge(args,run_dir,prepared['image'],prepared['pe'],log,record,phase_done,
                                  process,account_factory,(OSError,ValueError,sqlite3.Error), multiplayer=multiplayer,
                                  rename_session=rename_session, broadcast_session=broadcast_session,
-                                 realtime_dispatcher=realtime_dispatcher, chat_session=chat_session, online_session=online_session)
+                                 realtime_dispatcher=realtime_dispatcher, chat_session=chat_session, online_session=online_session,
+                                 match_session=match_session)
         debugger=DebugLoop(process,bridge,prepared['pe'],FORBIDDEN)
         process.start(prepared['exe'],prepared['settings'])
         debugger.run()
@@ -94,6 +102,10 @@ def run(args):
                     try:rename_session.close()
                     except Exception as error:
                         log['rename_cleanup_error']=str(error)
+                if match_session:
+                    try:match_session.close()
+                    except Exception as error:
+                        log['match_cleanup_error'] = str(error)
                 if broadcast_session:
                     try:broadcast_session.close()
                     except Exception as error:

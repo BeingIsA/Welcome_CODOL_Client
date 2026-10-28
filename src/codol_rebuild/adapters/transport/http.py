@@ -40,6 +40,26 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 class HttpGateway:
     """不重试写请求；连接与响应异常显式标记结果不确定。"""
+    def allocate_game(self, player_id: str, room_id: str) -> dict:
+        """请求已就绪的原生实例，返回连接资料。"""
+        data = self._request('POST', '/api/v1/rooms/'+_identifier(room_id, 'rm')+'/game-allocation', {}, player_id)
+        if not isinstance(data.get('allocationId'), str) or not re.fullmatch(r'[a-f0-9]{32}', data['allocationId']):
+            raise OnlineError('INVALID_RESPONSE', '游戏实例分配标识无效')
+        return data
+
+    def book_game(self, player_id: str, room_id: str, allocation_id: str, security_id: str) -> dict:
+        """确认原生预订，不在传输层执行连接或更新UI。"""
+        if not isinstance(allocation_id, str) or not re.fullmatch(r'[a-f0-9]{32}', allocation_id):
+            raise ValueError('游戏实例分配标识无效')
+        return self._request('POST', '/api/v1/rooms/'+_identifier(room_id, 'rm')+
+            '/game-allocation/'+allocation_id+'/booking', {'securityId': security_id}, player_id)
+
+    def start_game(self, player_id: str, room_id: str, allocation_id: str, payload: dict) -> dict:
+        """提交原生开局载荷；只运输数据，不在客户端解释服务端规则。"""
+        if not isinstance(allocation_id, str) or not re.fullmatch(r'[a-f0-9]{32}', allocation_id):
+            raise ValueError('游戏实例分配标识无效')
+        return self._request('POST', '/api/v1/rooms/'+_identifier(room_id, 'rm')+
+            '/game-allocation/'+allocation_id+'/start', payload, player_id)
     def send_broadcast(self, player_id: str, text: str, speaker_type: str) -> dict:
         """发送大小喇叭；响应只确认接受，展示由 WS 推送负责。"""
         return self._request('POST', '/api/v1/broadcasts',
