@@ -2,6 +2,7 @@
 import json, sqlite3, time, traceback
 from codol_rebuild.core.paths import REBUILD_ROOT as ROOT, accounts_dir
 from codol_rebuild.bootstrap.config import parse_args
+from codol_rebuild.bootstrap.logging_setup import session_logging
 from codol_rebuild.bootstrap.resource_setup import prepare, FORBIDDEN
 from codol_rebuild.adapters.persistence.sqlite_accounts import AccountRepository
 from codol_rebuild.adapters.game.v1649370.accounts.profile_codec import AccountCodec
@@ -17,6 +18,15 @@ def run(args):
         from codol_rebuild.adapters.game.v1649370.matches.network_initialization import native_arguments
         args.argument += native_arguments(args.game_bind_ip, args.game_bind_port)
     reporter=SessionLog(ROOT/'workspaces/offline-runs',args.name)
+    try:
+        with session_logging(reporter.run_dir):
+            return run_session(args, reporter)
+    finally:
+        reporter.close()
+
+
+def run_session(args, reporter):
+    """在已配置日志的会话中装配并清理客户端依赖。"""
     run_dir,stage,log=reporter.run_dir,reporter.stage,reporter.data
     record,phase_done=reporter.record,reporter.phase_done
     accounts = accounts_dir()
@@ -114,7 +124,6 @@ def run(args):
                         log['broadcast_cleanup_error'] = str(error)
                 if runtime_lease is not None:
                     runtime_lease.close()
-                reporter.close()
     return log
 
 
