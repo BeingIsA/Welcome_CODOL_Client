@@ -1,5 +1,5 @@
 """已确认身份/房间上的异步对局请求；完成结果由原生主线程消费。"""
-import time
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Protocol
@@ -43,8 +43,10 @@ class MatchSession:
         self._player_id = None
         self._pending = None
         self._start_query = None
-        self._next_start_query = 0
-        self._consumed_start = None
+        self._observed_room = None
+        self._start_generation = 0
+        self._reconcile_start = False
+        self._consumed_starts = set()
         self._available_start = None
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='codol-match')
 
@@ -84,40 +86,60 @@ class MatchSession:
             return MatchCompletion(operation, room_id, error=OnlineError('ROOM_CHANGED', '对局请求期间房间已改变'))
         return MatchCompletion(operation, room_id, data=data)
 
+    def _accept_start(self, room_id, start):
+        """只保留当前房间未消费的终态；原生执行点确认前保持可交付。"""
+        if not isinstance(start, dict):
+            return
+        start_id = start.get('startId')
+        if (room_id and room_id == self._current_room()
+                and isinstance(start_id, str) and start_id
+                and start.get('status') in ('ready', 'failed')
+                and (room_id, start_id) not in self._consumed_starts):
+            self._available_start = dict(start, roomId=room_id)
+
     def poll_start(self):
-        """定时读权威开局结果；只交付当前房间的新结果一次，不自动重试开局。"""
+        """消费开局推送；仅入房及重连后查询一次，不定时请求服务端。"""
         room_id = self._current_room()
+        if room_id != self._observed_room:
+            self._observed_room = room_id
+            self._start_generation += 1
+            self._reconcile_start = bool(room_id)
+            self._available_start = None
+            self._consumed_starts.clear()
         if self._inbox is not None:
             message = self._inbox.poll_event()
-            if message is not None and message.get('payload', {}).get('roomId') == room_id:
-                self._next_start_query = 0
-        if self._start_query is not None and self._start_query[1].done():
-            queried_room, future = self._start_query
+            while message is not None:
+                if message.get('type') == 'realtime_reconnected':
+                    self._start_generation += 1
+                    self._reconcile_start = bool(room_id)
+                elif message.get('type') == 'room_start_updated':
+                    start = message.get('payload', {})
+                    if isinstance(start, dict) and start.get('roomId') == room_id:
+                        self._start_generation += 1
+                        self._accept_start(room_id, start)
+                message = self._inbox.poll_event()
+        if self._start_query is not None and self._start_query[2].done():
+            queried_room, generation, future = self._start_query
             self._start_query = None
             try:
                 snapshot = future.result()
-                start = snapshot.get('start')
-                if queried_room == room_id and isinstance(start, dict):
-                    identity = (room_id, start.get('startId'))
-                    if (isinstance(identity[1], str) and start.get('status') in ('ready', 'failed')
-                            and identity != self._consumed_start):
-                        self._available_start = dict(start, roomId=room_id)
+                if queried_room == room_id and generation == self._start_generation:
+                    self._accept_start(room_id, snapshot.get('start'))
             except OnlineError:
-                pass  # 只读状态查询后续重取；不重发准备或开局命令。
-        if (self._player_id and room_id and self._start_query is None
-                and self._pending is None and time.monotonic() >= self._next_start_query):
-            self._next_start_query = time.monotonic() + 1
-            self._start_query = (room_id, self._executor.submit(
+                logging.getLogger(__name__).warning('开局状态恢复查询失败，等待后续推送或重连', exc_info=True)
+        if (self._reconcile_start and self._player_id and room_id
+                and self._start_query is None and self._pending is None):
+            self._reconcile_start = False
+            self._start_query = (room_id, self._start_generation, self._executor.submit(
                 self._gateway.room_detail, self._player_id, room_id))
-        if self._available_start is not None and self._available_start['roomId'] == room_id:
-            return self._available_start
-        self._available_start = None
-        return None
+        return self._available_start
 
     def acknowledge_start(self, room_id, start_id):
-        """原生已接收或显示失败后才消费；原生房间尚未就绪时保留通知。"""
-        self._consumed_start = (room_id, start_id)
-        self._available_start = None
+        """原生已接收或显示失败后才消费；重复推送不重复启动。"""
+        self._consumed_starts.add((room_id, start_id))
+        if (self._available_start is not None
+                and (self._available_start['roomId'], self._available_start['startId']) == (room_id, start_id)):
+            self._available_start = None
 
     def close(self):
         """等待有限超时的通信完成并释放线程，不执行原生操作。"""

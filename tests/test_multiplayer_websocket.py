@@ -26,6 +26,52 @@ def wait_for(predicate):
 
 
 class RealtimeTests(unittest.TestCase):
+    def test_large_member_snapshot_is_delivered_and_incomplete_snapshot_rejected(self):
+        """真实 WS 传输超过旧 1 MiB 限制的完整快照，拒绝缺档案字段的消息。"""
+        import base64
+        from copy import deepcopy
+        profile = {'contentVersion': 'codol-1649370', **{
+            name: base64.b64encode(bytes(size)).decode('ascii')
+            for name, size in (('public', 32764), ('secure', 32764), ('tf141', 160), ('scar', 160))}}
+        payload = {'roomId': '123', 'ownerPlayerId': 'pl_0', 'maxPlayers': 19,
+                   'playerCount': 19, 'settings': {'map': 'mp_cross_fire', 'mode': 'war'},
+                   'members': [{'playerId': 'pl_' + str(member_number), 'displayName': '成员',
+                                'isOwner': member_number == 0, 'team': 'tf141',
+                                'readyState': False, 'profile': profile}
+                               for member_number in range(19)]}
+        message = {'type': 'room_members_updated', 'payload': payload}
+        encoded = json.dumps(message)
+        self.assertGreater(len(encoded), 1024 * 1024)
+        invalid = deepcopy(message)
+        del invalid['payload']['members'][0]['profile']
+        def handler(connection):
+            try:
+                connection.send(json.dumps(invalid))
+                connection.send(encoded)
+                for ignored_message in connection:
+                    pass
+            except ConnectionClosed:
+                pass
+        with serve(handler, '127.0.0.1', 0) as server:
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            client = WebSocketConnection('http://127.0.0.1:' + str(server.socket.getsockname()[1]))
+            received = []
+            try:
+                client.start('pl_0', 'fp')
+                def arrived():
+                    event = client.poll_event()
+                    if event is not None:
+                        received.append(event)
+                    return bool(received)
+                wait_for(arrived)
+                self.assertEqual(received, [message])
+                self.assertIsNone(client.poll_event())
+            finally:
+                client.close()
+                server.shutdown()
+                thread.join(3)
+
     def test_chat_uplink_and_push_use_existing_authenticated_connection(self):
         from codol_rebuild.application.chat.service import ChatSession
         from codol_rebuild.application.realtime.dispatch import EventInbox, RealtimeDispatcher
@@ -91,6 +137,15 @@ class RealtimeTests(unittest.TestCase):
             wait_for(lambda: first_connection.close.called)
             client.send_message({'text': '离线消息'})
             wait_for(lambda: client._connect.call_count == 2)
+            connection_events = []
+            def received_reconnect():
+                message = client.poll_event()
+                if message is not None:
+                    connection_events.append(message)
+                return bool(connection_events)
+            wait_for(received_reconnect)
+            self.assertEqual(connection_events, [{'type': 'realtime_reconnected', 'payload': {}}])
+
             wait_for(lambda: client.status() == RealtimeStatus.CONNECTED)
             client.send_message({'text': '新连接消息'})
             wait_for(lambda: second_connection.send.called)

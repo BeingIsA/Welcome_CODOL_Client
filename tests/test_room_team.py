@@ -75,9 +75,6 @@ class TeamSessionTests(unittest.TestCase):
         realtime = Mock()
         session = RoomSession(Mock(), Mock(), 'http://server', realtime)
         self.addCleanup(session._executor.shutdown)
-        session._members_pending = Future()
-        self.assertFalse(session.begin_change_team('rm_test', 'spectator'))
-        session._members_pending = None
         session._kick_pending = Future()
         self.assertFalse(session.begin_change_team('rm_test', 'spectator'))
         session._kick_pending = None

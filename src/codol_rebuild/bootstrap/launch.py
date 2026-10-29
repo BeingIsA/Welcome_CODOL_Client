@@ -72,7 +72,7 @@ def run(args):
             if getattr(args, 'game_server_ip', None):
                 from codol_rebuild.application.matches.service import MatchSession
                 match_inbox = EventInbox()
-                realtime_dispatcher.register(('room_start_updated',), match_inbox)
+                realtime_dispatcher.register(('room_start_updated', 'realtime_reconnected'), match_inbox)
                 match_session = MatchSession(HttpGateway(args.server_url, 30), multiplayer.confirmed_room_id, match_inbox)
             online_session = OnlineSession(gateway, identity_store, gateway.server, fingerprint(),
                                            multiplayer, realtime_connection)

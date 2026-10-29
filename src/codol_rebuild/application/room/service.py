@@ -31,7 +31,6 @@ class RoomSession:
         self._list_pending = None
         self._list_cancel = threading.Event()
         self._list_request = None
-        self._members_pending = None
         self._kick_pending = None
         self._departure_pending = None
         self._team_pending = None
@@ -109,8 +108,8 @@ class RoomSession:
 
     def poll_change_ready(self):
         """一次性消费准备命令完成结果。"""
-        # 先发布此前已提交的成员查询、换队或踢人快照，避免其覆盖准备结果。
-        if (self._members_pending is not None or self._team_pending is not None
+        # 先发布此前已提交的换队或踢人快照，避免其覆盖准备结果。
+        if (self._team_pending is not None
                 or self._kick_pending is not None):
             return None
         if self._ready_pending is None or not self._ready_pending.done():
@@ -121,7 +120,7 @@ class RoomSession:
     def begin_change_team(self, room_id, team):
         """共用串行工作线程提交换队，未消费的请求不会重复发送。"""
         if (self._closed or self._pending is not None or self._team_pending is not None
-                or self._departure_pending is not None or self._members_pending is not None
+                or self._departure_pending is not None
                 or self._kick_pending is not None or self._ready_pending is not None):
             return False
         self._team_pending = self._executor.submit(self._execute_change_team, room_id, team)
@@ -228,24 +227,13 @@ class RoomSession:
         # 换队回包先消费，随后才读取事件快照，避免较旧回包覆盖较新成员列表。
         if (self._closed or self._inbox is None or self._pending is not None
                 or self._team_pending is not None
-                or (self._ready_pending is not None and self._members_pending is None)):
+                or self._ready_pending is not None):
             return None
         if self._departure_pending is not None:
             if not self._departure_pending.done():
                 return None
             pending_departure, self._departure_pending = self._departure_pending, None
             return pending_departure.result()
-        if self._members_pending is not None:
-            if not self._members_pending.done():
-                return None
-            pending, self._members_pending = self._members_pending, None
-            result = pending.result()
-            if result.error is not None:
-                return result
-            if (result.data is not None and self._record is not None
-                    and result.data['roomId'] == self._record.room_id):
-                return result
-            return None
         event = self._inbox.poll_event()
         if event is None:
             return None
@@ -275,19 +263,10 @@ class RoomSession:
         return Completion(event_type, data={'roomId': room_id})
 
     def _handle_room_members_updated(self, payload):
-        """成员通知只触发后台权威快照查询，迟到通知不能直接改写本地成员。"""
-        if self._record is not None and self._record.room_id == payload.get('roomId'):
-            self._members_pending = self._executor.submit(self._refresh_members, self._record)
-        return None
-
-    def _refresh_members(self, record):
-        """在业务工作线程读取成员与档案，原生适配只消费完成结果。"""
-        try:
-            data = self._gateway.room_detail(record.player_id, record.room_id)
-            self._load_profiles(data, record.player_id)
-            return Completion('room_members_updated', data=data)
-        except OnlineError as error:
-            return Completion('room_members_updated', error=error)
+        """直接交付当前房间成员快照；原生适配在主线程校验、解码并刷新。"""
+        if self._record is None or self._record.room_id != payload.get('roomId'):
+            return None
+        return Completion('room_members_updated', data=payload)
 
     def _load_profiles(self, data, player_id):
         """按成员读取完整资料；原生缺失资料不能用其他玩家的数据代替。"""

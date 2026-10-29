@@ -13,19 +13,19 @@ from test_refactor_equivalence import MemoryProcess
 
 
 class ReadySessionTests(unittest.TestCase):
-    def test_earlier_member_snapshot_is_consumed_before_ready_result(self):
+    def test_ready_result_is_consumed_before_queued_member_push(self):
         realtime = Mock()
+        payload = {'roomId': 'rm_test', 'members': []}
+        realtime.poll_event.return_value = {'type': 'room_members_updated', 'payload': payload}
         session = RoomSession(Mock(), Mock(), 'http://server', realtime)
-        self.addCleanup(session._executor.shutdown)
-        session._record = IdentityRecord('pl_me', 'rm_test')
-        session._members_pending = Future()
-        session._members_pending.set_result(Completion('room_members_updated', data={'roomId': 'rm_test'}))
+        self.addCleanup(session.close)
+        session._record = IdentityRecord('pl_a', 'rm_test')
         session._ready_pending = Future()
         session._ready_pending.set_result(Completion('change_ready', data={'roomId': 'rm_test'}))
-        self.assertIsNone(session.poll_change_ready())
-        self.assertEqual(session.poll_event().operation, 'room_members_updated')
-        self.assertEqual(session.poll_change_ready().operation, 'change_ready')
+        self.assertIsNone(session.poll_event())
         realtime.poll_event.assert_not_called()
+        self.assertEqual(session.poll_change_ready().operation, 'change_ready')
+        self.assertEqual(session.poll_event().data, payload)
 
     def test_ready_cancel_deliver_confirmed_snapshot_once(self):
         gateway = Mock()
