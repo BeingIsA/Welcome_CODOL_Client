@@ -130,6 +130,8 @@ class GameSessionBridge:
         from codol_rebuild.adapters.game.v1649370.accounts.profile import build_initializer, inventory_relocations, CAPACITY, STRIDE, INITIALIZER_DATA_SIZE
         from codol_rebuild.adapters.game.v1649370.accounts.profile import validate_account_native_contract
         validate_account_native_contract(self.process.read)
+        from codol_rebuild.adapters.game.v1649370.accounts.profile import install_upload_checksum_order
+        install_upload_checksum_order(self.process.read, self.process.write)
         initializer_address = self.process.allocate(4096)
         profile_data_address = self.process.allocate(INITIALIZER_DATA_SIZE)
         pool_allocation = self.process.allocate(CAPACITY * STRIDE + 32)

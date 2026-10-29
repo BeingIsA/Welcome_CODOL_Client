@@ -25,6 +25,22 @@ SKU_SALE_OFFSET = 4096 + 65536
 INITIALIZER_DATA_SIZE = SKU_SALE_OFFSET + 65536
 
 
+def install_upload_checksum_order(read, write):
+    """仅调整上传专用入口：原生整理/解码后计算CRC，再走原压缩分包。
+
+    重进时正文可能仍为编码态；先计算CRC会让随后整理出的明文与头部失配。
+    保留EDI参数及整理函数ret4约定，不修改公共函数或原生上传状态分支。
+    """
+    address = 0x7F6EE2
+    original = bytes.fromhex('e889fbffff57e8f30e0000')
+    replacement = bytes.fromhex('57e8f80e0000e883fbffff')
+    if read(address, len(original)) != original:
+        raise ValueError('Native profile upload order mismatch')
+    write(address, replacement)
+    if read(address, len(replacement)) != replacement:
+        raise ValueError('Native profile upload order readback mismatch')
+
+
 def publish_consumption(read, write, inventory, item_id, next_state, commit):
     """发布已规划的单件消耗，沿既有库存槽约定保存数量，提交失败恢复原槽。"""
     pool_address = int(inventory['pool'], 16)

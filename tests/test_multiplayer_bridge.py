@@ -407,28 +407,93 @@ class MultiplayerBridgeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             bridge.room_options(memory.read, room)
 
-    def test_settings_detour_wraps_submit_method_entry(self):
-        plan = bridge.build_settings_detours(0x50000000)
+    def test_settings_detours_preserve_ui_arguments_and_return_to_callers(self):
+        """UI调用边保留参数、虚调用与清栈；公共配置函数完全不打补丁。"""
         decoder = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
-        rows = list(decoder.disasm(plan['code'], 0x50000000))
-        self.assertEqual(sum(row.size for row in rows), len(plan['code']))
-        # 单陷阱在桩首；原序幕 6 字节原样保留后跳回方法体 0x6300A6。
-        self.assertEqual(list(plan['traps'].values()), ['settings_submit'])
-        trap = next(iter(plan['traps']))
-        self.assertEqual(plan['code'][trap-0x50000000], 0xCC)
-        self.assertEqual(plan['code'][trap-0x50000000+1:trap-0x50000000+7],
-                         bytes.fromhex('558bec83ec10'))
-        back = next(r for r in rows if r.mnemonic == 'jmp')
-        self.assertEqual(int(back.op_str, 16), bridge.SETTINGS_SUBMIT+6)
-        # 补丁：原序幕 6 字节替换为 E9 JMP + NOP（JMP 不压栈，入口栈与
-        # 原方法一致），目标落在陷阱字节上。
-        patch = plan['patches'][0]
-        self.assertEqual(patch['va'], bridge.SETTINGS_SUBMIT)
-        self.assertEqual(patch['before'], bytes.fromhex('558bec83ec10'))
-        self.assertEqual(patch['after'][0], 0xE9)
-        self.assertEqual(patch['after'][5], 0x90)
-        target = patch['va']+5+struct.unpack('<i', patch['after'][1:5])[0]
-        self.assertEqual(target, trap)
+        for entry in (0x20000000, 0xf0000000):
+            plan = bridge.build_settings_detours(entry)
+            self.assertEqual([patch['va'] for patch in plan['patches']], [0x7CFE34, 0x7CFEFC])
+            self.assertNotIn(0x6300A0, [patch['va'] for patch in plan['patches']])
+            self.assertEqual(list(plan['traps'].values()), ['settings_command'] * 2)
+            for patch, displacement in zip(plan['patches'], (0x30, 8)):
+                target = (patch['va'] + 5 + struct.unpack('<i', patch['after'][1:5])[0]) & 0xffffffff
+                rows = list(decoder.disasm(plan['code'][target-entry:target-entry+13], target))
+                self.assertEqual([row.mnemonic for row in rows], ['lea', 'push', 'int3', 'call', 'jmp'])
+                self.assertEqual(rows[0].op_str, f'edx, [esp + {hex(displacement) if displacement >= 10 else displacement}]')
+                self.assertEqual(rows[1].op_str, 'edx')
+                self.assertEqual(rows[3].op_str, 'eax')
+                self.assertEqual(int(rows[4].op_str, 16), patch['va'] + 7)
+                self.assertIn(rows[2].address, plan['traps'])
+                self.assertEqual(patch['after'][5:], b'\x90\x90')
+
+    def test_default_initialization_command_is_not_suppressed_by_member_display(self):
+        """初始化是合法UI命令，即使成员展示尚未收尾也必须提交。"""
+        value, process, port, room, session = self.setup_bridge()
+        write_full_config(process, room, scalars={'modeScoreLimit': 75, 'playerMaxHealth': 100})
+        value.applying_members = True
+        with mock.patch.object(bridge, 'username', lambda read: '测试玩家'):
+            value._submit_settings(room + 0x105F0)
+        port.begin.assert_called_once()
+        self.assertEqual(port.begin.call_args.kwargs['settings']['modeScoreLimit'], 75)
+
+    def test_settings_call_edges_execute_with_balanced_x86_stack(self):
+        """实际执行生成的跳转桩；不把反汇编检查当作调用栈验证。"""
+        import os
+        import subprocess
+        import tempfile
+        compiler = Path(os.environ.get('WINDIR', 'C:/Windows')) / 'Microsoft.NET/Framework/v4.0.30319/csc.exe'
+        if not compiler.exists():
+            self.skipTest('需要Windows .NET x86编译器')
+        root = Path(__file__).resolve().parents[2]
+        workspace_root = root / 'verification/client/workspaces/room-settings-tests'
+        workspace_root.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=workspace_root) as directory:
+            workspace = Path(directory)
+            plan = bridge.build_settings_detours(0x20000000)
+            instruction_bytes = bytearray(plan['code'])
+            for address in plan['traps']:
+                instruction_bytes[address-0x20000000] = 0x90
+            from test_room_list_native import relocate_fixture_calls
+            relocate_fixture_calls(instruction_bytes, 0x20000000)
+            paths = [workspace / 'adapter.bin']
+            paths[0].write_bytes(instruction_bytes)
+            for index, patch in enumerate(plan['patches']):
+                paths.append(workspace / f'edge-{index}.bin')
+                relocated_patch = bytearray(patch['after'])
+                target = (patch['va'] + 5 + struct.unpack('<i', relocated_patch[1:5])[0]) & 0xffffffff
+                relocated_address = 0x28000000 + (patch['va'] & 0xffff)
+                struct.pack_into('<I', relocated_patch, 1, (target-relocated_address-5) & 0xffffffff)
+                paths[-1].write_bytes(relocated_patch)
+            executable = workspace / 'fixture.exe'
+            compiled = subprocess.run([str(compiler), '/nologo', '/platform:x86', '/out:'+str(executable),
+                str(root / 'client/tests/native/room_settings_fixture.cs')], capture_output=True, timeout=30)
+            self.assertEqual(compiled.returncode, 0, compiled.stdout.decode('mbcs', errors='replace'))
+            executed = subprocess.run([str(executable), *map(str, paths)], capture_output=True, timeout=15)
+            self.assertEqual(executed.returncode, 0, (executed.stdout+executed.stderr).decode('mbcs', errors='replace'))
+
+    def test_member_display_movie_patch_is_local_and_preserves_stack(self):
+        """固定电影仅取消成员派生广播，初始化和用户设置代码保持原字节。"""
+        from codol_rebuild.adapters.game.v1649370.rooms import room
+        from codol_rebuild.adapters.game.v1649370 import movie_identity
+        from codol_rebuild.adapters.game.v1649370.session import ui_movie
+        root = Path(__file__).resolve().parents[2]
+        original = (root / 'research/client/ui-investigation/codo.gfx').read_bytes()
+        patched = movie_identity.apply_rules(original, room.replacements())
+        self.assertEqual(len(room.replacements()), 1)
+        self.assertEqual([index for index, (before, after) in enumerate(zip(original, patched))
+                          if before != after], list(range(5101924, 5101928)))
+        self.assertIn(room.replacements()[0], ui_movie.replacements())
+        self.assertEqual(original[5101928], 0x29)
+        # 保留广播调用之前的栈前缀，替换后连同原 pop 一起净消耗三个操作数。
+        stack = ['preserved', 'event_manager', 'event_name', 'room']
+        for instruction in patched[5101924:5101929]:
+            if instruction == 0x29:
+                stack.pop()
+            elif instruction == 0x21:
+                stack.append(None)
+            else:
+                self.fail(f'非预期AVM2指令：{instruction:#x}')
+        self.assertEqual(stack, ['preserved'])
 
     def test_create_and_identical_lobby_settings_are_separate_requests(self):
         # 创建与后续设置是独立请求；即使配置相同，也不能按内容去重。
@@ -451,11 +516,11 @@ class MultiplayerBridgeTests(unittest.TestCase):
         baseline = port.begin.call_args.kwargs['settings']
         # 大厅再次应用同一份配置：仍产生 settings 提交。
         ctx2 = bytearray(716)
-        struct.pack_into('<I', ctx2, 196, 0x30000000)
+        struct.pack_into('<I', ctx2, 196, 0x30000100)
         struct.pack_into('<I', ctx2, 184, 0x50000020)
         process.context = Mock(return_value=(1, ctx2))
-        process.word(0x30000004, room+0x105F0)
-        value.traps = {0x50000020: 'settings_submit'}
+        process.word(0x30000100, room+0x105F0)
+        value.traps = {0x50000020: 'settings_command'}
         value.pending = None
         with mock.patch.object(bridge, 'username', lambda read: '测试玩家'):
             value.handle(event, 0x50000020)
@@ -473,10 +538,10 @@ class MultiplayerBridgeTests(unittest.TestCase):
         value, process, port, room, session = self.setup_bridge()
         write_full_config(process, room)
         ctx = bytearray(716)
-        struct.pack_into('<I', ctx, 196, 0x30000000)  # esp
+        struct.pack_into('<I', ctx, 196, 0x30000100)  # UI调用边栈顶
         struct.pack_into('<I', ctx, 184, 0x50000010)  # eip = 陷阱地址
-        process.word(0x30000004, room+0x105F0)        # [esp+4] = 配置指针
-        value.traps = {0x50000010: 'settings_submit'}
+        process.word(0x30000100, room+0x105F0)        # [esp] = 配置指针
+        value.traps = {0x50000010: 'settings_command'}
         event = SimpleNamespace(tid=1)
         process.context = Mock(return_value=(1, ctx))
         process.set_context = Mock()
@@ -489,6 +554,8 @@ class MultiplayerBridgeTests(unittest.TestCase):
 
     def _fire(self, value, process, phase, address, esp=0x30000000):
         """按主线程陷阱约定派发一次 handle；ctx 带 esp 与待回写的 eip。"""
+        if phase == 'settings_command':
+            esp = 0x30000100
         ctx = bytearray(716)
         struct.pack_into('<I', ctx, 196, esp)
         struct.pack_into('<I', ctx, 184, address)
@@ -512,11 +579,11 @@ class MultiplayerBridgeTests(unittest.TestCase):
         value.port = port
         records = []
         value.record = records.append
-        process.word(0x30000004, room+0x105F0)  # [esp+4] = 配置指针
+        process.word(0x30000100, room+0x105F0)  # [esp] = 配置指针
 
         # 建房界面首次应用配置：占用通道，同时必须武装轮询让帧桩取走结果。
         write_full_config(process, room, mode='td', map_name='mp_crash')
-        self._fire(value, process, 'settings_submit', 0x50000010)
+        self._fire(value, process, 'settings_command', 0x50000010)
         self.assertTrue(port.busy)
         self.assertEqual(bridge.u32(process.read, value.state+bridge.POLL), 1)
 
@@ -538,7 +605,7 @@ class MultiplayerBridgeTests(unittest.TestCase):
 
         # 房内改地图：通道已腾空，必须真正提交而不是丢成 busy。
         write_full_config(process, room, mode='td', map_name='mp_crash_tropical')
-        self._fire(value, process, 'settings_submit', 0x50000010)
+        self._fire(value, process, 'settings_command', 0x50000010)
         self.assertEqual(bridge.u32(process.read, value.state+bridge.POLL), 1)
         value._poll()
         self.assertEqual(port.submitted[-1]['map'], 'mp_crash_tropical')
@@ -556,13 +623,13 @@ class MultiplayerBridgeTests(unittest.TestCase):
         value.port = port
         records = []
         value.record = records.append
-        process.word(0x30000004, room+0x105F0)
+        process.word(0x30000100, room+0x105F0)
         process.word(0x30000010, room)
         process.word(0x30000000, session)
 
         # 改设置后立刻建房：补交在途时被主流程抢占。
         write_full_config(process, room, mode='td', map_name='mp_crash')
-        self._fire(value, process, 'settings_submit', 0x50000010)
+        self._fire(value, process, 'settings_command', 0x50000010)
         self.assertTrue(port.busy)
         self._fire(value, process, 'create', 0x50000010)
         self.assertEqual(value.pending[0], 'create')
@@ -580,7 +647,7 @@ class MultiplayerBridgeTests(unittest.TestCase):
         self.assertEqual(records[-1]['multiplayer_settings'], 'done')
         self.assertEqual(bridge.u32(process.read, value.state+bridge.POLL), 0)
         write_full_config(process, room, mode='sd', map_name='mp_crash_tropical')
-        self._fire(value, process, 'settings_submit', 0x50000010)
+        self._fire(value, process, 'settings_command', 0x50000010)
         self.assertEqual(port.submitted[-1]['mode'], 'sd')
         self.assertNotIn('skipped', [r.get('multiplayer_settings') for r in records])
 

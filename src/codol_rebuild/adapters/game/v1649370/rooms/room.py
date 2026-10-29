@@ -9,6 +9,16 @@ from __future__ import annotations
 import struct
 from codol_rebuild.adapters.game.v1649370.native_state import MESSAGE as JOIN_ERROR_MESSAGE_OFFSET
 
+
+def replacements():
+    """成员回显只刷新展示，不再广播规则写命令；保留原生默认初始化和用户修改。
+
+    initRoomMembers 的 callproperty broadcast(2) 消费接收者和两个参数，
+    并压入一个返回值。局部替换保留同样栈效果及随后原生 pop，其余字节不变。
+    """
+    return [(5101924, bytes.fromhex('46e40302'), bytes.fromhex('29292921'))]
+
+
 CREATE = 0x62CCEA
 VALID = 0x62FDE0
 IDENTITY = 0x7CADFA

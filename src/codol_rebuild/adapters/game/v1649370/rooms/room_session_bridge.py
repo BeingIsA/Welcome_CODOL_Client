@@ -17,11 +17,11 @@ from codol_rebuild.adapters.game.v1649370.frontend.notifications import display_
 from codol_rebuild.adapters.game.v1649370.accounts.player_name import username
 
 ROOM_POINTER = 0x82E13FC
-# 房间设置提交方法本体（房间管理器 vtable+0x7C，构造 0x62C000 写 vtable
-# 0xDC7274 得出）。所有配置变更——建房、规则设置页应用、单项改地图/模式
-# 及管理器内部路径——最终都经此处把新配置拷入管理器 +0x105F0，拦入口
-# 一处即可覆盖全部调用方（0x6300BD/0x6300C6 的两次 637AB0 拷贝之前）。
-SETTINGS_SUBMIT = 0x6300A0
+# UI 的地图/模式修改与规则修改调用边；公共配置应用方法不承担网络请求。
+SETTINGS_COMMAND_SITES = {
+    0x7CFE34: bytes.fromhex('8d54243052ffd0'),
+    0x7CFEFC: bytes.fromhex('8d54240852ffd0'),
+}
 
 
 def room_options(read, room):
@@ -119,33 +119,29 @@ def validate_contract(read):
         0x730280: bytes.fromhex('558bec83ec4ca198bb770c'),
         0x5CF5E6: bytes.fromhex('8b4d085083c118'),
         0x5CF6FC: bytes.fromhex('8a45f08b4d0888410e88410f'),
-        SETTINGS_SUBMIT: bytes.fromhex('558bec83ec10'),
+        **SETTINGS_COMMAND_SITES,
     }.items():
         if read(address, len(expected)) != expected:
             raise ValueError(f'联机桥原生 ABI 不匹配：{address:#x}')
 
 
 def build_settings_detours(entry):
-    """生成设置提交方法（0x6300A0）入口的重定向桩与补丁计划。
+    """只在两个 UI 命令调用边捕获配置，保留原参数生成、虚调用及清栈约定。
 
-    被替换的 6 字节是原函数序幕（push ebp; mov ebp,esp; sub esp,0x10）。
-    入口必须用 E9 JMP 重定向而不是 CALL：JMP 不压返回地址，桩入口的
-    栈与原方法入口完全一致（[esp]=调用者返回地址、[esp+4]=新配置指针），
-    否则整个方法在 esp 偏移 4 的栈上运行，ret 4 会吞掉调用者返回地址
-    （2026-10-23 实机崩溃教训）。桩先以 int3 陷阱上报，再执行原序幕
-    并跳回 0x6300A6 继续原方法，原生行为保持不变。
+    JMP 不额外压栈。先执行原 lea/push，陷阱处栈顶就是配置指针；
+    原 call eax 及其 ret 4 消费参数，再跳回原调用边后续清理。
     """
     code, traps, patches = bytearray(), {}, []
-    stub = 0
-    traps[entry+stub] = 'settings_submit'
-    code.append(0xCC)                       # 陷阱：读取 [esp+4] 的配置指针
-    code.extend(bytes.fromhex('558bec83ec10'))  # 原序幕 6 字节
-    code.extend(b'\xe9')                    # jmp 0x6300A6（相对跳回）
-    code.extend(struct.pack('<i', (SETTINGS_SUBMIT+6)-(entry+len(code))-4))
-    before = bytes.fromhex('558bec83ec10')
-    after = b'\xe9' + struct.pack('<I', (entry+stub-SETTINGS_SUBMIT-5) & 0xffffffff)
-    after += b'\x90'
-    patches.append({'va': SETTINGS_SUBMIT, 'before': before, 'after': after})
+    for address, original_bytes in SETTINGS_COMMAND_SITES.items():
+        stub_address = entry + len(code)
+        code.extend(original_bytes[:5])
+        traps[entry + len(code)] = 'settings_command'
+        code.append(0xCC)
+        code.extend(original_bytes[5:])
+        code.append(0xE9)
+        code.extend(struct.pack('<I', (address + len(original_bytes) - entry - len(code) - 4) & 0xffffffff))
+        replacement = b'\xe9' + struct.pack('<I', (stub_address - address - 5) & 0xffffffff) + b'\x90\x90'
+        patches.append({'va': address, 'before': original_bytes, 'after': replacement})
     return {'code': bytes(code), 'patches': patches, 'traps': traps}
 
 
@@ -409,9 +405,9 @@ class RoomSessionBridge:
                     self._word(36, 0)
             elif phase in ('create', 'leave'):
                 self._request(phase, frame)
-            elif phase == 'settings_submit':
-                # JMP 重定向后桩入口栈与原方法一致：[esp]=调用者返回、[esp+4]=配置。
-                self._submit_settings(u32(self.process.read, frame+4))
+            elif phase == 'settings_command':
+                # UI 调用边已压入配置，原生虚调用尚未执行，栈顶没有返回地址。
+                self._submit_settings(u32(self.process.read, frame))
             elif phase == 'poll':
                 self._poll()
             elif phase == 'realtime':
@@ -647,9 +643,9 @@ class RoomSessionBridge:
             self._failure(operation, str(error))
 
     def _submit_settings(self, config):
-        """逐次提交设置，不按内容去重；原生提交继续执行，失败只记录。"""
+        """接收 UI 初始化或用户设置命令；服务端回显不经此入口。"""
         try:
-            if not self.is_owner or self.applying_members:
+            if not self.is_owner:
                 return
             settings = read_settings(self.process.read, config)
             if self.pending is not None:
