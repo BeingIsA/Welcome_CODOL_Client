@@ -65,6 +65,12 @@ def build_plan(options: argparse.Namespace) -> dict:
     session = datetime.now().strftime('offline-%Y%m%d-%H%M%S-') + uuid.uuid4().hex[:8]
     arguments = ['--name', session]
     required = {'--name', '--image', '--patches', '--breakpoint'}
+    if getattr(options, 'trace_native_exit', True):
+        arguments.append('--trace-native-exit')
+        required.add('--trace-native-exit')
+    else:
+        arguments.append('--no-trace-native-exit')
+        required.add('--no-trace-native-exit')
     if options.seconds is None:
         arguments.append('--until-close')
         required.add('--until-close')
@@ -128,6 +134,8 @@ def build_plan(options: argparse.Namespace) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--trace-native-exit', action='store_true', default=True, help='采集原生无效参数及退出调用栈（默认开启）')
+    parser.add_argument('--no-trace-native-exit', action='store_false', dest='trace_native_exit', help='关闭原生退出诊断')
     lifetime = parser.add_mutually_exclusive_group()
     lifetime.add_argument('--until-close', action='store_true', help='运行直到关闭或致命错误（默认）')
     lifetime.add_argument('--seconds', type=int, help='改为 1..600 秒有时限的诊断运行')

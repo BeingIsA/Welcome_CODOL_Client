@@ -18,6 +18,8 @@ def parse_args(argv=None):
     parser.add_argument('--patches',type=Path)
     parser.add_argument('--native-library',type=Path,default=ROOT/'resources/v1649370/game',help='完整原生资源根，只联接顶层目录')
     parser.add_argument('--trace-files',action='store_true')
+    parser.add_argument('--trace-native-exit', action='store_true', default=True, help='启用一次性原生退出诊断断点（默认开启）')
+    parser.add_argument('--no-trace-native-exit', action='store_false', dest='trace_native_exit', help='关闭原生退出诊断')
     parser.add_argument('--offline-menu-preview',action='store_true')
     parser.add_argument('--local-profile',action='store_true',help='Experimental build-specific local profile bridge')
     parser.add_argument('--game-server-ip')

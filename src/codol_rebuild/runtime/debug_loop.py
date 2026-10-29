@@ -12,6 +12,10 @@ class DebugLoop:
         self.process=process;self.bridge=bridge;self.pe=pe
         self.args=process.args;self.log=process.log;self.record=process.record
         self.forbidden=forbidden;self.breaks={};self.file_traps={};self.tids=set();self.rearm={}
+        self.termination_trace = None
+        if getattr(self.args, 'trace_native_exit', False):
+            from codol_rebuild.runtime.termination_trace import TerminationTrace
+            self.termination_trace = TerminationTrace(process, self.record)
         bridge.bind_debugger(self)
 
     def arm(self, address, label):
@@ -63,6 +67,8 @@ class DebugLoop:
                 self.log['modules'].append(row)
                 self.record(row)
                 name = Path(path).name.lower()
+                if self.termination_trace is not None:
+                    self.termination_trace.module_loaded(path, base)
                 if name in self.forbidden:
                     self.log['stop_reason'] = 'forbidden_module_before_initialization'
                     break
@@ -74,6 +80,9 @@ class DebugLoop:
                     for symbol in loaded.DIRECTORY_ENTRY_EXPORT.symbols:
                         if symbol.name in (b'MessageBoxA', b'MessageBoxW') and (not symbol.forwarder):
                             self.arm(base + symbol.address, symbol.name.decode())
+            elif event.code == 7:
+                if self.termination_trace is not None:
+                    self.termination_trace.module_unloaded(struct.unpack_from('<Q', data)[0])
             elif event.code == 1:
                 code = struct.unpack_from('<I', data)[0]
                 address = struct.unpack_from('<Q', data, 16)[0]
@@ -87,6 +96,14 @@ class DebugLoop:
                         row['thread_name'] = self.process.cstring(parameters[1])
                     except OSError:
                         row['thread_name_unreadable'] = True
+                    self.record(row)
+                elif (code in (2147483651, 1073741855) and self.termination_trace is not None
+                      and address in self.termination_trace.breakpoints):
+                    thread, context = self.process.context(event.tid)
+                    try:
+                        self.termination_trace.capture(address, thread, context, row)
+                    finally:
+                        close(thread)
                     self.record(row)
                 elif self.bridge.handle_exception(event, code, address, row):
                     pass
