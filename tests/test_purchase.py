@@ -1,10 +1,12 @@
 """本地购买的事务、失败回滚、期限策略及原生契约验证。"""
 import copy
+from contextlib import closing
 from pathlib import Path
 import sqlite3
 import struct
 import tempfile
 import unittest
+from unittest.mock import Mock, patch
 import pefile
 import capstone
 
@@ -37,6 +39,52 @@ class Memory:
 
 
 class PurchaseTests(unittest.TestCase):
+    def test_purchase_does_not_write_profiles_and_later_save_preserves_purchase(self):
+        """数据库禁止档案写入时购买仍成功，后续配装保存不回滚余额和物品。"""
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'account.db'
+            session, profiles = self.session(path)
+            with closing(sqlite3.connect(path)) as database, database:
+                database.execute("CREATE TRIGGER reject_profile_insert BEFORE INSERT ON profiles BEGIN SELECT RAISE(ABORT, 'purchase touched profiles'); END")
+                database.execute("CREATE TRIGGER reject_profile_update BEFORE UPDATE ON profiles BEGIN SELECT RAISE(ABORT, 'purchase touched profiles'); END")
+            session.commit_purchase(OFFER)
+            restored = session.repository.load('local', session.codec.identities)
+            self.assertEqual(restored['profiles'], profiles)
+            self.assertEqual(restored['initialization']['gp'], 950)
+            self.assertIn(123, restored['initialization']['owned_ids'])
+            with closing(sqlite3.connect(path)) as database, database:
+                database.execute('DROP TRIGGER reject_profile_insert')
+                database.execute('DROP TRIGGER reject_profile_update')
+            session.codec = Mock(identities=Codec.identities)
+            changed_profiles = {**profiles, 'public': b'changed loadout'}
+            session.save(changed_profiles)
+            saved = session.repository.load('local', Codec.identities)
+            self.assertEqual(saved['profiles'], changed_profiles)
+            self.assertEqual(saved['initialization'], restored['initialization'])
+
+    def test_bridge_purchase_never_reads_or_saves_native_profiles(self):
+        """编码态与未保存配装均不应成为购买的前置条件。"""
+        from codol_rebuild.adapters.game.v1649370.accounts.profile_bridge import LocalProfileBridge
+        with tempfile.TemporaryDirectory() as folder:
+            session, profiles = self.session(Path(folder) / 'account.db')
+            process = Mock()
+            process.read.side_effect = AssertionError('purchase read native profile')
+            bridge = LocalProfileBridge(process, Mock(), {}, Mock())
+            bridge._service = session
+            bridge._ready = True
+            bridge._inventory = {'pool': '0x100000'}
+            bridge._catalog = {123: {'id': 123}}
+            bridge.save = Mock(side_effect=AssertionError('purchase saved unrelated profile'))
+            # 原生库存/余额发布与回滚由现有publish_transaction测试独立覆盖。
+            def publish(read, write, inventory, items, next_state, commit):
+                return commit()
+            with patch.object(purchase, 'publish_transaction', side_effect=publish):
+                bridge.purchase(OFFER)
+            bridge.save.assert_not_called()
+            process.read.assert_not_called()
+            self.assertEqual(session.account['profiles'], profiles)
+            self.assertEqual(session.account['initialization']['gp'], 950)
+
     def test_bundle_accumulates_and_deduplicates_atomically(self):
         bundle = {**OFFER, 'contents': [
             {'item_id': 545, 'stackable': False, 'count': 1},
@@ -67,8 +115,8 @@ class PurchaseTests(unittest.TestCase):
             {'item_id': 123, 'stackable': False, 'count': 1}]}
         with tempfile.TemporaryDirectory() as folder:
             session, blobs = self.session(Path(folder)/'account.db')
-            session.commit_purchase(blobs, bundle)
-            session.commit_purchase(blobs, bundle)
+            session.commit_purchase(bundle)
+            session.commit_purchase(bundle)
             saved = session.repository.load('local', session.codec.identities)['initialization']
             self.assertEqual(saved['quantities'], {'545': 9})
             mem, pool = Memory(), 0x100000
@@ -125,14 +173,14 @@ class PurchaseTests(unittest.TestCase):
             session, blobs = self.session(Path(folder)/'account.db')
             stale = AccountSession(session.repository, session.codec)
             stale.account = copy.deepcopy(session.account)
-            session.commit_purchase(blobs, {**OFFER, 'currency': 'cp'})
+            session.commit_purchase({**OFFER, 'currency': 'cp'})
             restored = session.repository.load('local', session.codec.identities)
             self.assertEqual(restored['initialization']['cp'], 50)
             self.assertIn(123, restored['initialization']['owned_ids'])
             with self.assertRaises(ValueError):
-                session.commit_purchase(blobs, OFFER)
+                session.commit_purchase(OFFER)
             with self.assertRaises(ValueError):
-                stale.commit_purchase(blobs, OFFER)
+                stale.commit_purchase(OFFER)
             self.assertEqual(session.repository.load('local', session.codec.identities), restored)
 
     def test_sqlite_failure_rolls_back_currency_and_ownership(self):
@@ -144,7 +192,7 @@ class PurchaseTests(unittest.TestCase):
                 db.execute("CREATE TRIGGER reject_purchase BEFORE UPDATE ON account_initialization BEGIN SELECT RAISE(ABORT, 'injected failure'); END")
             db.close()
             with self.assertRaises(sqlite3.Error):
-                session.commit_purchase(blobs, OFFER)
+                session.commit_purchase(OFFER)
             self.assertEqual(session.account, before)
             self.assertEqual(session.repository.load('local', session.codec.identities), before)
 

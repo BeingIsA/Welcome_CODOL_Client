@@ -63,7 +63,7 @@ class RenameCardTests(RenameCardFixture):
         next_state=self.session.purchase_state(offer)
         purchase.publish_transaction(self.mem.read,self.mem.write,self.inventory,
             {'id':50001,'type_bytes':[0,8,0,0]},next_state,
-            lambda:self.session.commit_purchase(self.blobs,offer))
+            lambda:self.session.commit_purchase(offer))
         self.assertEqual(self.inventory['items'],2)
         self.assertEqual(purchase.u32(self.mem.read,self.pool+purchase.STRIDE+0x40),50001)
         self.assertEqual(self.session.account['initialization']['quantities']['50001'],1)

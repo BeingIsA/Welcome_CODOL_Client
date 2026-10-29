@@ -31,6 +31,7 @@ class MatchBridge:
         self.start_notification = None
         self.delivered_allocation = None
         self.notification_ready = False
+        self.notify = lambda message: self.record({'match_start_error': message})
 
     def integer(self, address):
         return struct.unpack('<I', self.process.read(address, 4))[0]
@@ -211,6 +212,25 @@ class MatchBridge:
 
     def poll(self, resume_address):
         """仅消费已完成结果；离房后不向新原生房间投递旧回调。"""
+        start = self.session.poll_start()
+        if start is not None:
+            if start['status'] == 'failed':
+                self.notify(start.get('error') or '开局失败，请取消准备后重新准备')
+                self.session.acknowledge_start(start['roomId'], start['startId'])
+            elif self.current_room() == start['roomId']:
+                room_pointer = self.integer(ROOM_POINTER)
+                if room_pointer >= 0x10000 and self.integer(room_pointer + 0x1C):
+                    if self.process.read(0x62F840, 8) != bytes.fromhex('558becb814200000'):
+                        raise ValueError('原生StartMatch调用约定不匹配')
+                    entry = self.code + 1280
+                    instructions = bytearray(b'\x9c\x60\xb9' + struct.pack('<I', room_pointer))
+                    instructions.extend(bytes.fromhex('6a006aff6a01'))
+                    instructions.extend(b'\xe8' + struct.pack('<i', 0x62F840-entry-len(instructions)-5))
+                    instructions.extend(b'\x61\x9d\xe9' + struct.pack('<i', resume_address-entry-len(instructions)-7))
+                    self.process.write(entry, bytes(instructions))
+                    self.session.acknowledge_start(start['roomId'], start['startId'])
+                    self.record({'formal_start': start['startId'], 'roomId': start['roomId']})
+                    return entry
         completion = self.session.poll()
         if completion is not None:
             self.record({'match_completion': completion.operation, 'succeeded': completion.error is None,

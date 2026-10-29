@@ -17,6 +17,8 @@ COMPRESSED_SIZE = 3023971
 RESOURCE_SHA256 = '314c4abd6936b02955e2f31f781b20ac119ea9878f83698d1a1d6f106558c31c'
 LOAD_SITE = 0x5EB9F7
 LOAD_BYTES = bytes.fromhex('e8a4812300')
+LOAD_RETURN_SITE = LOAD_SITE + len(LOAD_BYTES)
+LOAD_RETURN_BYTES = bytes.fromhex('8b0da0e97a0c')
 
 
 def apply_rules(original: bytes, rules) -> bytes:
@@ -45,7 +47,7 @@ def build_resource_patch(read, header_address: int, rules) -> dict:
     """校验重定位 RawFile 头及完整解压内容，返回数据和长度两项显式写计划。"""
     header = read(header_address, 16)
     name, compressed_size, size, data = struct.unpack('<4I', header)
-    if (compressed_size, size) != (COMPRESSED_SIZE, RESOURCE_SIZE):
+    if size != RESOURCE_SIZE or not 0 < compressed_size <= COMPRESSED_SIZE:
         raise ValueError('主电影 RawFile 长度不符')
     if read(name, len(RESOURCE_NAME)) != RESOURCE_NAME:
         raise ValueError('主电影 RawFile 名称不符')
@@ -54,11 +56,24 @@ def build_resource_patch(read, header_address: int, rules) -> dict:
     original = decoder.decompress(compressed, RESOURCE_SIZE + 1)
     if not decoder.eof or decoder.unused_data or decoder.unconsumed_tail:
         raise ValueError('主电影压缩流不完整或包含尾部数据')
-    patched = apply_rules(original, rules)
-    replacement = zlib.compress(patched, 9)
+    already_applied = hashlib.sha256(original).hexdigest() != RESOURCE_SHA256
+    if already_applied:
+        # 逆向核验全部规则及原版完整摘要，不用地址缓存代替资源身份校验。
+        restored = bytearray(original)
+        for offset, before, after in rules:
+            if original[offset:offset + len(after)] != after:
+                raise ValueError('主电影既有补丁内容不符')
+            restored[offset:offset + len(before)] = before
+        patched = apply_rules(bytes(restored), rules)
+        if patched != original:
+            raise ValueError('主电影既有补丁指纹不符')
+        replacement = compressed
+    else:
+        patched = apply_rules(original, rules)
+        replacement = zlib.compress(patched, 9)
     if len(replacement) > compressed_size:
         raise ValueError('主电影压缩资源超出原缓冲区')
-    return {'header_address': header_address, 'header_before': header,
+    return {'header_address': header_address, 'header_before': header, 'already_applied': already_applied,
             'data_address': data, 'data_before': compressed, 'data_after': replacement,
             'length_address': header_address + 4,
             'length_after': struct.pack('<I', len(replacement)),
@@ -67,7 +82,7 @@ def build_resource_patch(read, header_address: int, rules) -> dict:
 
 def find_resource_patch(read, regions, rules) -> dict:
     """扫描精确长度对后校验名称与完整资源指纹；歧义或缺失时拒绝修改。"""
-    marker = struct.pack('<II', COMPRESSED_SIZE, RESOURCE_SIZE)
+    marker = struct.pack('<I', RESOURCE_SIZE)
     found = {}
     for base, size in regions:
         for offset in range(0, size, 1024 * 1024):
@@ -78,7 +93,7 @@ def find_resource_patch(read, regions, rules) -> dict:
             start = 0
             while (index := chunk.find(marker, start)) >= 0:
                 start = index + 1
-                address = base + offset + index - 4
+                address = base + offset + index - 8
                 if address in found:
                     continue
                 try:

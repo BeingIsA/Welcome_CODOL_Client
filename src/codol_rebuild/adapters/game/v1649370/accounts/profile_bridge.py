@@ -182,16 +182,12 @@ class LocalProfileBridge:
         from codol_rebuild.adapters.game.v1649370.accounts.purchase import publish_transaction
         if not self._ready or not self._account:
             raise ValueError('本地档案尚未就绪')
-        self.save(force=True)
-        blobs = {kind: self.process.read(base + 0x90, layout.BUFFER_CAPACITY)
-                 for kind, base in [('public', PUBLIC), ('secure', SECURE)]}
-        if blobs != self._account['profiles']:
-            raise ValueError('档案快照尚未同步，请重试')
+        # 购买只改变库存与余额；原生配装可处于编码态，不参与购买事务。
         next_state = self._service.purchase_state(offer, quantity)
         return publish_transaction(
             self.process.read, self.process.write, self._inventory,
             [self._catalog[row['item_id']] for row in offer.get('contents', [{'item_id': offer['item_id']}])], next_state,
-            lambda: self._service.commit_purchase(blobs, offer, quantity))
+            lambda: self._service.commit_purchase(offer, quantity))
 
     def save(self, force=False):
         if not self._account or not self._ready: return

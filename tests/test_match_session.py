@@ -50,3 +50,23 @@ class MatchSessionTests(unittest.TestCase):
         self.assertIs(completion.error, failure)
         self.assertIsNone(completion.data)
         self.assertIsNone(self.session.poll())
+
+
+class FormalStartPollingTests(MatchSessionTests):
+    """详情恢复只交付当前开局，原生确认前不会丢失结果。"""
+    def test_ready_result_waits_for_native_acknowledgment(self):
+        self.session.connected('player')
+        self.assertIsNone(self.session.poll_start())
+        self.future.set_result({'start': {'startId': 'start-one', 'status': 'ready', 'error': None}})
+        first = self.session.poll_start()
+        self.assertEqual(first['startId'], 'start-one')
+        self.assertEqual(self.session.poll_start(), first)
+        self.session.acknowledge_start(self.room_id, 'start-one')
+        self.assertIsNone(self.session.poll_start())
+
+    def test_old_room_result_cannot_start_new_room(self):
+        self.session.connected('player')
+        self.session.poll_start()
+        self.room_id = 'new-room'
+        self.future.set_result({'start': {'startId': 'old', 'status': 'ready'}})
+        self.assertIsNone(self.session.poll_start())

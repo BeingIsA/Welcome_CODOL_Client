@@ -109,15 +109,12 @@ class AccountSession:
             raise ValueError('旧版全解锁档案无需购买装备')
         return permanent_purchase(state, offer, quantity)
 
-    def commit_purchase(self, blobs, offer, quantity=1):
-        """扣款与永久授权使用既有双档案事务；提交成功才推进内存状态。"""
-        self.codec.validate_snapshot(blobs)
+    def commit_purchase(self, offer, quantity=1):
+        """原子提交扣款与物品授权，不接收或覆盖配装、角色和进度档案。"""
         state = self.purchase_state(offer, quantity)
-        revision = self.repository.save(
-            self.name, self.account['revision'], blobs, self.codec.identities,
-            initialization=state)
+        revision = self.repository.save_inventory(self.name, self.account['revision'], state)
         self.account = {**self.account, 'revision': revision,
-                        'profiles': dict(blobs), 'initialization': state}
+                        'initialization': state}
         return state
 
     def consume_state(self, item):

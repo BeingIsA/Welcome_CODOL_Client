@@ -111,7 +111,7 @@ def build_plan(options: argparse.Namespace) -> dict:
             '--game-bind-ip', options.game_bind_ip, '--game-bind-port', str(options.game_bind_port)]
         required.update(('--game-network-mode', '--game-bind-ip', '--game-bind-port'))
     missing = sorted(required - host_options(ROOT / 'src/codol_rebuild/bootstrap/config.py'))
-    return {'scope': ('server login/create/leave; gameplay not implemented' if getattr(options,'server_url',None) else 'local profile; offline room' if getattr(options,'local_profile',False) else 'offline character-selection preview; lobby and gameplay not verified'),
+    return {'scope': ('server room and single-player ready/start; Cross Fire / war only' if getattr(options,'server_url',None) else 'local profile; offline room' if getattr(options,'local_profile',False) else 'offline character-selection preview; lobby and gameplay not verified'),
             'local_profile': getattr(options,'local_profile',False),
             'dry_run': options.dry_run, 'main_menu_verified': False, 'session': session,
             'offline_menu_preview': options.offline_menu_preview,

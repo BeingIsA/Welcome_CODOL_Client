@@ -38,6 +38,7 @@ class MatchBridgeTests(unittest.TestCase):
     def setUp(self):
         self.process = MemoryProcess()
         self.session = Mock()
+        self.session.poll_start.return_value = None
         self.bridge = MatchBridge(self.process, self.session, lambda: 'room', ('127.0.0.2', 27760), Mock())
         self.process.write(FIND_CALL, bytes.fromhex('e87cb11c00'))
         self.process.write(BINARY_SLOT, struct.pack('<I', 0x629730))
@@ -46,6 +47,18 @@ class MatchBridgeTests(unittest.TestCase):
         for call_address, original_bytes in IDENTITY_CALLS:
             self.process.write(call_address, original_bytes)
         self.bridge.install(0x42000)
+
+    def test_formal_ready_calls_original_start_match_with_preserved_return(self):
+        self.session.poll_start.return_value = {'roomId': 'room', 'startId': 'first', 'status': 'ready'}
+        self.process.write(ROOM_POINTER, struct.pack('<I', 0x40000))
+        self.process.write(0x4001c, struct.pack('<I', 0x50000))
+        self.process.write(0x62F840, bytes.fromhex('558becb814200000'))
+        entry = self.bridge.poll(0x500123)
+        instructions = list(capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32).disasm(self.process.read(entry, 25), entry))
+        self.assertEqual([(instruction.mnemonic, instruction.op_str) for instruction in instructions], [
+            ('pushfd',''),('pushal',''),('mov','ecx, 0x40000'),('push','0'),('push','-1'),('push','1'),
+            ('call','0x62f840'),('popal',''),('popfd',''),('jmp','0x500123')])
+        self.session.acknowledge_start.assert_called_once_with('room', 'first')
 
     def test_other_message_recipient_falls_through(self):
         self.bridge.allocation = {'serverUserId': '5'}

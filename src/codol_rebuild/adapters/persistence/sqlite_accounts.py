@@ -74,6 +74,19 @@ class AccountRepository:
                            (name, json.dumps(initialization, sort_keys=True)))
         return revision+1
 
+    def save_inventory(self, name, revision, inventory_state):
+        """购买仅提交库存与余额；版本冲突或写入失败时整笔回滚。"""
+        with closing(self._connect()) as database, database:
+            changed = database.execute(
+                'UPDATE accounts SET revision=revision+1, updated=? WHERE name=? AND revision=?',
+                (time.time(), name, revision)).rowcount
+            if changed != 1:
+                raise RevisionConflict('Account changed since last load')
+            database.execute(
+                'INSERT INTO account_initialization VALUES (?,?) ON CONFLICT(account) DO UPDATE SET state=excluded.state',
+                (name, json.dumps(inventory_state, sort_keys=True)))
+        return revision + 1
+
     def display_name(self, name):
         """昵称版本独立于配装存档；旧数据库无需改写原有表或blob。"""
         with closing(self._connect()) as db:

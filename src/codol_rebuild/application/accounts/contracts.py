@@ -29,6 +29,10 @@ class AccountStore(Protocol):
         """读取独立昵称版本；未改名时 value 为 None，不改变账号主键。"""
         ...
 
+    def save_inventory(self, name: str, revision: int, inventory_state: dict) -> int:
+        """按账号版本原子保存物品归属、数量与余额，不读写玩家档案。"""
+        ...
+
     def save_display_name(self, name: str, revision: int, value: str,
                           *, account_revision: int | None = None, initialization: dict | None = None) -> int:
         """提交昵称；附带库存时同时校验账号版本并原子保存，两种版本均递增。"""

@@ -106,6 +106,8 @@ class GameSessionBridge:
         from codol_rebuild.adapters.game.v1649370.session import ui_movie
         if self.process.read(ui_movie.LOAD_SITE, len(ui_movie.LOAD_BYTES)) != ui_movie.LOAD_BYTES:
             raise ValueError('大厅 UI 加载调用边不匹配')
+        if self.process.read(ui_movie.LOAD_RETURN_SITE, len(ui_movie.LOAD_RETURN_BYTES)) != ui_movie.LOAD_RETURN_BYTES:
+            raise ValueError('大厅 UI 加载返回点不匹配')
         self.debug.arm(ui_movie.LOAD_SITE, 'Local navigation resource')
         from codol_rebuild.adapters.game.v1649370.frontend.local_ui_services import local_optional_service_patches, local_welcome_page_patch
         welcome_patch = local_welcome_page_patch()
@@ -212,6 +214,7 @@ class GameSessionBridge:
         if self.multiplayer:
             self.multiplayer.allocate()
             if self.match_bridge is not None:
+                self.match_bridge.notify = lambda message: self.multiplayer.notifications.message(message)
                 self.match_bridge.install(self.multiplayer.state+24)
         room_plan = build_room_adapter(room_entry, room_state, profile_data_address + 72,
                                   deferred=self.multiplayer is not None,
@@ -371,6 +374,9 @@ class GameSessionBridge:
         """在原版主电影解析前安装已校验的会话内资源补丁，并回读数据及长度。"""
         from codol_rebuild.adapters.game.v1649370.session.ui_movie import find_resource_patch
         plan = find_resource_patch(self.process.read, self.process.regions())
+        if plan['already_applied']:
+            return {'installed': False, 'already_applied': True,
+                    'header': hex(plan['header_address']), 'patched_sha256': plan['patched_sha256']}
         if self.process.read(plan['header_address'], 16) != plan['header_before']:
             raise ValueError('大厅资源头在安装前改变')
         self.process.write(plan['data_address'], plan['data_after'])
@@ -657,7 +663,17 @@ class GameSessionBridge:
         if label == 'CRT entry' and self.args.offline_menu_preview:
             self.install_lobby_adapters()
         if label == 'Local navigation resource':
-            row['local_navigation_resource'] = self.install_navigation_resource()
+            from codol_rebuild.adapters.game.v1649370.session import ui_movie
+            # 此调用边也加载游戏内电影；仅大厅主电影需要这些适配。
+            resource_name = self.process.cstring(struct.unpack('<I', self.process.read(esp, 4))[0], strict=True)
+            row['ui_movie_loading'] = resource_name
+            if resource_name == ui_movie.RESOURCE_NAME[:-1].decode('ascii'):
+                row['local_navigation_resource'] = self.install_navigation_resource()
+            self.debug.arm(ui_movie.LOAD_RETURN_SITE, 'Local navigation loaded')
+        if label == 'Local navigation loaded':
+            from codol_rebuild.adapters.game.v1649370.session import ui_movie
+            # 返回后再观察下一次加载，不在当前指令尚未执行时重置同一断点。
+            self.debug.arm(ui_movie.LOAD_SITE, 'Local navigation resource')
         if label.startswith('MessageBox'):
             values = struct.unpack('<4I', self.process.read(esp, 16))
             row['text'] = self.process.cstring(values[2], label.endswith('W'))

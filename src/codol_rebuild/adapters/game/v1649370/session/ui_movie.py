@@ -10,6 +10,8 @@ from __future__ import annotations
 from codol_rebuild.adapters.game.v1649370 import movie_identity
 from codol_rebuild.adapters.game.v1649370.movie_identity import (  # noqa: F401 兼容既有调用
     LOAD_BYTES as LOAD_BYTES,
+    LOAD_RETURN_SITE as LOAD_RETURN_SITE,
+    LOAD_RETURN_BYTES as LOAD_RETURN_BYTES,
     LOAD_SITE as LOAD_SITE,
     COMPRESSED_SIZE as COMPRESSED_SIZE,
     RESOURCE_NAME as RESOURCE_NAME,
