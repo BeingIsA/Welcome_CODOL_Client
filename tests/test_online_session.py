@@ -105,6 +105,7 @@ class OnlineSessionTests(unittest.TestCase):
         bridge = GameSessionBridge.__new__(GameSessionBridge)
         process = Mock(main_thread_id=1, context=Mock(return_value=(100, bytearray(256))))
         bridge.process = process
+        bridge.match_bridge = None
         bridge.session_traps = {0x2000: 'session_poll'}
         bridge.online_bridge = Mock()
         bridge.realtime_dispatcher = Mock()

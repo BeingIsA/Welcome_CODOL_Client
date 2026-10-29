@@ -86,7 +86,7 @@ class RuntimeImageLocationTests(unittest.TestCase):
         from codol_rebuild.bootstrap import resource_setup
         from codol_rebuild.core.paths import REBUILD_ROOT
 
-        class CopyReached(Exception):
+        class RuntimeReached(Exception):
             pass
 
         cases = (
@@ -98,9 +98,11 @@ class RuntimeImageLocationTests(unittest.TestCase):
         for image, allowed in cases:
             with self.subTest(image=image):
                 args = SimpleNamespace(image=image, client=REBUILD_ROOT.parent / 'Original Client')
-                with patch.object(resource_setup.shutil, 'copyfile', side_effect=CopyReached) as copy:
-                    with self.assertRaises(CopyReached if allowed else ValueError):
+                with patch.object(resource_setup, 'prepare_reusable_runtime', side_effect=RuntimeReached) as prepare_runtime:
+                    with self.assertRaises(RuntimeReached if allowed else ValueError):
                         resource_setup.prepare(args, REBUILD_ROOT / 'workspaces/offline-runs/test',
                                                REBUILD_ROOT / 'workspaces/offline-runs/test/runtime',
                                                {}, lambda *args: None)
-                    self.assertEqual(copy.call_count, int(allowed))
+                    self.assertEqual(prepare_runtime.call_count, int(allowed))
+                    if allowed:
+                        self.assertEqual(prepare_runtime.call_args.args[-1], image.resolve())

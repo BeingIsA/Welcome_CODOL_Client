@@ -91,11 +91,20 @@ class ArchitectureTests(unittest.TestCase):
                 for target in imports:
                     self.assertFalse(target.startswith(('verification','research')),str(path))
                     if target.startswith('codol_rebuild.') and layer in ALLOWED:
-                        self.assertIn(boundary(target),ALLOWED[layer],f'{path}: {target}')
+                        format_error_contract = (
+                            path == PACKAGE/'adapters/game/profile_format/unlock.py'
+                            and target == 'codol_rebuild.application.accounts.contracts'
+                            and isinstance(node, ast.ImportFrom)
+                            and [(alias.name, alias.asname) for alias in node.names]
+                                == [('ProfileFormatError', 'UnlockError')])
+                        # 格式适配只共享这个异常契约，不放行应用服务依赖。
+                        if not format_error_contract:
+                            self.assertIn(boundary(target),ALLOWED[layer],f'{path}: {target}')
                         if layer=='adapters.game.v1649370' and boundary(target)=='runtime':
                             self.assertEqual(target,'codol_rebuild.runtime.contracts',str(path))
                         if layer in ('adapters.persistence','adapters.transport') and boundary(target)=='application':
-                            self.assertTrue(target.endswith('.contracts'),str(path))
+                            self.assertTrue(target.endswith('.contracts') or target == 'codol_rebuild.application.errors',
+                                            f'{path}: {target}')
                     if layer=='application':
                         self.assertNotIn(target.split('.')[0],{'ctypes','sqlite3','subprocess','struct','socket','requests'},str(path))
 

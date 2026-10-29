@@ -215,7 +215,7 @@ class MatchBridge:
         start = self.session.poll_start()
         if start is not None:
             if start['status'] == 'failed':
-                self.notify(start.get('error') or '开局失败，请取消准备后重新准备')
+                self.notify(start.get('error') or '开局失败，请重新准备')
                 self.session.acknowledge_start(start['roomId'], start['startId'])
             elif self.current_room() == start['roomId']:
                 room_pointer = self.integer(ROOM_POINTER)

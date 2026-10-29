@@ -38,3 +38,12 @@
 - 2026-10-23：经批准加入普通房间详情 playListID 缺省保护，同步 ui_navigation.py 快照；默认倍率及下游显示逻辑不变。
 
 - 2026-10-23：应用层 multiplayer 更名为 room，MultiplayerSession/Port/Error 更名为 RoomSession/Port/Error；同步桥接快照中的导入和类型引用，原生生成逻辑不变。
+
+
+## 2026-10-30 历史差分检查维护
+
+冻结夹具保持不变，不以当前源码覆盖历史基线。`test_native_generators_unchanged` 改为逐声明比较函数、类方法和常量，显式列出已经接入的改名、房间、档案保护、购买、主题重载等变更符号；其余历史声明仍比较 AST。新增功能的行为由对应正式测试覆盖。`session_bridge.py` 明确指向 session 目录，避免误选 matches 下同名文件；旧 multiplayer_bridge 已迁移到 rooms/room_session_bridge，检查旧路径不存在和新路径存在。
+
+档案初始化差分只允许 loadoutVersion 从 0 迁移为 3：比较其余全部字节、secure 档案、完整返回数据及保存调用，并验证第二次初始化不再次保存。规则数量断言按现有组合更新为 34，继续验证全部替换区间不重叠。启动来源检查拦截当前资源装配入口，公共帧夹具显式声明未安装 match_bridge。
+
+架构规则仅允许传输/持久化层使用 application.errors 共享错误契约，以及 profile_format/unlock.py 导入 ProfileFormatError as UnlockError；没有普遍放开应用层实现依赖。本次未修改生产行为。

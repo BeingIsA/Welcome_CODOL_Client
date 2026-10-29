@@ -81,31 +81,69 @@ class Debugger:
 
 class RefactorEquivalenceTests(unittest.TestCase):
     def test_native_generators_unchanged(self):
-        """原生生成器漂移守护：当前代码须与 2026-10-22 冻结快照逐模块 AST 等价。
+        """历史声明漂移守护：除明确列出的功能变更外，函数、方法和常量保持 AST 等价。
 
         快照冻结于问题 2/7/8/10 修复后；有意修改这些模块时应重新冻结并说明原因。
         旧 refactor-20261020 基线专为一次性迁移差分设计，其模块拆分特殊分支
         不适用于同构快照，已被本比较取代。
         """
-        files=list((BASE22/'client/v1649370').glob('*.py'))
-        self.assertGreater(len(files),10)
+        # 已变更部分由对应功能回归约束；未列出的历史函数和常量仍逐项比较。
+        changed_symbols = {
+            'movie_identity.py': {'build_resource_patch', 'find_resource_patch'},  # 资源重载与幂等
+            'player_name.py': {'consume_card', 'build_adapter'},  # 服务端改名与道具消耗
+            'room.py': {'build_room_adapter', 'JOIN_CONTRACT', 'build_join_adapter'},  # 正式房间接入
+            'ui_movie.py': {'replacements'},  # 房间、聊天等组合补丁
+            'ui_theme.py': {'METHOD_OFFSET', 'ORIGINAL_METHOD', 'replacements'},  # 局部主题补丁
+            'layout.py': {'ENGINE_RETURN', 'COMMAND_QUEUE', 'COMMAND_DESCRIPTOR',
+                          'COMMAND_BUFFER', 'COMMAND_LOCK'},  # 删除宿主菜单命令注入
+        }
+        changed_methods = {
+            'profile_bridge.py': {'LocalProfileBridge.prepare_native', 'LocalProfileBridge.complete_native',
+                'LocalProfileBridge.quote', 'LocalProfileBridge.rename', 'LocalProfileBridge.purchase',
+                'LocalProfileBridge.save'},  # 账号同步、购买解耦和编码存档保护
+            'profile_codec.py': {'AccountCodec.initialize'},  # 配装版本迁移
+            'session_bridge.py': {'GameSessionBridge.__init__', 'GameSessionBridge.module_loaded',
+                'GameSessionBridge.install_menu_preview', 'GameSessionBridge.install_navigation_resource',
+                'GameSessionBridge.handle_exception', 'GameSessionBridge.breakpoint'},  # 正式入口与资源生命周期
+        }
+        def declarations(statements, prefix=''):
+            result = {}
+            for statement in statements:
+                if isinstance(statement, ast.ClassDef):
+                    result.update(declarations(statement.body, statement.name + '.'))
+                elif isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    result[prefix + statement.name] = ast.dump(statement)
+                elif isinstance(statement, (ast.Assign, ast.AnnAssign)):
+                    targets = statement.targets if isinstance(statement, ast.Assign) else [statement.target]
+                    for target in targets:
+                        if isinstance(target, ast.Name):
+                            result[prefix + target.id] = ast.dump(statement)
+            return result
+        files = list((BASE22/'client/v1649370').glob('*.py'))
+        self.assertGreater(len(files), 10)
         for old in files:
-            if old.name=='image.py':continue
-            # 2026-10-27 已移除宿主菜单命令注入；保留历史夹具，不要求恢复废弃模块。
-            if old.name == 'menu_queue.py':
-                self.assertFalse(list((PKG/'adapters/game/v1649370').rglob(old.name)))
+            if old.name == 'image.py':
                 continue
-            baseline=ast.parse(old.read_text(encoding='utf-8'))
-            if old.name == 'layout.py':
-                removed_names = {'ENGINE_RETURN', 'COMMAND_QUEUE', 'COMMAND_DESCRIPTOR',
-                                 'COMMAND_BUFFER', 'COMMAND_LOCK'}
-                baseline.body = [statement for statement in baseline.body
-                                 if not (isinstance(statement, ast.Assign)
-                                         and any(isinstance(target, ast.Name) and target.id in removed_names
-                                                 for target in statement.targets))]
-            current_path = next((PKG/'adapters/game/v1649370').rglob(old.name), PKG/'adapters/game/v1649370'/old.name)
-            current=ast.parse(current_path.read_text(encoding='utf-8'))
-            self.assertEqual(ast.dump(baseline),ast.dump(current),old.name)
+            if old.name in ('menu_queue.py', 'multiplayer_bridge.py'):
+                self.assertFalse(list((PKG/'adapters/game/v1649370').rglob(old.name)))
+                if old.name == 'multiplayer_bridge.py':
+                    self.assertTrue((PKG/'adapters/game/v1649370/rooms/room_session_bridge.py').is_file())
+                continue
+            if old.name == 'session_bridge.py':
+                current_path = PKG/'adapters/game/v1649370/session/session_bridge.py'
+            elif old.name == '__init__.py':
+                current_path = PKG/'adapters/game/v1649370/__init__.py'
+            else:
+                candidates = list((PKG/'adapters/game/v1649370').rglob(old.name))
+                self.assertEqual(len(candidates), 1, old.name)
+                current_path = candidates[0]
+            baseline = declarations(ast.parse(old.read_text(encoding='utf-8')).body)
+            current = declarations(ast.parse(current_path.read_text(encoding='utf-8')).body)
+            approved = changed_symbols.get(old.name, set()) | changed_methods.get(old.name, set())
+            self.assertTrue(approved <= baseline.keys(), old.name)
+            for name, declaration in baseline.items():
+                if name not in approved:
+                    self.assertEqual(declaration, current.get(name), old.name + ':' + name)
         # 格式模块迁入的版本身份保持显式断言。
         from codol_rebuild.adapters.game.v1649370 import layout
         self.assertEqual(layout.BUFFER_CAPACITY,0x7ffc)
@@ -163,8 +201,17 @@ class RefactorEquivalenceTests(unittest.TestCase):
         for cycle in range(2):
             old=ns['bootstrap'](before,schemas,captured['tables'],captured['catalog'])
             new=bootstrap(after,codec)
-            self.assertEqual(old,new,f'cycle {cycle}')
-            self.assertEqual(before.calls,after.calls)
+            # 仅放行已批准的 loadoutVersion 0→3 迁移，其他档案字节仍严格比较。
+            from codol_rebuild.adapters.game.profile_format.fields import Fields
+            fields = Fields(schemas['public'])
+            self.assertEqual(fields.read(old['profiles']['public'], 'loadoutVersion'), 0)
+            expected_public = bytearray(old['profiles']['public'])
+            fields.write(expected_public, 'loadoutVersion', 3)
+            expected_profiles = {**old['profiles'], 'public': bytes(expected_public)}
+            self.assertEqual(new, {**old, 'profiles': expected_profiles, 'revision': old['revision'] + 1},
+                             f'cycle {cycle}')
+            self.assertEqual(before.calls, [])
+            self.assertEqual(after.calls, [('local', old['revision'], expected_profiles, codec.identities)])
 
     def test_account_failed_save_keeps_revision(self):
         from codol_rebuild.application.accounts.service import AccountSession
