@@ -56,13 +56,14 @@ def manifest_path(game_root: Path) -> Path:
     return Path(game_root).parent / 'native-library-manifest.json'
 
 
-def read_manifest(game_root: Path) -> tuple[bytes, dict]:
-    """拒绝不完整构建和缺少必要顶层目录的库，供启动装配使用。"""
+def read_manifest(game_root: Path, *, verify_resources: bool = True) -> tuple[bytes, dict]:
+    """读取完成清单；普通启动仅检查装配依赖，显式复核检查全部路径。"""
     manifest_bytes = manifest_path(game_root).read_bytes()
     manifest = json.loads(manifest_bytes)
     validate_library_manifest(manifest, LIBRARY_KIND)
     names = [entry['game_path'] for entry in manifest['resources']]
-    if len(set(names)) != len(names) or any(canonical_native_resource(name) != name for name in names):
+    checked_names = names if verify_resources else [name for name in names if '/' not in name]
+    if len(set(checked_names)) != len(checked_names) or any(canonical_native_resource(name) != name for name in checked_names):
         raise ValueError('原生资源清单存在非法或重复路径')
     if any(not any(name.startswith(directory + '/') for name in names) for directory in MOUNT_DIRECTORIES):
         raise ValueError('原生资源清单缺少必要顶层目录')

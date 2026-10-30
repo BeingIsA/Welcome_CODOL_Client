@@ -54,7 +54,7 @@ def build_plan(options: argparse.Namespace) -> dict:
     from codol_rebuild.resources.native_library import read_manifest
     if not native_library.is_relative_to((ROOT / 'resources/v1649370').resolve()):
         raise ValueError('完整原生库必须位于项目固定版本资源目录')
-    read_manifest(native_library)
+    read_manifest(native_library, verify_resources=False)
     if hashlib.sha256(image.read_bytes()).hexdigest() != IMAGE_SHA256:
         raise ValueError('离线镜像与已验证 1649370 镜像指纹不符')
     rows = json.loads(patches.read_text(encoding='utf-8'))
@@ -127,7 +127,7 @@ def build_plan(options: argparse.Namespace) -> dict:
             'seconds': options.seconds, 'python': sys.executable,
             'host_identity': '当前 Python 用户和权限；入口不请求提升宿主',
             'uac': '仅临时断网守卫；客户端使用低权限令牌且守卫未就绪时不恢复执行',
-            'resource_library_policy': '完整原生资源树；启动前校验，仅联接顶层目录；玩家设置独立保存',
+            'resource_library_policy': '完整原生资源树；仅显式 --verify-resources 时全库复核，仅联接顶层目录；玩家设置独立保存',
             'missing_host_options': missing, 'entrypoint': 'codol_rebuild.bootstrap.launch.main',
             'arguments': arguments}
 

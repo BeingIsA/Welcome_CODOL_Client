@@ -163,12 +163,34 @@ class NativeLibraryTests(unittest.TestCase):
         with contextlib.ExitStack() as patches:
             patches.enter_context(patch.object(resource_setup, 'ROOT', self.project_root / 'client'))
             patches.enter_context(patch.object(native_library, 'read_manifest', return_value=(b'manifest', manifest)))
-            patches.enter_context(patch.object(resource_setup, 'prepare_library'))
-            resource_directories, dependencies = resource_setup.prepare_native_library(game_root, runtime.parent, {}, False)
+            prepare_library_mock = patches.enter_context(patch.object(resource_setup, 'prepare_library'))
+            startup_log = {}
+            resource_directories, dependencies = resource_setup.prepare_native_library(game_root, runtime.parent, startup_log, False)
+            prepare_library_mock.assert_not_called()
+            self.assertEqual(startup_log['native_library']['validation']['validation'], 'not-requested')
+            resource_setup.prepare_native_library(game_root, runtime.parent, {}, True)
+            prepare_library_mock.assert_called_once()
+            self.assertTrue(prepare_library_mock.call_args.kwargs['force_verify'])
         self.assertEqual([directory.name for directory in resource_directories], list(native_library.MOUNT_DIRECTORIES))
         self.assertTrue(all(directory.parent == game_root for directory in resource_directories))
         self.assertEqual(dependencies, manifest['resources'])
         self.assertFalse((runtime / 'libcef.dll').exists(), '资源校验不再复制程序依赖')
+
+    def test_normal_manifest_read_checks_dependencies_without_bulk_paths(self):
+        """普通启动不逐项校验素材路径，显式复核仍检查，根级依赖始终检查。"""
+        game_root = self.version_root / 'game'
+        resource_names = [*native_library.RUNTIME_FILES,
+                          *(directory + '/sample.invalid' for directory in native_library.MOUNT_DIRECTORIES)]
+        manifest = {'resources': [{'game_path': name} for name in resource_names]}
+        native_library.manifest_path(game_root).write_text(json.dumps(manifest), encoding='utf-8')
+        with patch.object(native_library, 'validate_library_manifest'):
+            native_library.read_manifest(game_root, verify_resources=False)
+            with self.assertRaisesRegex(ValueError, '非法'):
+                native_library.read_manifest(game_root, verify_resources=True)
+            manifest['resources'].append({'game_path': '..\\unexpected.dll'})
+            native_library.manifest_path(game_root).write_text(json.dumps(manifest), encoding='utf-8')
+            with self.assertRaises(ValueError):
+                native_library.read_manifest(game_root, verify_resources=False)
 
     def test_removed_legacy_arguments_are_rejected(self):
         from codol_rebuild.bootstrap.config import parse_args

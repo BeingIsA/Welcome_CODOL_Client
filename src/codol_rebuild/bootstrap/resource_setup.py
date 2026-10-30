@@ -1,4 +1,4 @@
-"""启动资源装配：完整资源校验、程序复用、设置恢复和顶层联接。"""
+"""启动资源装配：可选完整资源复核、程序复用、设置恢复和顶层联接。"""
 import hashlib, json, shutil
 from pathlib import Path
 from codol_rebuild.core.paths import REBUILD_ROOT as ROOT, accounts_dir
@@ -9,18 +9,19 @@ from codol_rebuild.adapters.game.v1649370.image import prepare_runtime_image
 FORBIDDEN = {'codomp_client_shipretailbase.dll', 'tersafe.dll', 'tenslx.dll', 'tenproxy.dll', 'gamerpcs.dll', 'tenrpcs.dll', 'ace-ats32.dll', 'ace-drv32.dll', 'vsddrvdll.dll', 'policyprobe.dll', 'tp3helper.exe', 'gbspy.dll', 'tcj.dll'}
 
 def prepare_native_library(library, run_dir, log, force_verify):
-    """校验完整库，返回顶层挂载计划和根级依赖清单，不复制程序文件。"""
+    """读取挂载计划及根级依赖；仅显式复核时扫描完整资源库。"""
     from codol_rebuild.resources.native_library import (
         canonical_native_resource, manifest_path, read_manifest, MOUNT_DIRECTORIES,
     )
     library = library.resolve()
     if not library.is_relative_to((ROOT / 'resources/v1649370').resolve()):
         raise ValueError('完整原生库必须位于项目固定版本资源目录')
-    manifest_bytes, manifest = read_manifest(library)
-    validation_audit = {}
-    prepare_library(ROOT / 'workspaces/resource-library-verification', library,
-                    manifest_bytes, manifest['resources'], canonical_native_resource, protect_cache,
-                    audit=validation_audit, force_verify=force_verify, external_manifest=manifest_path(library))
+    manifest_bytes, manifest = read_manifest(library, verify_resources=force_verify)
+    validation_audit = {'validation': 'not-requested', 'hashed_bytes': 0, 'copied_bytes': 0}
+    if force_verify:
+        prepare_library(ROOT / 'workspaces/resource-library-verification', library,
+                        manifest_bytes, manifest['resources'], canonical_native_resource, protect_cache,
+                        audit=validation_audit, force_verify=True, external_manifest=manifest_path(library))
     reference = {'manifest_path': str(manifest_path(library)),
                  'manifest_sha256': hashlib.sha256(manifest_bytes).hexdigest(),
                  'resource_root': str(library), 'storage': 'top-level-directory-junctions',
