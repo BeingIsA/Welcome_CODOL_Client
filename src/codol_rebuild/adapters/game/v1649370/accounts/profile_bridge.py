@@ -189,26 +189,43 @@ class LocalProfileBridge:
             [self._catalog[row['item_id']] for row in offer.get('contents', [{'item_id': offer['item_id']}])], next_state,
             lambda: self._service.commit_purchase(offer, quantity))
 
+    def _sample_plaintext_profiles(self):
+        """在既有保存入口取得前后读取一致的快照，仅在宿主副本解除公共档案编码。"""
+        from codol_rebuild.adapters.game.v1649370.accounts.profile_codec import public_profile_plaintext
+        profile_addresses = (('public', PUBLIC), ('secure', SECURE))
+        representation_states = {
+            kind: self.process.read(base + 0x11128, 5) for kind, base in profile_addresses}
+        # 安全档案的编码字段集合尚未确认，继续拒绝编码态安全档案；
+        # 两份档案仍作为同一事务保存，force 不绕过表示和稳定性检查。
+        if representation_states['secure'][4]:
+            return None
+        profile_blobs = {
+            kind: self.process.read(base + 0x90, layout.BUFFER_CAPACITY)
+            for kind, base in profile_addresses}
+        if any(self.process.read(base + 0x90, layout.BUFFER_CAPACITY) != profile_blobs[kind]
+               for kind, base in profile_addresses):
+            return None
+        if any(self.process.read(base + 0x11128, 5) != representation_states[kind]
+               for kind, base in profile_addresses):
+            return None
+        encoding_key, encoded = struct.unpack('<IB', representation_states['public'])
+        # 直接保存编码值曾导致角色缓存无法初始化；但返回大厅仍可保持编码态，
+        # 一律跳过又会丢失后续配装修改。因此只转换副本，不调用原生解码函数。
+        profile_blobs['public'] = public_profile_plaintext(
+            profile_blobs['public'], self._schemas['public'], encoding_key, encoded)
+        return profile_blobs
+
     def save(self, force=False):
         if not self._account or not self._ready: return
         if not self._task.due(force=force): return
         mem=self.process.read
-        # 原生连接/上传流程会暂时编码档案字段：0x7F7CD0 设置对象+0x1112C，
-        # 字段写入按+0x11128密钥变换；0x7F858E清标志后刷新为明文。
-        # M2实机曾在连接超时后把编码角色570保存为362318160，导致下次启动
-        # 无法建立角色缓存。schema和两次字节一致都不能证明此时是明文。
-        # 两份档案作为一个事务：任一编码态均暂缓，force仅控制采样频率，
-        # 不能在退出时绕过表示检查；不调用或改变原生编码/解码流程。
-        if any(mem(base+0x1112C,1) != b'\0' for base in (PUBLIC,SECURE)): return
+        blobs = self._sample_plaintext_profiles()
+        if blobs is None: return
         current_view=view_state(mem)
         if current_view!=self._last_view:
             self._last_view=current_view
             self.log['local_view_state']=current_view
             self.record({'local_view_state':current_view})
-        blobs={k:mem(base+0x90,layout.BUFFER_CAPACITY) for k,base in [('public',PUBLIC),('secure',SECURE)]}
-        if any(mem(base+0x90,layout.BUFFER_CAPACITY)!=blobs[k] for k,base in [('public',PUBLIC),('secure',SECURE)]): return
-        # 读取后再确认表示状态，防止把跨越原生状态切换的快照交给持久层。
-        if any(mem(base+0x1112C,1) != b'\0' for base in (PUBLIC,SECURE)): return
         character=self._service.inspect_snapshot(blobs)
         pool=int(self._inventory['pool'],16)
         if mem(pool-16,16)!=b'LOCAL-INVENTORY!' or mem(pool+CAPACITY*STRIDE,16)!=b'LOCAL-INVENTORY!':

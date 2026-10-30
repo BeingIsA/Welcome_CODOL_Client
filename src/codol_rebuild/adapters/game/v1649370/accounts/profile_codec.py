@@ -6,6 +6,48 @@ from codol_rebuild.adapters.game.profile_format.fields import Fields
 
 IDENTITIES={'public':PUBLIC_IDENTITY,'secure':SECURE_IDENTITY}
 
+
+def _encoded_public_field_paths():
+    """枚举原生 0x7F85C0 及其字段写入函数实际转换的 1969 个 DDL 字段。"""
+    for character_index in range(12):
+        for field_name, field_count in (('slots', 9), ('emotes', 4)):
+            for field_index in range(field_count):
+                yield f'characterClasses.{character_index}.{field_name}.{field_index}'
+    for loadout_index in range(60):
+        for field_name in ('primaryBase', 'secondaryBase', 'swordWpn',
+                           'lethal', 'meleeWpn', 'tactical'):
+            yield f'weaponClasses.{loadout_index}.{field_name}'
+        for field_name, field_count in (('primaryAttach', 6), ('secondaryAttach', 6),
+                                         ('perks', 6), ('killstreaks', 3), ('wildcards', 3)):
+            for field_index in range(field_count):
+                yield f'weaponClasses.{loadout_index}.{field_name}.{field_index}'
+    yield from ('cardIcon', 'cardBackground', 'cardTitle', 'cardNameplate',
+                'cardFrame', 'acestreak', 'badge')
+    for badge_index in range(6):
+        yield f'badgeExtra.{badge_index}'
+
+
+def public_profile_plaintext(profile_bytes, schema, encoding_key, encoded):
+    """仅还原公共档案副本，不写原生内存，不改变 DDL 的存储语义。
+
+    0x50FDF0、0x50FB30 等写入函数按对象密钥编码；读取端（如
+    0x50CC31）先异或密钥，再左旋八位。武器部分字段本身存 ID+1，
+    此处只解除表示变换，不额外增减编号。名称、布尔值和索引不转换。
+    """
+    if not encoded:
+        return bytes(profile_bytes)
+    fields = Fields(schema)
+    plaintext_bytes = bytearray(profile_bytes)
+    for field_path in _encoded_public_field_paths():
+        field_kind, _, byte_offset = fields.resolve(field_path)
+        if field_kind != 0:
+            raise ValueError('Encoded public profile field is not int32: ' + field_path)
+        encoded_value = struct.unpack_from('<I', profile_bytes, byte_offset)[0]
+        rotated_value = encoded_value ^ encoding_key
+        plaintext_value = ((rotated_value << 8) | (rotated_value >> 24)) & 0xffffffff
+        struct.pack_into('<I', plaintext_bytes, byte_offset, plaintext_value)
+    return bytes(plaintext_bytes)
+
 # 业务配装字段到档案 DDL 路径的映射，仅本版本适配层使用。
 LOADOUT_DDL_FIELDS = (
     ('primaryBase', lambda row: row['primary']['base']),
