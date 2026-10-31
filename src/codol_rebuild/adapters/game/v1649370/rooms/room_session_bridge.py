@@ -802,6 +802,8 @@ class RoomSessionBridge:
             # 原生界面已本地生效，这里只确认服务端落库结果；失败不回滚。
             self.record({'multiplayer_settings': 'done', 'success': result.error is None,
                          **({'error': str(result.error)} if result.error else {})})
+            if result.error is not None:
+                self.notifications.message(display_message(result.error))
             # 设置通道已腾空，无主流程在途时停止轮询，与登录分支同样处理。
             self._settings_outstanding = False
             if self.pending is None:
