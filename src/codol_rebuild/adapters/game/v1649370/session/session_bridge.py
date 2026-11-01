@@ -161,6 +161,9 @@ class GameSessionBridge:
         self.process.write(stats['patch_va'], stats['after'])
         if self.process.read(stats_entry, len(stats['code'])) != stats['code'] or self.process.read(stats['patch_va'], 5) != stats['after']:
             raise ValueError('Local UI stats adapter readback mismatch')
+        from codol_rebuild.adapters.game.v1649370.matches.scoreboard_title import install as install_scoreboard_title
+        self.log['scoreboard_title_adapter'] = install_scoreboard_title(self.process, stats_entry)
+        self.record({'scoreboard_title_adapter': self.log['scoreboard_title_adapter']})
         from codol_rebuild.adapters.game.v1649370.frontend.viewer import build_local_viewer_adapter
         viewer_entry = initializer_address + 3328
         viewer = build_local_viewer_adapter(viewer_entry, profile_data_address + 72)
