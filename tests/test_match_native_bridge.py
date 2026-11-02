@@ -48,20 +48,22 @@ class MatchBridgeTests(unittest.TestCase):
             self.process.write(call_address, original_bytes)
         self.bridge.install(0x42000)
 
-    def test_allocation_accepts_server_address_and_all_valid_ports(self):
+    def test_allocation_uses_client_config_address_and_validates_port(self):
         self.bridge.room_id = 'room'
         self.bridge.room_pointer = 0
         self.bridge.callback = Mock(return_value=123)
-        for address, port, accepted in (
-                ('127.0.0.2', 27760, True), ('127.0.0.2', 27763, True),
-                ('127.0.0.2', 1, True), ('127.0.0.2', 65535, True),
-                ('127.0.0.2', 0, False), ('127.0.0.2', 65536, False),
-                ('127.0.0.3', 27761, False)):
-            self.session.poll.return_value = SimpleNamespace(operation='allocate', error=None, data={
-                'address': address, 'port': port, 'securityId': bytes(8).hex(),
-                'securityKey': bytes(16).hex(), 'serverUserId': '5', 'serverName': 'fixture', 'maxPlayers': 6})
-            self.bridge.poll(0x500123)
-            self.bridge.callback.assert_called_with(0x500123, accepted)
+        for server_address in ('127.0.0.1', '47.114.209.151'):
+            self.bridge.server_address = server_address
+            for port, accepted in ((1, True), (27760, True), (65535, True), (0, False), (65536, False)):
+                self.session.poll.return_value = SimpleNamespace(operation='allocate', error=None, data={
+                    'port': port, 'securityId': bytes(8).hex(), 'securityKey': bytes(16).hex(),
+                    'serverUserId': '5', 'serverName': 'fixture', 'maxPlayers': 6})
+                self.bridge.poll(0x500123)
+                self.bridge.callback.assert_called_with(0x500123, accepted)
+                if accepted:
+                    from ipaddress import IPv4Address
+                    self.assertEqual(dict(self.bridge.callback_fields)[0x18][:6],
+                        IPv4Address(server_address).packed + struct.pack('<H', port))
 
     def test_formal_ready_calls_original_start_match_with_preserved_return(self):
         self.session.poll_start.return_value = {'roomId': 'room', 'startId': 'first', 'status': 'ready'}

@@ -243,9 +243,7 @@ class MatchBridge:
                 if success:
                     allocation = completion.data
                     try:
-                        if allocation['address'] != self.server_address:
-                            raise ValueError('分配地址与已批准守卫端点不一致')
-                        self.callback_fields = allocation_fields(allocation['address'], allocation['port'],
+                        self.callback_fields = allocation_fields(self.server_address, allocation['port'],
                             bytes.fromhex(allocation['securityId']), bytes.fromhex(allocation['securityKey']),
                             int(allocation['serverUserId']), allocation['serverName'], allocation['maxPlayers'])
                         self.allocation = allocation
