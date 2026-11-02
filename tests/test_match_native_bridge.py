@@ -39,7 +39,7 @@ class MatchBridgeTests(unittest.TestCase):
         self.process = MemoryProcess()
         self.session = Mock()
         self.session.poll_start.return_value = None
-        self.bridge = MatchBridge(self.process, self.session, lambda: 'room', ('127.0.0.2', 27760, 27763), Mock())
+        self.bridge = MatchBridge(self.process, self.session, lambda: 'room', '127.0.0.2', Mock())
         self.process.write(FIND_CALL, bytes.fromhex('e87cb11c00'))
         self.process.write(BINARY_SLOT, struct.pack('<I', 0x629730))
         self.process.write(NOTIFICATION_SLOT, struct.pack('<I', 0x62C580))
@@ -48,13 +48,14 @@ class MatchBridgeTests(unittest.TestCase):
             self.process.write(call_address, original_bytes)
         self.bridge.install(0x42000)
 
-    def test_allocation_accepts_only_configured_address_and_port_range(self):
+    def test_allocation_accepts_server_address_and_all_valid_ports(self):
         self.bridge.room_id = 'room'
         self.bridge.room_pointer = 0
         self.bridge.callback = Mock(return_value=123)
         for address, port, accepted in (
                 ('127.0.0.2', 27760, True), ('127.0.0.2', 27763, True),
-                ('127.0.0.2', 27759, False), ('127.0.0.2', 27764, False),
+                ('127.0.0.2', 1, True), ('127.0.0.2', 65535, True),
+                ('127.0.0.2', 0, False), ('127.0.0.2', 65536, False),
                 ('127.0.0.3', 27761, False)):
             self.session.poll.return_value = SimpleNamespace(operation='allocate', error=None, data={
                 'address': address, 'port': port, 'securityId': bytes(8).hex(),
@@ -138,7 +139,7 @@ class MatchBridgeTests(unittest.TestCase):
                     process.write(address, original)
                 process.write(changed_address, bytes(5))
                 before = dict(process.memory)
-                bridge = MatchBridge(process, Mock(), lambda: 'room', ('127.0.0.2', 27760, 27763), Mock())
+                bridge = MatchBridge(process, Mock(), lambda: 'room', '127.0.0.2', Mock())
                 with self.assertRaises(ValueError): bridge.install(0x42000)
                 self.assertEqual(process.memory, before)
 
@@ -157,7 +158,7 @@ class MatchBridgeTests(unittest.TestCase):
     def test_changed_original_vtable_refuses_install_without_patch(self):
         process = MemoryProcess()
         process.write(FIND_CALL, bytes.fromhex('e87cb11c00'))
-        bridge = MatchBridge(process, Mock(), lambda: 'room', ('127.0.0.2', 27760, 27763), Mock())
+        bridge = MatchBridge(process, Mock(), lambda: 'room', '127.0.0.2', Mock())
         with self.assertRaises(ValueError): bridge.install(0x42000)
         self.assertEqual(process.read(FIND_CALL, 5), bytes.fromhex('e87cb11c00'))
 

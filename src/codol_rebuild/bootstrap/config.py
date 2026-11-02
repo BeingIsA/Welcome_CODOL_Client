@@ -3,6 +3,7 @@ import argparse
 import configparser
 import ipaddress
 from pathlib import Path
+from urllib.parse import urlsplit
 from codol_rebuild.core.paths import REBUILD_ROOT as ROOT, accounts_dir
 
 def parse_args(argv=None):
@@ -22,12 +23,7 @@ def parse_args(argv=None):
     parser.add_argument('--no-trace-native-exit', action='store_false', dest='trace_native_exit', help='关闭原生退出诊断')
     parser.add_argument('--offline-menu-preview',action='store_true')
     parser.add_argument('--local-profile',action='store_true',help='Experimental build-specific local profile bridge')
-    parser.add_argument('--game-server-ip')
-    parser.add_argument('--game-server-port', type=int)
-    parser.add_argument('--game-server-port-end', type=int)
-    parser.add_argument('--game-network-mode', choices=('local',))
-    parser.add_argument('--game-bind-ip')
-    parser.add_argument('--game-bind-port', type=int)
+    parser.add_argument('--client-port', type=int, default=30001, help='客户端本地UDP端口')
     parser.add_argument('--server-url',help='启用服务端登录与房间接口，例如 http://127.0.0.1:8080')
     parser.add_argument('--server-timeout',type=float,default=5.0,help='业务请求超时秒数（0.1～30）')
     parser.add_argument('--server-identity',type=Path,
@@ -38,24 +34,14 @@ def parse_args(argv=None):
     parser.add_argument('--breakpoint',action='append',default=[])
     parser.add_argument('argument',nargs='*')
     args=parser.parse_args(argv)
-    if (args.game_server_ip is None) != (args.game_server_port is None):
-        parser.error('游戏服务器地址与端口必须同时提供')
-    if args.game_server_ip is not None:
-        try: args.game_server_ip, args.game_server_port = game_endpoint(args.game_server_ip, args.game_server_port)
-        except ValueError as error: parser.error(str(error))
-    if args.game_server_port_end is None:
-        args.game_server_port_end = args.game_server_port
-    if args.game_server_port_end is not None and (
-            args.game_server_port is None or not args.game_server_port <= args.game_server_port_end <= 65535):
-        parser.error('游戏服务器端口范围无效')
-    if any(value is not None for value in (args.game_network_mode, args.game_bind_ip, args.game_bind_port)):
-        if not args.game_network_mode or args.game_bind_ip is None or args.game_bind_port is None or args.game_server_ip is None:
-            parser.error('本地网络模式需要完整绑定地址、端口及已启用游戏服务器端点')
-        try: args.game_bind_ip, args.game_bind_port = game_endpoint(args.game_bind_ip, args.game_bind_port)
-        except ValueError as error: parser.error(str(error))
+    args.server_address = None
+    if not 1 <= args.client_port <= 65535:
+        parser.error('客户端UDP端口必须为1～65535')
     if args.server_url:
         from codol_rebuild.adapters.transport.http import normalize_server
-        try:args.server_url=normalize_server(args.server_url)
+        try:
+            args.server_url=normalize_server(args.server_url)
+            args.server_address = server_ipv4(urlsplit(args.server_url).hostname)
         except ValueError as error:parser.error(str(error))
         if not args.local_profile:parser.error('--server-url 需要 --local-profile')
     if not 0.1 <= args.server_timeout <= 30:parser.error('业务请求超时须为 0.1～30 秒')
@@ -64,37 +50,22 @@ def parse_args(argv=None):
     return args
 
 
-def game_endpoint(address, port):
-    """游戏UDP端点仅允许本机回环IPv4，不执行DNS或连接操作。"""
+def server_ipv4(address):
+    """大厅、原生对局及守卫共享同一个明确的服务器IPv4。"""
     parsed_address = ipaddress.IPv4Address(address)
-    parsed_port = int(port)
-    if not parsed_address.is_loopback or not 1 <= parsed_port <= 65535:
-        raise ValueError('游戏服务器必须为回环IPv4地址及1～65535端口')
-    return str(parsed_address), parsed_port
+    if not 0 < int(parsed_address) < 0xE0000000:
+        raise ValueError('服务器必须为具体单播IPv4地址')
+    return str(parsed_address)
 
 
 def read_server_config(path):
-    """按分节读取大厅与游戏端点；未配置游戏分节时保持断网。"""
+    """读取服务器HTTP端点和客户端UDP端口，不维护第二份服务器地址。"""
     configuration = configparser.ConfigParser(interpolation=None)
     with Path(path).open(encoding='utf-8-sig') as stream:
         configuration.read_file(stream)
-    lobby_address = configuration.get('server', 'ip')
-    lobby_port = configuration.getint('server', 'port', fallback=8080)
-    if not lobby_address or not 1 <= lobby_port <= 65535:
-        raise ValueError('大厅服务器地址或端口无效')
-    endpoint = None
-    if configuration.getboolean('game_server', 'enabled', fallback=False):
-        endpoint = game_endpoint(configuration.get('game_server', 'ip'), configuration.get('game_server', 'port'))
-        port_end = configuration.getint('game_server', 'port_end', fallback=endpoint[1])
-        if not endpoint[1] <= port_end <= 65535:
-            raise ValueError('游戏服务器端口范围无效')
-        endpoint = (*endpoint, port_end)
-    network = None
-    if configuration.has_section('game_network'):
-        mode = configuration.get('game_network', 'mode')
-        if mode != 'local' or endpoint is None:
-            raise ValueError('本轮仅支持local网络模式，且须启用游戏服务器端点')
-        bind_address, bind_port = game_endpoint(configuration.get('game_network', 'bind_ip'),
-                                                 configuration.get('game_network', 'bind_port'))
-        network = (mode, bind_address, bind_port)
-    return f'http://{lobby_address}:{lobby_port}', endpoint, network
+    server_address = server_ipv4(configuration.get('server', 'ip'))
+    server_port = configuration.getint('server', 'port', fallback=8080)
+    client_port = configuration.getint('client', 'port', fallback=30001)
+    if not 1 <= server_port <= 65535 or not 1 <= client_port <= 65535:
+        raise ValueError('服务器HTTP端口及客户端UDP端口必须为1～65535')
+    return f'http://{server_address}:{server_port}', client_port

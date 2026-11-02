@@ -151,11 +151,9 @@ class ProcessSession:
         request.file = str(guard_path)
         expected_bound = 0 if self.args.until_close else max(120, self.args.seconds + 60)
         request.parameters = subprocess.list2cmdline([str(self.run_dir), str(self.info.pid), str(exe), str(times[0].value), str(expected_bound)])
-        game_address = getattr(self.args, 'game_server_ip', None)
-        game_port = getattr(self.args, 'game_server_port', None)
-        game_port_end = getattr(self.args, 'game_server_port_end', game_port)
+        game_address = self.args.server_address
         if game_address:
-            request.parameters += ' ' + subprocess.list2cmdline([game_address, str(game_port), str(game_port_end)])
+            request.parameters += ' ' + subprocess.list2cmdline([game_address])
         request.show = 0
         check(api(C.WinDLL('shell32', use_last_error=True), 'ShellExecuteExW', W.BOOL, C.POINTER(SHELLINFO))(C.byref(request)))
         self.guard = request.process
@@ -174,7 +172,7 @@ class ProcessSession:
                 time.sleep(0.05)
         expected_scope = 'local-game-udp' if game_address else 'offline-deny-all'
         expected_filters = 6 if game_address else 4
-        if game_address and (ready.get('game_ip') != game_address or ready.get('game_port') != game_port or ready.get('game_port_end') != game_port_end):
+        if game_address and ready.get('game_ip') != game_address:
             raise ValueError('守卫游戏端点不符合本次配置')
         if ready['scope'] != expected_scope or len(ready['filter_ids']) != expected_filters or (not ready['job_kill_on_close']) or (ready['max_processes'] != 1) or (ready['child_pid'] != self.info.pid) or (int(ready['creation_filetime']) != times[0].value) or (not ready['dynamic']):
             raise ValueError('断网守卫状态不符')

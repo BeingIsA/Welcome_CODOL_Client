@@ -97,7 +97,8 @@ def build_plan(options: argparse.Namespace) -> dict:
             raise ValueError('--server-url 需要 --local-profile')
         arguments += ['--server-url', normalize_server(options.server_url),
                       '--server-timeout', str(options.server_timeout)]
-        required.update(('--server-url', '--server-timeout'))
+        arguments += ['--client-port', str(options.client_port)]
+        required.update(('--server-url', '--server-timeout', '--client-port'))
         if options.server_identity:
             arguments += ['--server-identity', str(options.server_identity.resolve())]
             required.add('--server-identity')
@@ -107,16 +108,6 @@ def build_plan(options: argparse.Namespace) -> dict:
     for point in BREAKPOINTS:
         arguments += ['--breakpoint', point]
     arguments += ['--', '+set', '2439', '0']
-    if getattr(options, 'game_server_ip', None):
-        delimiter = arguments.index('--')
-        arguments[delimiter:delimiter] = ['--game-server-ip', options.game_server_ip, '--game-server-port', str(options.game_server_port),
-            '--game-server-port-end', str(getattr(options, 'game_server_port_end', options.game_server_port))]
-        required.update(('--game-server-ip', '--game-server-port', '--game-server-port-end'))
-    if getattr(options, 'game_network_mode', None):
-        delimiter = arguments.index('--')
-        arguments[delimiter:delimiter] = ['--game-network-mode', options.game_network_mode,
-            '--game-bind-ip', options.game_bind_ip, '--game-bind-port', str(options.game_bind_port)]
-        required.update(('--game-network-mode', '--game-bind-ip', '--game-bind-port'))
     missing = sorted(required - host_options(ROOT / 'src/codol_rebuild/bootstrap/config.py'))
     return {'scope': ('server room and single-player ready/start; Cross Fire / war only' if getattr(options,'server_url',None) else 'local profile; offline room' if getattr(options,'local_profile',False) else 'offline character-selection preview; lobby and gameplay not verified'),
             'local_profile': getattr(options,'local_profile',False),
@@ -146,6 +137,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--capture-schema', action='store_true',
                         help='在前端帧只读扫描档案 DDL 指纹并导出结构定义（不写目标进程）')
     parser.add_argument('--local-profile', action='store_true', help='启用本地档案适配（实验验证中）')
+    parser.add_argument('--client-port', type=int, default=30001, help='客户端本地UDP端口')
     parser.add_argument('--server-config', type=Path, help='大厅与游戏服务器INI配置')
     parser.add_argument('--server-url', help='连接业务服务器，例如 http://127.0.0.1:8080')
     parser.add_argument('--server-timeout', type=float, default=5.0, help='业务请求超时秒数（0.1～30）')
@@ -162,10 +154,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if options.server_config:
             from codol_rebuild.bootstrap.config import read_server_config
-            configured_url, endpoint, network = read_server_config(options.server_config)
+            configured_url, options.client_port = read_server_config(options.server_config)
             if not options.server_url: options.server_url = configured_url
-            if endpoint: options.game_server_ip, options.game_server_port, options.game_server_port_end = endpoint
-            if network: options.game_network_mode, options.game_bind_ip, options.game_bind_port = network
         plan = build_plan(options)
         print(json.dumps(plan, ensure_ascii=False, indent=2), flush=True)
         if plan['missing_host_options']:

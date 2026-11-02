@@ -1,5 +1,7 @@
 """离线运行组合入口：创建依赖、注入版本桥并启动运行会话。"""
 import json, sqlite3, time, traceback
+import socket
+from urllib.parse import urlsplit
 from codol_rebuild.core.paths import REBUILD_ROOT as ROOT, accounts_dir
 from codol_rebuild.bootstrap.config import parse_args
 from codol_rebuild.bootstrap.logging_setup import session_logging
@@ -12,11 +14,20 @@ from codol_rebuild.runtime.session import ProcessSession, SessionLog
 from codol_rebuild.runtime.debug_loop import DebugLoop
 
 
+def select_client_address(server_url):
+    """启动时查询系统到服务器的IPv4路由；不发送数据，不占用游戏端口。"""
+    server_endpoint = urlsplit(server_url)
+    server_port = server_endpoint.port or (443 if server_endpoint.scheme == 'https' else 80)
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as route_socket:
+        route_socket.connect((server_endpoint.hostname, server_port))
+        return route_socket.getsockname()[0]
+
+
 def run(args):
     """装配单次运行；所有失败均由会话清理并生成结果。"""
-    if getattr(args, 'game_network_mode', None) == 'local':
+    if args.server_address:
         from codol_rebuild.adapters.game.v1649370.matches.network_initialization import native_arguments
-        args.argument += native_arguments(args.game_bind_ip, args.game_bind_port)
+        args.argument += native_arguments(select_client_address(args.server_url), args.client_port)
     reporter=SessionLog(ROOT/'workspaces/offline-runs',args.name)
     try:
         with session_logging(reporter.run_dir):
@@ -79,11 +90,10 @@ def run_session(args, reporter):
                 lambda: realtime_connection.status().value == 'connected')
             identity_store = JsonIdentityStore(args.server_identity)
             multiplayer = RoomSession(gateway, identity_store, gateway.server, inbox=room_inbox)
-            if getattr(args, 'game_server_ip', None):
-                from codol_rebuild.application.matches.service import MatchSession
-                match_inbox = EventInbox()
-                realtime_dispatcher.register(('room_start_updated', 'realtime_reconnected'), match_inbox)
-                match_session = MatchSession(HttpGateway(args.server_url, 30), multiplayer.confirmed_room_id, match_inbox)
+            from codol_rebuild.application.matches.service import MatchSession
+            match_inbox = EventInbox()
+            realtime_dispatcher.register(('room_start_updated', 'realtime_reconnected'), match_inbox)
+            match_session = MatchSession(HttpGateway(args.server_url, 30), multiplayer.confirmed_room_id, match_inbox)
             online_session = OnlineSession(gateway, identity_store, gateway.server, fingerprint(),
                                            multiplayer, realtime_connection)
             chat_session = ChatSession(realtime_connection, chat_inbox, multiplayer.confirmed_room_id)

@@ -34,7 +34,7 @@ class GameSessionBridge:
         if match_session is not None and multiplayer is not None:
             from codol_rebuild.adapters.game.v1649370.matches.session_bridge import MatchBridge
             self.match_bridge = MatchBridge(process, match_session, multiplayer.confirmed_room_id,
-                (args.game_server_ip, args.game_server_port, args.game_server_port_end), record)
+                args.server_address, record)
         self.broadcast_bridge = None
         if broadcast_session is not None:
             from codol_rebuild.adapters.game.v1649370.chat.broadcast import BroadcastBridge
@@ -663,7 +663,7 @@ class GameSessionBridge:
         if label == 'Engine init returned':
             self.log['engine_init_returned'] = True
             self.phase_done('engine-init')
-        if label == 'CRT entry' and getattr(self.args, 'game_network_mode', None) == 'local':
+        if label == 'CRT entry' and self.args.server_address:
             from codol_rebuild.adapters.game.v1649370.matches.network_initialization import install
             self.log['native_network_initialization'] = install(self.process)
             self.record({'native_network_initialization': self.log['native_network_initialization']})

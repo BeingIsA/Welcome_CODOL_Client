@@ -18,9 +18,9 @@ IDENTITY_CALLS = ((0x5BF864, bytes.fromhex('e8d7812400')),
 
 class MatchBridge:
     """一个受控原生记录对应一个分配；不拥有玩家或房间权威状态。"""
-    def __init__(self, process, session, current_room, endpoint, record):
+    def __init__(self, process, session, current_room, server_address, record):
         self.process, self.session, self.current_room = process, session, current_room
-        self.endpoint, self.record = endpoint, record
+        self.server_address, self.record = server_address, record
         self.traps = {}
         self.allocation = None
         self.room_id = None
@@ -243,8 +243,7 @@ class MatchBridge:
                 if success:
                     allocation = completion.data
                     try:
-                        if (allocation['address'] != self.endpoint[0]
-                                or not self.endpoint[1] <= allocation['port'] <= self.endpoint[2]):
+                        if allocation['address'] != self.server_address:
                             raise ValueError('分配地址与已批准守卫端点不一致')
                         self.callback_fields = allocation_fields(allocation['address'], allocation['port'],
                             bytes.fromhex(allocation['securityId']), bytes.fromhex(allocation['securityKey']),
