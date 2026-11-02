@@ -24,12 +24,13 @@ from codol_rebuild.resources.offline_resources import (
 from codol_rebuild.resources.runtime_cache import save_receipt, tree_stamp
 
 LIBRARY_KIND = 'native_game_resources'
-MOUNT_DIRECTORIES = ('main', 'hires', 'client_shipretail', 'locales')
+MOUNT_DIRECTORIES = ('main', 'hires', 'client_shipretail', 'locales', 'miles')
 RUNTIME_FILES = (
     'gcloudvoice.dll', 'bink2w32.dll', 'dbghelp.dll', 'libcef.dll', 'mss32.dll',
     'd3dx9_43.dll', 'd3dcompiler_43.dll', 'libegl.dll', 'libglesv2.dll', 'icudtl.dat',
     'natives_blob.bin', 'snapshot_blob.bin', 'cef.pak', 'cef_100_percent.pak',
     'cef_200_percent.pak', 'cef_extensions.pak', 'localization.txt', 'logo.bmp', 'splash.bmp',
+    'miles/mssmp3.asi',  # 原生 Miles 从 miles 目录加载 MP3 解码器。
 )
 
 
@@ -62,7 +63,7 @@ def read_manifest(game_root: Path, *, verify_resources: bool = True) -> tuple[by
     manifest = json.loads(manifest_bytes)
     validate_library_manifest(manifest, LIBRARY_KIND)
     names = [entry['game_path'] for entry in manifest['resources']]
-    checked_names = names if verify_resources else [name for name in names if '/' not in name]
+    checked_names = names if verify_resources else [name for name in names if '/' not in name or name.startswith('miles/')]
     if len(set(checked_names)) != len(checked_names) or any(canonical_native_resource(name) != name for name in checked_names):
         raise ValueError('原生资源清单存在非法或重复路径')
     if any(not any(name.startswith(directory + '/') for name in names) for directory in MOUNT_DIRECTORIES):
@@ -200,6 +201,12 @@ def create_plan(project_root: Path) -> dict:
                 raise ValueError('独立文件与包内资源重名: ' + name)
             candidates[name] = [{'source': str((source_root / relative).resolve()),
                                  'encoded_size': stamp[1], 'copy_only': True}]
+    # 解码插件来自同一终版客户端，按原生相对路径发布，不混入根级 DLL。
+    for name in RUNTIME_FILES:
+        if name.startswith('miles/'):
+            source = original_root / name
+            candidates[name] = [{'source': str(source.resolve()),
+                                 'encoded_size': source.stat().st_size, 'copy_only': True}]
     resources = []
     for name, sources in sorted(candidates.items()):
         resources.append({'game_path': name, 'size': decoded_size(sources[-1], name), 'candidates': sources})

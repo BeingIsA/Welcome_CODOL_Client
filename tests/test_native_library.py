@@ -177,14 +177,20 @@ class NativeLibraryTests(unittest.TestCase):
         self.assertFalse((runtime / 'libcef.dll').exists(), '资源校验不再复制程序依赖')
 
     def test_normal_manifest_read_checks_dependencies_without_bulk_paths(self):
-        """普通启动不逐项校验素材路径，显式复核仍检查，根级依赖始终检查。"""
+        """普通启动不逐项校验素材路径，但根级依赖和 MP3 解码器必须登记。"""
         game_root = self.version_root / 'game'
         resource_names = [*native_library.RUNTIME_FILES,
-                          *(directory + '/sample.invalid' for directory in native_library.MOUNT_DIRECTORIES)]
+                          *(directory + '/sample.invalid' for directory in native_library.MOUNT_DIRECTORIES if directory != 'miles')]
         manifest = {'resources': [{'game_path': name} for name in resource_names]}
         native_library.manifest_path(game_root).write_text(json.dumps(manifest), encoding='utf-8')
         with patch.object(native_library, 'validate_library_manifest'):
             native_library.read_manifest(game_root, verify_resources=False)
+            manifest['resources'].remove({'game_path': 'miles/mssmp3.asi'})
+            native_library.manifest_path(game_root).write_text(json.dumps(manifest), encoding='utf-8')
+            with self.assertRaises(ValueError):
+                native_library.read_manifest(game_root, verify_resources=False)
+            manifest['resources'].append({'game_path': 'miles/mssmp3.asi'})
+            native_library.manifest_path(game_root).write_text(json.dumps(manifest), encoding='utf-8')
             with self.assertRaisesRegex(ValueError, '非法'):
                 native_library.read_manifest(game_root, verify_resources=True)
             manifest['resources'].append({'game_path': '..\\unexpected.dll'})
