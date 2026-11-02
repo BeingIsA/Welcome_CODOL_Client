@@ -243,7 +243,8 @@ class MatchBridge:
                 if success:
                     allocation = completion.data
                     try:
-                        if (allocation['address'], allocation['port']) != self.endpoint:
+                        if (allocation['address'] != self.endpoint[0]
+                                or not self.endpoint[1] <= allocation['port'] <= self.endpoint[2]):
                             raise ValueError('分配地址与已批准守卫端点不一致')
                         self.callback_fields = allocation_fields(allocation['address'], allocation['port'],
                             bytes.fromhex(allocation['securityId']), bytes.fromhex(allocation['securityKey']),

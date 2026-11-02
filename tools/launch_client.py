@@ -109,8 +109,9 @@ def build_plan(options: argparse.Namespace) -> dict:
     arguments += ['--', '+set', '2439', '0']
     if getattr(options, 'game_server_ip', None):
         delimiter = arguments.index('--')
-        arguments[delimiter:delimiter] = ['--game-server-ip', options.game_server_ip, '--game-server-port', str(options.game_server_port)]
-        required.update(('--game-server-ip', '--game-server-port'))
+        arguments[delimiter:delimiter] = ['--game-server-ip', options.game_server_ip, '--game-server-port', str(options.game_server_port),
+            '--game-server-port-end', str(getattr(options, 'game_server_port_end', options.game_server_port))]
+        required.update(('--game-server-ip', '--game-server-port', '--game-server-port-end'))
     if getattr(options, 'game_network_mode', None):
         delimiter = arguments.index('--')
         arguments[delimiter:delimiter] = ['--game-network-mode', options.game_network_mode,
@@ -163,7 +164,7 @@ def main(argv: list[str] | None = None) -> int:
             from codol_rebuild.bootstrap.config import read_server_config
             configured_url, endpoint, network = read_server_config(options.server_config)
             if not options.server_url: options.server_url = configured_url
-            if endpoint: options.game_server_ip, options.game_server_port = endpoint
+            if endpoint: options.game_server_ip, options.game_server_port, options.game_server_port_end = endpoint
             if network: options.game_network_mode, options.game_bind_ip, options.game_bind_port = network
         plan = build_plan(options)
         print(json.dumps(plan, ensure_ascii=False, indent=2), flush=True)

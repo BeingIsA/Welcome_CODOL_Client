@@ -24,6 +24,7 @@ def parse_args(argv=None):
     parser.add_argument('--local-profile',action='store_true',help='Experimental build-specific local profile bridge')
     parser.add_argument('--game-server-ip')
     parser.add_argument('--game-server-port', type=int)
+    parser.add_argument('--game-server-port-end', type=int)
     parser.add_argument('--game-network-mode', choices=('local',))
     parser.add_argument('--game-bind-ip')
     parser.add_argument('--game-bind-port', type=int)
@@ -42,6 +43,11 @@ def parse_args(argv=None):
     if args.game_server_ip is not None:
         try: args.game_server_ip, args.game_server_port = game_endpoint(args.game_server_ip, args.game_server_port)
         except ValueError as error: parser.error(str(error))
+    if args.game_server_port_end is None:
+        args.game_server_port_end = args.game_server_port
+    if args.game_server_port_end is not None and (
+            args.game_server_port is None or not args.game_server_port <= args.game_server_port_end <= 65535):
+        parser.error('游戏服务器端口范围无效')
     if any(value is not None for value in (args.game_network_mode, args.game_bind_ip, args.game_bind_port)):
         if not args.game_network_mode or args.game_bind_ip is None or args.game_bind_port is None or args.game_server_ip is None:
             parser.error('本地网络模式需要完整绑定地址、端口及已启用游戏服务器端点')
@@ -79,6 +85,10 @@ def read_server_config(path):
     endpoint = None
     if configuration.getboolean('game_server', 'enabled', fallback=False):
         endpoint = game_endpoint(configuration.get('game_server', 'ip'), configuration.get('game_server', 'port'))
+        port_end = configuration.getint('game_server', 'port_end', fallback=endpoint[1])
+        if not endpoint[1] <= port_end <= 65535:
+            raise ValueError('游戏服务器端口范围无效')
+        endpoint = (*endpoint, port_end)
     network = None
     if configuration.has_section('game_network'):
         mode = configuration.get('game_network', 'mode')

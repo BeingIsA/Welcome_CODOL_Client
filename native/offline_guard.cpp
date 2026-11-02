@@ -120,9 +120,9 @@ static void write_new(const fs::path& path, const std::string& text) {
 int wmain(int argc, wchar_t** argv) {
     // 参数：run_directory pid absolute_exe_path creation_FILETIME [bound_seconds]。
     // 时限 0 表示等待宿主 done 标记或子进程退出；有限时限允许 1..3660 秒。
-    if (argc != 5 && argc != 6 && argc != 8) return 2;
+    if (argc != 5 && argc != 6 && argc != 8 && argc != 9) return 2;
     fs::path run, target;
-    UINT32 game_address=0; UINT16 game_port=0;
+    UINT32 game_address=0; UINT16 game_port=0, game_port_end=0;
     std::string game_ip;
     DWORD pid = 0;
     uint64_t creation = 0, bound_seconds = 120;
@@ -134,11 +134,14 @@ int wmain(int argc, wchar_t** argv) {
         if (!creation) throw std::runtime_error("Invalid creation FILETIME");
         if (argc >= 6) bound_seconds = parse_unsigned(argv[5], "Invalid time bound");
         if (bound_seconds > 3660) throw std::runtime_error("Invalid time bound");
-        if (argc == 8) {
+        if (argc >= 8) {
             game_address=parse_loopback(argv[6]);
             const uint64_t port_value=parse_unsigned(argv[7],"Invalid game UDP port");
             if (!port_value || port_value>65535) throw std::runtime_error("Invalid game UDP port");
             game_port=static_cast<UINT16>(port_value);
+            const uint64_t last_port = argc == 9 ? parse_unsigned(argv[8], "Invalid last UDP port") : port_value;
+            if (last_port < port_value || last_port > 65535) throw std::runtime_error("Invalid UDP range");
+            game_port_end = static_cast<UINT16>(last_port);
             game_ip=std::to_string(game_address>>24)+"."+std::to_string((game_address>>16)&255)+"."+
                 std::to_string((game_address>>8)&255)+"."+std::to_string(game_address&255);
         }
@@ -228,9 +231,15 @@ int wmain(int argc, wchar_t** argv) {
             endpoint_conditions[1].conditionValue.type=FWP_UINT32;
             endpoint_conditions[1].conditionValue.uint32=game_address;
             endpoint_conditions[2].fieldKey=CODOL_REMOTE_PORT;
-            endpoint_conditions[2].matchType=FWP_MATCH_EQUAL;
-            endpoint_conditions[2].conditionValue.type=FWP_UINT16;
-            endpoint_conditions[2].conditionValue.uint16=game_port;
+            // 仅放行配置地址的连续 UDP 端口范围，IPv6 与其余流量仍阻断。
+            FWP_RANGE0 port_range{};
+            port_range.valueLow.type = FWP_UINT16;
+            port_range.valueLow.uint16 = game_port;
+            port_range.valueHigh.type = FWP_UINT16;
+            port_range.valueHigh.uint16 = game_port_end;
+            endpoint_conditions[2].matchType=FWP_MATCH_RANGE;
+            endpoint_conditions[2].conditionValue.type=FWP_RANGE_TYPE;
+            endpoint_conditions[2].conditionValue.rangeValue=&port_range;
             endpoint_conditions[3].fieldKey=CODOL_PROTOCOL;
             endpoint_conditions[3].matchType=FWP_MATCH_EQUAL;
             endpoint_conditions[3].conditionValue.type=FWP_UINT8;
@@ -258,7 +267,7 @@ int wmain(int argc, wchar_t** argv) {
         for (size_t i = 0; i < filter_ids.size(); ++i)
             ready += (i ? "," : "") + std::to_string(filter_ids[i]);
         ready += "],\"dynamic\":true,\"job_kill_on_close\":true,\"max_processes\":1,\"bound_seconds\":" +
-            std::to_string(bound_seconds) + ",\"scope\":\"" + (game_port ? "local-game-udp" : "offline-deny-all") + "\",\"identity_verified\":true,\"game_ip\":\"" + game_ip + "\",\"game_port\":" + std::to_string(game_port) + "}";
+            std::to_string(bound_seconds) + ",\"scope\":\"" + (game_port ? "local-game-udp" : "offline-deny-all") + "\",\"identity_verified\":true,\"game_ip\":\"" + game_ip + "\",\"game_port\":" + std::to_string(game_port) + ",\"game_port_end\":" + std::to_string(game_port_end) + "}";
         write_new(run / L"guard-ready.json", ready);
         const ULONGLONG deadline = GetTickCount64() + bound_seconds * 1000;
         while ((bound_seconds == 0 || GetTickCount64() < deadline) &&

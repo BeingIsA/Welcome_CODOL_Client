@@ -15,7 +15,7 @@ class GameServerConfigurationTests(unittest.TestCase):
 
     def test_separate_endpoints(self):
         self.assertEqual(self.read_configuration('[server]\nip=127.0.0.1\nport=8080\n[game_server]\nenabled=true\nip=127.0.0.2\nport=27760'),
-                         ('http://127.0.0.1:8080', ('127.0.0.2', 27760), None))
+                         ('http://127.0.0.1:8080', ('127.0.0.2', 27760, 27760), None))
 
     def test_disabled_or_absent(self):
         for suffix in ('', '\n[game_server]\nenabled=false'):
@@ -43,3 +43,9 @@ class GameServerConfigurationTests(unittest.TestCase):
         for mode, address, port in [('remote', '127.0.0.1', 30001), ('local', '192.168.1.1', 30001), ('local', '127.0.0.1', 0)]:
             with self.subTest(mode=mode, address=address, port=port), self.assertRaises(ValueError):
                 self.read_configuration(prefix+f'mode={mode}\nbind_ip={address}\nbind_port={port}')
+
+    def test_explicit_port_range(self):
+        configuration = self.read_configuration('[server]\nip=127.0.0.1\n[game_server]\nenabled=true\nip=127.0.0.2\nport=27760\nport_end=27763')
+        self.assertEqual(configuration[1], ('127.0.0.2', 27760, 27763))
+        with self.assertRaises(ValueError):
+            self.read_configuration('[server]\nip=127.0.0.1\n[game_server]\nenabled=true\nip=127.0.0.2\nport=27760\nport_end=27759')
