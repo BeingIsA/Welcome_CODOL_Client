@@ -12,7 +12,7 @@ from codol_rebuild.platform.win32 import K, PTR, api, check, close
 from codol_rebuild.platform.resource_mount import mount_resource
 
 
-SESSION_DIRECTORIES = ('players', 'appdata', 'localappdata', 'temp')
+SESSION_DIRECTORIES = ('appdata', 'localappdata', 'temp')
 
 
 class RuntimeDirectoryLease:
@@ -44,6 +44,21 @@ class RuntimeDirectoryLease:
             elif destination.exists() or destination.is_symlink():
                 raise ValueError('会话联接位置被其他文件占用: ' + str(destination))
             mount_resource(source, destination, session_directory, self.path)
+
+    def bind_players(self, players_directory):
+        """将原生 players 绑定到持久目录，允许替换旧版会话联接。"""
+        players_directory = Path(players_directory).resolve()
+        destination = self.path / 'players'
+        if destination.is_junction():
+            previous = destination.resolve()
+            if previous == players_directory:
+                return
+            if not previous.is_relative_to(self.sessions_root):
+                raise ValueError('既有设置联接目标越界')
+            destination.rmdir()
+        elif destination.exists() or destination.is_symlink():
+            raise ValueError('设置联接位置被其他文件占用')
+        mount_resource(players_directory, destination, players_directory, self.path)
 
     def hold_for_process(self, process_handle):
         """给挂起的游戏进程保留无读写权限的锁句柄，随其退出自动关闭。"""

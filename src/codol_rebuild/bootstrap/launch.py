@@ -45,7 +45,6 @@ def run_session(args, reporter):
         return AccountSession(AccountRepository(accounts/'local.sqlite3'),
                               AccountCodec(schemas,tables,catalog))
     process=ProcessSession(args,run_dir,stage,log,record,phase_done,ROOT/'bin/offline_guard.exe')
-    process.settings_errors=(OSError,ValueError,sqlite3.Error)
     bridge=None
     multiplayer=None
     online_session = None
@@ -104,7 +103,7 @@ def run_session(args, reporter):
                                  realtime_dispatcher=realtime_dispatcher, chat_session=chat_session, online_session=online_session,
                                  match_session=match_session)
         debugger=DebugLoop(process,bridge,prepared['pe'],FORBIDDEN)
-        process.start(prepared['exe'],prepared['settings'])
+        process.start(prepared['exe'],prepared['players_directory'])
         debugger.run()
     except Exception as error:
         log['error']=str(error);log['traceback']=traceback.format_exc()

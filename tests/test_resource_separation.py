@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import unittest
 import test_offline_resources as fixtures
-from test_loose_library import LooseTests
+from test_loose_library import LooseResourceFixture
 from codol_rebuild.resources import offline_resources as resources
 from codol_rebuild.resources import loose_library as loose
 from codol_rebuild.resources.image_library import build_library
@@ -57,7 +57,7 @@ class PublicInterfaceOnlyTests(fixtures.ResourceFixture):
         self.assertEqual(supplier.receipt_entries('main/images/absent.iwi'), ())
 
 
-class LooseIndependenceTests(LooseTests):
+class LooseIndependenceTests(LooseResourceFixture, unittest.TestCase):
     def test_loose_source_no_longer_loads_iwi_manifest(self):
         # 松散来源改为直接继承只读基类：损坏的 IWI 缓存清单不应影响其构造。
         expected_resources = self.prepare()[1]

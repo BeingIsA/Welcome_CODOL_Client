@@ -17,7 +17,9 @@ class ReadySessionTests(unittest.TestCase):
         realtime = Mock()
         payload = {'roomId': 'rm_test', 'members': []}
         realtime.poll_event.return_value = {'type': 'room_members_updated', 'payload': payload}
-        session = RoomSession(Mock(), Mock(), 'http://server', realtime)
+        gateway = Mock()
+        gateway.room_detail.return_value = payload
+        session = RoomSession(gateway, Mock(), 'http://server', realtime)
         self.addCleanup(session.close)
         session._record = IdentityRecord('pl_a', 'rm_test')
         session._ready_pending = Future()
@@ -25,7 +27,10 @@ class ReadySessionTests(unittest.TestCase):
         self.assertIsNone(session.poll_event())
         realtime.poll_event.assert_not_called()
         self.assertEqual(session.poll_change_ready().operation, 'change_ready')
+        self.assertIsNone(session.poll_event())
+        session._members_pending.result(timeout=5)
         self.assertEqual(session.poll_event().data, payload)
+        gateway.room_detail.assert_called_once_with('pl_a', 'rm_test')
 
     def test_ready_cancel_deliver_confirmed_snapshot_once(self):
         gateway = Mock()

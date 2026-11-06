@@ -47,3 +47,8 @@
 档案初始化差分只允许 loadoutVersion 从 0 迁移为 3：比较其余全部字节、secure 档案、完整返回数据及保存调用，并验证第二次初始化不再次保存。规则数量断言按现有组合更新为 34，继续验证全部替换区间不重叠。启动来源检查拦截当前资源装配入口，公共帧夹具显式声明未安装 match_bridge。
 
 架构规则仅允许传输/持久化层使用 application.errors 共享错误契约，以及 profile_format/unlock.py 导入 ProfileFormatError as UnlockError；没有普遍放开应用层实现依赖。本次未修改生产行为。
+
+
+### 2026-11-07 安装轨迹维护
+
+核对当前安装调用后更新两个 install-trace 基线。原有记录保持原顺序且全部保留：在线和本地模式各增加近战输入桥的四次写入与一段可执行内存保护；本地模式另增加计分板就绪调用 0x5EC2D2 的四字节位移写入。对应实现为 matches/melee_input.py 和 matches/scoreboard_title.py，行为分别由 test_melee_input.py 和 test_scoreboard_title.py 覆盖。本次仅维护测试，不修改原生行为；轨迹验证不代表实机验收。

@@ -1,7 +1,7 @@
 """启动资源装配：可选完整资源复核、程序复用、设置恢复和顶层联接。"""
 import hashlib, json, shutil
 from pathlib import Path
-from codol_rebuild.core.paths import REBUILD_ROOT as ROOT, accounts_dir
+from codol_rebuild.core.paths import REBUILD_ROOT as ROOT, accounts_dir, USER_DATA_ROOT
 from codol_rebuild.resources.runtime_cache import prepare_library
 from codol_rebuild.platform.resource_cache_acl import protect_cache
 from codol_rebuild.platform.resource_acl import apply_runtime_acl
@@ -43,7 +43,7 @@ def prepare_reusable_runtime(args, run_dir, session_stage, log, phase_done, imag
     from codol_rebuild.platform.runtime_directory import acquire_runtime_directory, SESSION_DIRECTORIES
     from codol_rebuild.platform.resource_mount import mount_resource
     from codol_rebuild.resources.runtime_cache import save_receipt
-    from codol_rebuild.adapters.persistence.game_settings import SettingsStore, SettingsSession
+    from codol_rebuild.adapters.persistence.game_settings import migrate_settings
     library = args.native_library.resolve()
     resource_directories, dependencies = prepare_native_library(
         library, run_dir, log, getattr(args, 'verify_resources', False))
@@ -120,15 +120,16 @@ def prepare_reusable_runtime(args, run_dir, session_stage, log, phase_done, imag
         phase_done('runtime-program-reuse' if reused else 'runtime-program-install')
         for name in SESSION_DIRECTORIES:
             (session_stage / name).mkdir()
-        settings_store = SettingsStore(accounts_dir() / 'game-settings.sqlite3')
-        settings_session = SettingsSession(settings_store, session_stage / 'players')
-        log['game_settings'] = {'database': str(settings_store.path),
-                                'restored_files': settings_session.restore()}
+        players_directory = USER_DATA_ROOT / 'players'
+        migrated_files = migrate_settings(accounts_dir() / 'game-settings.sqlite3', players_directory)
+        apply_runtime_acl(players_directory)
+        log['game_settings'] = {'directory': str(players_directory), 'migrated_files': migrated_files}
         apply_runtime_acl(session_stage)
         lease.bind_session(session_stage)
+        lease.bind_players(players_directory)
         phase_done('session-settings-and-mounts')
         return {'image': image, 'exe': executable, 'pe': prepared_image,
-                'settings': settings_session, 'runtime_lease': lease}
+                'players_directory': players_directory, 'runtime_lease': lease}
     except Exception:
         lease.close()
         raise

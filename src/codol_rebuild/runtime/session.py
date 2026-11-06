@@ -15,11 +15,8 @@ class ProcessSession:
         self.guard_path=guard_path
         self.info=PI(); self.token=None; self.guard=None; self.pending=None
         self.closed=False
-        self.settings_errors=(OSError,ValueError)
         self.resumed=False
-        self.settings=None
         self.runtime_lease=None
-        self.settings_task=PeriodicTask(2)
 
     @staticmethod
     def periodic(interval):
@@ -119,13 +116,12 @@ class ProcessSession:
             address = base + size if base + size > address else address + size
         return regions
 
-    def start(self, exe, settings_session):
+    def start(self, exe, players_directory):
         """守卫确认后才恢复低权限主线程。"""
-        self.settings=settings_session
         self.token = low_token()
         si = SI()
         si.cb = C.sizeof(si)
-        display_defaults = [] if 'config_mp.cfg' in settings_session.baseline else ['+set', 'r_displayMode', 'windowed']
+        display_defaults = [] if (players_directory / 'config_mp.cfg').is_file() else ['+set', 'r_displayMode', 'windowed']
         self.log['command_line'] = subprocess.list2cmdline([str(exe), '-q', *display_defaults, *self.args.argument])
         command = C.create_unicode_buffer(self.log['command_line'])
         env = {key: os.environ[key] for key in ('SystemRoot', 'WINDIR', 'COMSPEC', 'SystemDrive', 'NUMBER_OF_PROCESSORS', 'PROCESSOR_ARCHITECTURE') if key in os.environ}
@@ -187,23 +183,6 @@ class ProcessSession:
         self.log['resumed'] = True
         self.log['lifetime'] = 'until_client_exit' if self.args.until_close else 'bounded_observation'
 
-    def save_settings(self, final=False):
-        if self.settings is None or not self.resumed:
-            return
-        if not self.settings_task.due(force=final):
-            return
-        try:
-            changed = self.settings.checkpoint(final=final)
-            if changed:
-                self.log['game_settings_saved'] = {'files': changed, 'time': time.time(), 'final': final}
-                self.record({'game_settings_saved': self.log['game_settings_saved']})
-                self.log.pop('game_settings_save_error', None)
-        except self.settings_errors as error:
-            message = str(error)
-            if self.log.get('game_settings_save_error') != message:
-                self.record({'game_settings_save_error': message})
-            self.log['game_settings_save_error'] = message
-
     def close(self):
         """终止并排空待处理事件，回收令牌与守卫。"""
         if self.info.process:
@@ -217,8 +196,6 @@ class ProcessSession:
                 if api(K, 'WaitForDebugEvent', W.BOOL, C.POINTER(EVENT), W.DWORD)(C.byref(event), 100):
                     api(K, 'ContinueDebugEvent', W.BOOL, W.DWORD, W.DWORD, W.DWORD)(event.pid, event.tid, 65538)
             self.log['child_terminated'] = wait(self.info.process, 1000) == 0
-            if self.log['child_terminated']:
-                self.save_settings(final=self.log.get('exit_code') == 0)
             close(self.info.thread)
             close(self.info.process)
         if self.token:

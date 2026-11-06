@@ -81,7 +81,7 @@ class MemberProfileTests(unittest.TestCase):
         pe = pefile.PE(str(Path(__file__).resolve().parents[1]/'bin/v1649370/codol1649370-offline.exe'))
         self.assertEqual(pe.get_data(0x7F8F3D-0x400000, 3), bytes.fromhex('c20800'))
 
-    def test_member_push_delivers_profiles_without_http_requests(self):
+    def test_member_notification_refreshes_authoritative_profiles(self):
         from codol_rebuild.application.session.contracts import IdentityRecord
         from codol_rebuild.application.room.service import RoomSession
         gateway, inbox = Mock(), Mock()
@@ -92,10 +92,17 @@ class MemberProfileTests(unittest.TestCase):
         session = RoomSession(gateway, Mock(), 'http://localhost', inbox)
         self.addCleanup(session.close)
         session._record = IdentityRecord('pl_a', 'rm_test')
+        gateway.room_detail.return_value = {'roomId': 'rm_test', 'members': [
+            {'playerId': 'pl_a'}, {'playerId': 'pl_b'}]}
+        gateway.member_profile.return_value = sample_profile()
+        self.assertIsNone(session.poll_event())
+        session._members_pending.result(timeout=5)
         result = session.poll_event()
         self.assertEqual(result.operation, 'room_members_updated')
         self.assertEqual(result.data, payload)
-        self.assertEqual(gateway.mock_calls, [])
+        gateway.room_detail.assert_called_once_with('pl_a', 'rm_test')
+        self.assertEqual([entry.args for entry in gateway.member_profile.call_args_list],
+                         [('pl_a', 'rm_test', 'pl_a'), ('pl_a', 'rm_test', 'pl_b')])
 
     def test_other_room_membership_refresh_is_discarded(self):
         from codol_rebuild.application.session.contracts import IdentityRecord

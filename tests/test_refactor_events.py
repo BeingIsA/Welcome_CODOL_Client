@@ -223,28 +223,29 @@ class LifecycleTests(unittest.TestCase):
              patch.object(launch, 'DebugLoop'):
             lease = Mock(path=Path(directory) / 'program')
             prepare.return_value = {'runtime_lease': lease, 'image': None, 'pe': None,
-                                    'exe': lease.path / 'game.exe', 'settings': None}
+                                    'exe': lease.path / 'game.exe', 'settings': None,
+                                    'players_directory': Path(directory) / 'players'}
             process = process_class.return_value
             process.is_running.return_value = False
             process.start.side_effect = ValueError('start failed')
             calls = Mock()
             calls.attach_mock(process.close, 'close_process')
             calls.attach_mock(lease.close, 'release_directory')
-            result = launch.run(SimpleNamespace(name='lease-failure'))
+            result = launch.run(SimpleNamespace(name='lease-failure', server_address=None))
             self.assertEqual(result['error'], 'start failed')
             self.assertEqual([entry[0] for entry in calls.mock_calls], ['close_process', 'release_directory'])
 
     def test_prepare_failure_records_result_without_starting(self):
         with tempfile.TemporaryDirectory() as tmp, patch.object(launch,'ROOT',Path(tmp)),patch.object(launch,'prepare',side_effect=ValueError('bad image')),patch.object(launch,'ProcessSession') as cls:
             process=cls.return_value;process.is_running.return_value=False
-            result=launch.run(SimpleNamespace(name='failure'))
+            result=launch.run(SimpleNamespace(name='failure', server_address=None))
             self.assertEqual(result['error'],'bad image')
             process.start.assert_not_called();process.close.assert_called_once()
             self.assertTrue((Path(tmp)/'workspaces/offline-runs/failure/result.json').is_file())
 
     def test_prepare_only_never_starts_guard_or_debug_loop(self):
         with tempfile.TemporaryDirectory() as tmp,patch.object(launch,'ROOT',Path(tmp)),patch.object(launch,'prepare',return_value={}),patch.object(launch,'ProcessSession') as cls:
-            result=launch.run(SimpleNamespace(name='prepared',prepare_only=True))
+            result=launch.run(SimpleNamespace(name='prepared',prepare_only=True, server_address=None))
             self.assertTrue(result['prepared_only']);cls.return_value.start.assert_not_called()
             cls.return_value.close.assert_called_once()
 

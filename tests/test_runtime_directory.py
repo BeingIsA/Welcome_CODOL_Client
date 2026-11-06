@@ -65,12 +65,19 @@ class RuntimeDirectoryTests(unittest.TestCase):
         lease.path.mkdir()
         previous = self.session('previous')
         current = self.session('current')
-        original_settings = previous / 'players/config_mp.cfg'
+        original_settings = previous / 'appdata/session.dat'
         original_settings.write_bytes(b'previous settings')
         lease.bind_session(previous)
         lease.bind_session(current)
         self.assertEqual(original_settings.read_bytes(), b'previous settings')
-        self.assertEqual((lease.path / 'players').resolve(), current / 'players')
+        self.assertEqual((lease.path / 'appdata').resolve(), current / 'appdata')
+        players = self.project / 'persistent-players'
+        players.mkdir()
+        lease.bind_players(players)
+        (players / 'config_mp.cfg').write_bytes(b'native settings')
+        lease.bind_session(previous)
+        lease.bind_players(players)
+        self.assertEqual((lease.path / 'players/config_mp.cfg').read_bytes(), b'native settings')
         with self.assertRaisesRegex(ValueError, '越界'):
             lease.bind_session(self.project)
 
@@ -109,6 +116,7 @@ class RuntimeDirectoryTests(unittest.TestCase):
 
         with contextlib.ExitStack() as mocks:
             mocks.enter_context(patch.object(resource_setup, 'ROOT', self.root))
+            mocks.enter_context(patch.object(resource_setup, 'USER_DATA_ROOT', self.project / 'userdata'))
             mocks.enter_context(patch.object(resource_setup, 'accounts_dir', return_value=self.project / 'accounts'))
             mocks.enter_context(patch.object(native_library, 'read_manifest', return_value=(b'manifest', manifest)))
             mocks.enter_context(patch.object(resource_setup, 'prepare_library'))

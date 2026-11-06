@@ -43,7 +43,6 @@ class DebugLoop:
     def run(self):
         until=time.monotonic()+self.args.seconds
         while self.args.until_close or time.monotonic() < until:
-            self.process.save_settings()
             event = EVENT()
             if not api(K, 'WaitForDebugEvent', W.BOOL, C.POINTER(EVENT), W.DWORD)(C.byref(event), 200):
                 if C.get_last_error() == 121:

@@ -13,7 +13,8 @@ MP3=bytes.fromhex('fffb9000')+bytes(64)
 WAV_BODY=b'WAVE'+b'fmt '+struct.pack('<I',16)+struct.pack('<HHIIHH',1,1,8000,16000,2,16)+b'data'+struct.pack('<I',2)+bytes(2)
 WAV=b'RIFF'+struct.pack('<I',len(WAV_BODY))+WAV_BODY
 
-class LooseTests(unittest.TestCase):
+class LooseResourceFixture:
+    """共享松散资源夹具，不参与测试收集。"""
     setUp=fixtures.ResourceFixture.setUp
 
     def prepare(self):
@@ -30,6 +31,10 @@ class LooseTests(unittest.TestCase):
         priority=self.root/loose.PRIORITY_PATH;priority.write_text('verified fixture native order',encoding='utf-8')
         self.patches.enter_context(patch.object(loose,'AUDIT_SHA',resources.file_digest(proof)));self.patches.enter_context(patch.object(loose,'PRIORITY_SHA',resources.file_digest(priority)))
         return loose.LooseResourceSource(self.root),values
+
+
+class LooseTests(LooseResourceFixture, unittest.TestCase):
+    """验证松散资源库的格式与发布行为。"""
 
     def test_canonical_only_reviewed_data_types(self):
         self.assertEqual(loose.canonical_loose_resource(r'.\MAIN\models\weapon_lod010'),'main/models/weapon_lod010')
