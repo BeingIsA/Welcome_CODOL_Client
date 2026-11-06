@@ -283,6 +283,38 @@ class MultiplayerBridgeTests(unittest.TestCase):
         self.assertEqual(memory.read(owner+0xB2, 10), struct.pack('<5H', *range(101, 106)))
         adapter.port.begin.assert_not_called()
 
+    def test_ready_echo_stages_changes_and_only_forces_requesting_member(self):
+        """初始化保留快照；后续回显交接收器，重复快照不能重复触发全员准备通知。"""
+        memory, adapter, data, room, session = self.join_fixture()
+        adapter.ready_buffer = 0x29000000
+        adapter.current_room_id = data['roomId']
+        adapter._prepare_join_snapshot(data)
+        memory.word(room+0x1C, session)
+        memory.word(session+0x25C8, room)
+        memory.write(session, b'\x01')
+        adapter.pending = ('join', room, session)
+        adapter._publish_join_snapshot()
+        self.assertEqual(bridge.u32(memory.read, adapter.ready_buffer+4), 0)
+        data['members'][1]['readyState'] = True
+        adapter._apply_room_members(data, ready_player_id='pl_me')
+        self.assertEqual(memory.read(room+0xE3F8, 1), b'\0')
+        self.assertEqual(bridge.u32(memory.read, adapter.ready_buffer+4), 1)
+        self.assertEqual(memory.read(adapter.ready_buffer+8, 8), memory.read(room+0xE368, 8))
+        self.assertEqual(bridge.u32(memory.read, adapter.ready_buffer+16), 1)
+        # 模拟接收器完成应用后，相同推送不生成任何准备消息。
+        memory.write(room+0xE3F8, b'\x01')
+        adapter._apply_room_members(data)
+        self.assertEqual(bridge.u32(memory.read, adapter.ready_buffer+4), 0)
+        adapter._apply_room_members(data, ready_player_id='pl_me')
+        self.assertEqual(bridge.u32(memory.read, adapter.ready_buffer+4), 1)
+        # 一个快照同时取消本人、准备房主时，取消先交给接收器。
+        data['members'][0]['readyState'] = True
+        data['members'][1]['readyState'] = False
+        adapter._apply_room_members(data)
+        self.assertEqual(bridge.u32(memory.read, adapter.ready_buffer+4), 2)
+        self.assertEqual(bridge.u32(memory.read, adapter.ready_buffer+16), 0)
+        self.assertEqual(bridge.u32(memory.read, adapter.ready_buffer+28), 1)
+
     def test_spectator_profile_is_published_on_join_and_team_transitions(self):
         """首次遇到观众也发布模型资料，不依赖其曾加入参战阵营留下的缓存。"""
         import hashlib

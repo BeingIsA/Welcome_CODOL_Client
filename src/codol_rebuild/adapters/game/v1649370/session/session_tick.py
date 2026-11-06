@@ -39,15 +39,15 @@ def build_tick(entry, state, ready, preview_entry, room_entries, list_publish=No
             branch('0f84', 'members_done')
             emit('c705'); word(state+52); word(0)
             emit('83e4f0'); call(room_entries['members_apply']); emit('8be5')
-            if 'ready_notify' in room_entries:
-                emit('83e4f0'); call(room_entries['ready_notify']); emit('8be5')
+            if 'ready_receive' in room_entries:
+                emit('83e4f0'); call(room_entries['ready_receive']); emit('8be5')
             trap('members_applied')
             label('members_done')
-        if 'ready_notify' in room_entries:
+        if 'ready_failed' in room_entries:
             emit('833d'); word(state+56); emit('00')
             branch('0f84', 'ready_done')
             emit('c705'); word(state+56); word(0)
-            emit('83e4f0'); call(room_entries['ready_notify']); emit('8be5')
+            emit('83e4f0'); call(room_entries['ready_failed']); emit('8be5')
             label('ready_done')
         emit('833d'); word(state+SETTINGS_READY_OFFSET); emit('00')
         branch('0f84', 'poll_command')
@@ -97,7 +97,11 @@ def build_tick(entry, state, ready, preview_entry, room_entries, list_publish=No
     label('chat')
     if chat_poll is not None:
         emit('83e4f0'); call(chat_poll); emit('8be5')
-    label('done'); emit('8be5 619d c3')
+    label('done')
+    if 'match_evaluate' in room_entries:
+        emit('833d'); word(ready); emit('01'); branch('0f85', 'return')
+        emit('83e4f0'); call(room_entries['match_evaluate']); emit('8be5')
+    label('return'); emit('8be5 619d c3')
     for offset, target in refs:
         struct.pack_into('<i', code, offset, labels[target]-offset-4)
     return {'code': bytes(code), 'traps': traps}

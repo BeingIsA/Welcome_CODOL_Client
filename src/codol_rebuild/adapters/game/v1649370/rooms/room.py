@@ -114,6 +114,9 @@ class RoomReadyBridge:
         for address, expected in {
             0x7CF895: bytes.fromhex('8ad88b4508'),
             0x7CB4D0: bytes.fromhex('558bec83e4f883ec44'),
+            0x6287D0: bytes.fromhex('558bec538b5d0856'),
+            0x634870: bytes.fromhex('558bec81ecbc0d00'),
+            0x632A70: bytes.fromhex('558bec83ec0880bf'),
         }.items():
             if self.process.read(address, len(expected)) != expected:
                 raise ValueError('准备接口原生 ABI 不匹配')
@@ -178,21 +181,77 @@ class RoomReadyBridge:
             self.pending_room = ()
 
 
-def build_ready_notifications(entry, room_pointer_address):
-    """成员列表已发布后，沿原生监听器逐个完成准备状态通知。"""
+def build_ready_failure_notification(entry, room_pointer_address):
+    """准备请求失败时仅完成本人 UI 等待，保持已确认状态。"""
     instruction_bytes = bytearray.fromhex('9c60 8b1d')
     instruction_bytes.extend(struct.pack('<I', room_pointer_address))
-    instruction_bytes.extend(bytes.fromhex('8bb3d8050100 8dbb68e30000'))
-    loop_offset = len(instruction_bytes)
-    instruction_bytes.extend(bytes.fromhex('85f6 0f84'))
+    instruction_bytes.extend(bytes.fromhex('83bbd805010000 0f84'))
     end_offset = len(instruction_bytes)
     instruction_bytes.extend(bytes(4))
-    instruction_bytes.extend(bytes.fromhex('57 e8'))
+    instruction_bytes.extend(bytes.fromhex('8d8368e30000 50 e8'))
     instruction_bytes.extend(struct.pack('<I', (0x7CB4D0-entry-len(instruction_bytes)-4) & 0xffffffff))
-    instruction_bytes.extend(bytes.fromhex('81c7d0010000 4e e9'))
-    instruction_bytes.extend(struct.pack('<i', loop_offset-len(instruction_bytes)-4))
     struct.pack_into('<i', instruction_bytes, end_offset, len(instruction_bytes)-end_offset-4)
     instruction_bytes.extend(bytes.fromhex('619d c3'))
+    return bytes(instruction_bytes)
+
+
+def build_ready_receive(entry, ready_buffer):
+    """将确认的成员变更序列化为 0x10，复用原生状态写入、监听器和开局判断。"""
+    instruction_bytes = bytearray.fromhex('9c60')
+    command = ready_buffer + 1024
+    def emit(value):
+        instruction_bytes.extend(bytes.fromhex(value))
+    def word(value):
+        instruction_bytes.extend(struct.pack('<I', value))
+    def call(address):
+        emit('e8'); word((address-entry-len(instruction_bytes)-4) & 0xffffffff)
+    emit('8b1d'); word(ready_buffer)
+    emit('8b3d'); word(ready_buffer+4)
+    emit('c705'); word(ready_buffer+4); word(0)
+    emit('be'); word(ready_buffer+8)
+    loop_offset = len(instruction_bytes)
+    emit('85ff 0f84')
+    end_offset = len(instruction_bytes); word(0)
+    emit('8b4608 a3'); word(command+8)
+    emit('6a24'); call(0xB74220)
+    emit('83c404 6a00 6a00 8bc8'); call(0xB778E0)
+    emit('a3'); word(command+12)
+    emit('83c004 50 ff152881ca00')
+    emit('68'); word(command+12)
+    emit('b9'); word(command); call(0x6287D0)
+    emit('ff35'); word(command+12)
+    # 接收器按 metadata 身份定位成员；sender 同样使用该成员的映射身份。
+    emit('ff7604 ff36 ff7604 ff36 53 31c9'); call(0x634870)
+    emit('83c60c 4f e9'); word((loop_offset-len(instruction_bytes)-4) & 0xffffffff)
+    struct.pack_into('<i', instruction_bytes, end_offset, len(instruction_bytes)-end_offset-4)
+    emit('619d c3')
+    return bytes(instruction_bytes)
+
+
+def build_match_evaluation(entry, ownership):
+    """离线适配的有效房间在前端帧执行原生判断，不启动整个在线网络循环。"""
+    instruction_bytes = bytearray.fromhex('9c60 a1')
+    instruction_bytes.extend(struct.pack('<I', 0x849B874))
+    branches = []
+    def emit(value):
+        instruction_bytes.extend(bytes.fromhex(value))
+    def word(value):
+        instruction_bytes.extend(struct.pack('<I', value))
+    def skip(opcode):
+        emit(opcode); branches.append(len(instruction_bytes)); word(0)
+    emit('85c0'); skip('0f84')
+    emit('83780c00'); skip('0f85')
+    emit('8b3d'); word(ownership)
+    emit('85ff'); skip('0f84')
+    emit('3b3d'); word(0x82E13FC); skip('0f85')
+    emit('8b471c 85c0'); skip('0f84')
+    emit('3b05'); word(ownership+4); skip('0f85')
+    emit('803800'); skip('0f84')
+    emit('39b8c8250000'); skip('0f85')
+    emit('e8'); word((0x632A70-entry-len(instruction_bytes)-4) & 0xffffffff)
+    for offset in branches:
+        struct.pack_into('<i', instruction_bytes, offset, len(instruction_bytes)-offset-4)
+    emit('619d c3')
     return bytes(instruction_bytes)
 
 

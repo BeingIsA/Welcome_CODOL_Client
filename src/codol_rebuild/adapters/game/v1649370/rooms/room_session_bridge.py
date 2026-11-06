@@ -170,6 +170,7 @@ class RoomSessionBridge:
         self.profile_buffer = None
         self.members_buffer = None
         self.members_apply = None
+        self.ready_buffer = None
         self.applying_members = False
         self.member_profiles = {}
         self.member_menu = None
@@ -248,15 +249,24 @@ class RoomSessionBridge:
         from codol_rebuild.adapters.game.v1649370.rooms.room import RoomTeamBridge
         self.team_bridge = RoomTeamBridge(self.process, self.port, self._team_room_state)
         team_traps = self.team_bridge.install()
-        from codol_rebuild.adapters.game.v1649370.rooms.room import RoomReadyBridge, build_ready_notifications
+        from codol_rebuild.adapters.game.v1649370.rooms.room import (
+            RoomReadyBridge, build_ready_failure_notification, build_ready_receive,
+            build_match_evaluation,
+        )
         self.ready_bridge = RoomReadyBridge(self.process, self.port, self._team_room_state,
                                            lambda: self.applying_members)
         ready_traps = self.ready_bridge.install()
-        ready_notify = self.process.allocate(4096)
-        checked_write(self.process, ready_notify,
-                      build_ready_notifications(ready_notify, self.members_buffer))
-        self.process.executable(ready_notify, 4096)
-        room_plan['entries']['ready_notify'] = ready_notify
+        self.ready_buffer = self.process.allocate(4096)
+        checked_write(self.process, self.ready_buffer, bytes(4096))
+        checked_write(self.process, self.ready_buffer+1024, struct.pack('<IIII', 0xDC7624, 0x10, 0, 0))
+        for name, builder, parameter in (
+                ('ready_receive', build_ready_receive, self.ready_buffer),
+                ('ready_failed', build_ready_failure_notification, self.members_buffer),
+                ('match_evaluate', build_match_evaluation, self.ownership)):
+            entry = self.process.allocate(4096)
+            checked_write(self.process, entry, builder(entry, parameter))
+            self.process.executable(entry, 4096)
+            room_plan['entries'][name] = entry
         self.traps = {**room_plan['traps'], **self.room_list.traps, **join_plan['traps']}
         self.traps.update(menu_traps)
         self.traps.update(team_traps)
@@ -545,12 +555,18 @@ class RoomSessionBridge:
             checked_write(self.process, room+0x105F0+offset, raw)
         checked_write(self.process, room+0x105FE, bytes([data['maxPlayers']])*2)
 
-    def _publish_join_snapshot(self):
+    def _publish_join_snapshot(self, ready_player_id=None):
         """只写原生已构造的值类型成员槽，保留本机角色数据与原生对象指针。"""
         data, members, ids, names, scalars = self.join_snapshot
         room, session = self.pending[1:]
         if not self._valid_room(room, session):
             raise ValueError('入房发布对象已失效')
+        previous_ready = {}
+        if self.pending[0] == 'members':
+            for index in range(u32(self.process.read, room+0x105D8)):
+                address = room+0xE368+index*0x1D0
+                previous_ready[self.process.read(address, 8)] = self.process.read(address+0x90, 1)[0]
+        ready_changes = []
         owner_index = next(i for i, m in enumerate(members) if m['playerId'] == data['ownerPlayerId'])
         self.is_owner = data['ownerPlayerId'] == self.player_id
         # 原生 session 的成员摘要为 0x60 字节；房间 UI 的成员记录为 0x1D0 字节。
@@ -576,7 +592,17 @@ class RoomSessionBridge:
                 for offset, raw in member_profile.member_summary(profile):
                     checked_write(self.process, address+offset, raw)
             checked_write(self.process, address+0x88, struct.pack('<I', native_team))
-            checked_write(self.process, address+0x90, bytes([member.get('readyState', False)]))
+            confirmed_ready = int(member.get('readyState', False))
+            if self.pending[0] == 'members':
+                # 成员移动时按身份保留旧值；0x10 接收器负责应用准备变更。
+                old_ready = previous_ready.get(identity, 0)
+                checked_write(self.process, address+0x90, bytes([old_ready]))
+                if (old_ready != confirmed_ready or identity not in previous_ready
+                        or member['playerId'] == ready_player_id):
+                    ready_changes.append((identity, confirmed_ready))
+            else:
+                # 入房快照本身带成员状态；不把初始化解释成逐个准备命令。
+                checked_write(self.process, address+0x90, bytes([confirmed_ready]))
             checked_write(self.process, address+0x92, bytes([member['playerId'] == data['ownerPlayerId']]))
         checked_write(self.process, room+0x105D8,
                       struct.pack('<IIII', len(members), len(members), 0, data['maxPlayers']-len(members)))
@@ -584,10 +610,18 @@ class RoomSessionBridge:
         if self.pending[0] != 'members':
             checked_write(self.process, room+0x279, bytes([1, 0]))
             checked_write(self.process, room+0x27C, bytes(4))
-            checked_write(self.process, room+0x281, bytes(7))
+            # 服务端成员和身份已就绪后恢复原生房主判断；建房中间态仍不自动开局。
+            checked_write(self.process, room+0x281, b'\x01'+bytes(6))
             checked_write(self.process, room+0x38711, b'\x01')
         # 只在明确的服务端回显期间抑制成员刷新派生的设置提交。
         self.applying_members = True
+        if self.ready_buffer is not None:
+            # 先应用取消，避免批量快照中短暂出现并不存在的全员准备状态。
+            ready_changes.sort(key=lambda change: change[1])
+            checked_write(self.process, self.ready_buffer,
+                          struct.pack('<II', room, len(ready_changes))+
+                          b''.join(identity+struct.pack('<I', ready)
+                                   for identity, ready in ready_changes))
         packets = []
         for member, identity in zip(members, ids):
             profile = self.member_profiles.get(member['playerId'])
@@ -684,7 +718,7 @@ class RoomSessionBridge:
             result = self.ready_bridge.poll()
             if result is not None:
                 if result.error is None:
-                    self._apply_room_members(result.data)
+                    self._apply_room_members(result.data, ready_player_id=self.player_id)
                 else:
                     # 原生请求锁依赖完成通知解除；保留已确认状态，不重试写请求。
                     self.notifications.message(display_message(result.error))
@@ -734,7 +768,7 @@ class RoomSessionBridge:
         self._word(ACTION, 7)
         self._word(POLL, 1)
 
-    def _apply_room_members(self, payload):
+    def _apply_room_members(self, payload, ready_player_id=None):
         """应用层已取回完整快照；主线程只更新当前有效房间的展示副本。"""
         if payload is None or payload['roomId'] != self.current_room_id:
             return
@@ -745,7 +779,7 @@ class RoomSessionBridge:
         self.pending = ('members', room, session)
         try:
             self._prepare_join_snapshot(payload, joining=False)
-            self._publish_join_snapshot()
+            self._publish_join_snapshot(ready_player_id)
         finally:
             self.pending = None
 

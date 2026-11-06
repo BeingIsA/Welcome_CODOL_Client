@@ -20,6 +20,7 @@ class MatchSessionTests(unittest.TestCase):
                            'map': 'mp_killhouse', 'mode': 'dm', 'maxPlayers': 6}
         self.session = MatchSession(lambda: self.room_id, self.inbox)
         self.session.connected('player')
+        self.addCleanup(self.session.close)
 
     def push(self, start_id='first', status='ready', room_id=None, connection=True):
         """完整通知代表已准备的本人连接；不完整通知不能启动。"""
@@ -30,36 +31,50 @@ class MatchSessionTests(unittest.TestCase):
         self.inbox.receive({'type': 'room_start_updated', 'payload': payload})
 
 
-    def test_wait_precedes_ready_and_duplicate_wait_cannot_restart_it(self):
-        self.push(status='starting')
+    def test_native_start_waits_for_matching_broadcast_after_http(self):
+        from unittest.mock import Mock
+        self.session._gateway = Mock()
+        self.session._gateway.start_match.return_value = {'start': {'startId': 'first'}}
+        self.assertTrue(self.session.begin_start(self.room_id))
+        self.assertFalse(self.session.begin_start(self.room_id))
+        self.session._allocation_request[1].result(timeout=2)
+        self.assertIsNone(self.session.poll())
         self.push()
-        self.assertEqual(self.session.poll_start()['status'], 'starting')
-        self.session.acknowledge_wait(self.room_id, 'first')
-        self.assertEqual(self.session.poll_start()['status'], 'ready')
-        self.push(status='starting')
-        self.assertEqual(self.session.poll_start()['status'], 'ready')
+        self.session.poll_start()
         self.session.acknowledge_start(self.room_id, 'first')
-        self.push(status='starting')
-        self.assertIsNone(self.session.poll_start())
+        self.assertEqual(self.session.poll().operation, 'allocate')
+        self.session._gateway.start_match.assert_called_once_with('player', self.room_id)
 
-    def test_wait_alone_does_not_supply_connection(self):
-        self.push(status='starting')
-        self.assertEqual(self.session.poll_start()['status'], 'starting')
-        self.assertFalse(self.session.begin('allocate', self.room_id))
-        self.session.acknowledge_wait(self.room_id, 'first')
-        self.push(status='starting')
-        self.assertIsNone(self.session.poll_start())
+    def test_failed_broadcast_survives_ack_until_start_response(self):
+        from unittest.mock import Mock
+        self.session._gateway = Mock()
+        self.session._gateway.start_match.return_value = {'start': {'startId': 'first'}}
+        self.assertTrue(self.session.begin_start(self.room_id))
+        self.session._allocation_request[1].result(timeout=2)
+        self.push(status='failed')
+        self.session.poll_start()
+        self.session.acknowledge_start(self.room_id, 'first')
+        self.assertEqual(self.session.poll().error.code, 'START_FAILED')
+
+    def test_countdown_broadcast_preserves_cancel_order_and_room_filter(self):
+        for room_id, seconds in ((self.room_id, 30), ('other', 10), (self.room_id, -1)):
+            self.inbox.receive({'type': 'room_countdown_updated',
+                                'payload': {'roomId': room_id, 'seconds': seconds}})
+        self.session.poll_start()
+        self.assertEqual(self.session.poll_countdown()['seconds'], 30)
+        self.assertEqual(self.session.poll_countdown()['seconds'], -1)
+        self.assertIsNone(self.session.poll_countdown())
 
     def test_requires_identity_and_prepared_current_room(self):
-        self.assertFalse(self.session.begin('allocate', self.room_id))
+        self.assertFalse(self.session.begin('member_connect', self.room_id, start_id='first'))
         self.push()
         self.session.poll_start()
         self.session.connected(None)
-        self.assertFalse(self.session.begin('allocate', self.room_id))
+        self.assertFalse(self.session.begin('member_connect', self.room_id, start_id='first'))
         self.session.connected('player')
-        self.assertFalse(self.session.begin('allocate', 'other-room'))
-        self.assertTrue(self.session.begin('allocate', self.room_id))
-        self.assertFalse(self.session.begin('allocate', self.room_id))
+        self.assertFalse(self.session.begin('member_connect', 'other-room', start_id='first'))
+        self.assertTrue(self.session.begin('member_connect', self.room_id, start_id='first'))
+        self.assertFalse(self.session.begin('member_connect', self.room_id, start_id='first'))
         self.assertEqual(self.session.poll().data['allocationId'], self.connection['allocationId'])
         self.assertIsNone(self.session.poll())
 
@@ -68,7 +83,7 @@ class MatchSessionTests(unittest.TestCase):
         self.session.poll_start()
         self.session.acknowledge_start(self.room_id, 'first')
         self.assertIsNone(self.session.poll_start())
-        self.assertTrue(self.session.begin('allocate', self.room_id))
+        self.assertTrue(self.session.begin('member_connect', self.room_id, start_id='first'))
         self.assertEqual(self.session.poll().data, dict(self.connection, startId='first'))
         self.assertTrue(self.session.begin('book', self.room_id,
                         self.connection['allocationId'], self.connection['securityId']))
@@ -103,18 +118,18 @@ class MatchSessionTests(unittest.TestCase):
     def test_departure_rejects_pending_and_clears_prepared_data(self):
         self.push()
         self.session.poll_start()
-        self.session.begin('allocate', self.room_id)
+        self.session.begin('member_connect', self.room_id, start_id='first')
         previous_room = self.room_id
         self.room_id = None
         self.assertIsInstance(self.session.poll().error, OnlineError)
         self.session.poll_start()
         self.room_id = previous_room
-        self.assertFalse(self.session.begin('allocate', self.room_id))
+        self.assertFalse(self.session.begin('member_connect', self.room_id, start_id='first'))
 
     def test_new_start_replaces_pending_and_rejects_late_old_push(self):
         self.push()
         self.session.poll_start()
-        self.session.begin('allocate', self.room_id)
+        self.session.begin('member_connect', self.room_id, start_id='first')
         self.connection['allocationId'] = 'b' * 32
         self.push(start_id='second')
         self.assertEqual(self.session.poll_start()['startId'], 'second')
@@ -128,16 +143,16 @@ class MatchSessionTests(unittest.TestCase):
         self.push()
         self.session.poll_start()
         self.session.acknowledge_start(self.room_id, 'first')
-        self.session.begin('allocate', self.room_id)
+        self.session.begin('member_connect', self.room_id, start_id='first')
         self.push(status='failed')
         self.assertEqual(self.session.poll_start()['status'], 'failed')
         self.assertIsInstance(self.session.poll().error, OnlineError)
-        self.assertFalse(self.session.begin('allocate', self.room_id))
+        self.assertFalse(self.session.begin('member_connect', self.room_id, start_id='first'))
 
     def test_returned_connection_cannot_mutate_next_stage(self):
         self.push()
         self.session.poll_start()
-        self.session.begin('allocate', self.room_id)
+        self.session.begin('member_connect', self.room_id, start_id='first')
         self.session.poll().data['allocationId'] = 'changed'
         self.session.begin('book', self.room_id, self.connection['allocationId'], self.connection['securityId'])
         self.assertTrue(self.session.poll().data['booked'])
@@ -164,7 +179,7 @@ class MatchSessionTests(unittest.TestCase):
         self.inbox.receive({'type': 'realtime_reconnected'})
         self.push(connection=False)
         self.assertIsNone(self.session.poll_start())
-        self.assertFalse(self.session.begin('allocate', self.room_id))
+        self.assertFalse(self.session.begin('member_connect', self.room_id, start_id='first'))
         self.push()
         self.assertEqual(self.session.poll_start()['startId'], 'first')
 
@@ -174,4 +189,4 @@ class MatchSessionTests(unittest.TestCase):
         self.assertIsNone(self.session.poll_start())
         self.room_id = 'confirmed-room'
         self.assertIsNone(self.session.poll_start())
-        self.assertFalse(self.session.begin('allocate', self.room_id))
+        self.assertFalse(self.session.begin('member_connect', self.room_id, start_id='first'))

@@ -17,13 +17,8 @@ IDENTITY_CALLS = ((0x5BF864, bytes.fromhex('e8d7812400')),
 
 
 def replacements():
-    """仅替换倒计时回调的调试前导；-2 专用于服务端开局等待。
-
-    保留作用域和原 isRankedMatch 调用的接收者，普通参数跳回偏移18；
-    专用参数调用既有 lockMatch 后返回，不启动计时或最终投票。
-    """
-    return [(4705764, bytes.fromhex('f107f0df06d030ef01b60300df06f0e206d0'),
-             bytes.fromhex('d030d0d166c40224fe140500004f93030047'))]
+    """仅将 lockMatch 的 QName 改为公开命名空间，方法体及原有调用保持不变。"""
+    return [(4693267, b'\x01', b'\x03')]
 
 
 class MatchBridge:
@@ -42,6 +37,7 @@ class MatchBridge:
         self.delivered_allocation = None
         self.notification_ready = False
         self.member_start_id = None
+        self.host_lock_pending = False
         self.notify = lambda message: self.record({'match_start_error': message})
 
     def integer(self, address):
@@ -66,6 +62,9 @@ class MatchBridge:
         self.message = self.process.allocate(256)
         self.notification_flag = self.process.allocate(4)
         self.member_message = self.process.allocate(16)
+        self.countdown_message = self.process.allocate(16)
+        self.lock_method = self.process.allocate(16)
+        self.process.write(self.lock_method, b'lockMatch\0')
         self.process.write(self.message, b'mmbook accepted\0CODOL Local\0')
         # trap处尚未执行指令，寄存器/栈保持原始调用约定。
         for offset, phase, original, cleanup in ((0, 'find', 0x7F44B0, 0), (32, 'send', 0x629730, 24),
@@ -118,6 +117,15 @@ class MatchBridge:
                 next_instruction = self.notification_callback(address+1, accepted)
             elif phase == 'notification':
                 native_room = struct.unpack_from('<I', context, 172)[0]
+                command = self.integer(stack+4)
+                if (self.current_room() is not None and native_room == self.integer(ROOM_POINTER)
+                        and self.integer(command) == 0xDC7630 and self.integer(command+4) == 0x11):
+                    seconds = struct.unpack('<f', self.process.read(command+8, 4))[0]
+                    accepted = self.session.broadcast_countdown(self.current_room(), seconds)
+                    struct.pack_into('<I', context, 176, int(accepted))
+                    struct.pack_into('<I', context, 184, address+6)
+                    self.process.set_context(thread, context)
+                    return
                 # 仅预订回复中 632809 的专用调用；其他房间通知原样执行。
                 if (self.integer(stack) == 0x63280B and native_room == self.room_pointer
                         and self.current_room() == self.room_id and self.pending_start_phase is not None
@@ -156,9 +164,10 @@ class MatchBridge:
                 room_pointer = self.integer(ROOM_POINTER)
                 parameters = struct.unpack('<5I', self.process.read(stack+4, 20))
                 if room_id and parameters[0] == 0x27 and parameters[3] == room_pointer+0x7470 and parameters[4] == 0x637930:
-                    accepted = self.session.begin('allocate', room_id)
+                    accepted = self.session.begin_start(room_id)
                     if accepted:
                         self.room_id, self.room_pointer = room_id, room_pointer
+                        self.host_lock_pending = True
                         self.record({'match_request': 'allocate', 'room_id': room_id})
                     struct.pack_into('<I', context, 176, int(accepted))
                     next_instruction = address+6
@@ -267,11 +276,22 @@ class MatchBridge:
         next_address = self.clear_departed_room(resume_address)
         if next_address is not None:
             return next_address
+        if self.host_lock_pending:
+            self.host_lock_pending = False
+            return self.build_host_lock(resume_address)
         start = self.session.poll_start()
+        # 已排队的倒计时先交给原生，避免就绪入局后再重启旧UI计时。
+        countdown = self.session.poll_countdown()
+        if isinstance(countdown, dict):
+            if self.integer(ROOM_POINTER) >= 0x10000:
+                return self.build_countdown_receive(countdown, resume_address)
         if start is not None:
             next_address = self.apply_start_event(start, resume_address)
             if next_address is not None:
                 return next_address
+        command_error = self.session.poll_command_error()
+        if isinstance(command_error, Exception):
+            self.notify(str(command_error))
         completion = self.session.poll()
         if completion is not None:
             next_address = self.apply_completion(completion, resume_address)
@@ -284,6 +304,7 @@ class MatchBridge:
         if self.current_room() == self.room_id and self.integer(ROOM_POINTER) == self.room_pointer:
             return None
         self.member_start_id = None
+        self.host_lock_pending = False
         self.pending_start_phase = None
         self.allocation = None
         self.delivered_allocation = None
@@ -291,14 +312,30 @@ class MatchBridge:
             return self.notification_callback(resume_address, False)
         return None
 
+    def build_host_lock(self, resume_address):
+        """主线程调用原生控制器 lockMatch；复用遮罩、去重及开局完成清理。"""
+        entry = self.code+2560
+        instructions = bytearray.fromhex('9c60 8bec 83e4f0 6a00 6a00 83ec20 8bfc 31c0 b908000000 f3ab 8bfc')
+        # GFx Value 初始为 undefined；Invoke 包装负责释放 GetVariable 取得的对象引用。
+        # 830AC0 与原生控制器初始化一致：GetVariable(value*, path)，被调方清栈 8 字节。
+        instructions.extend(bytes.fromhex('c707ffffffff c74704ffffffff 68'))
+        instructions.extend(struct.pack('<I', 0xDD5C84))  # 原生 MatchController 路径字符串。
+        instructions.extend(bytes.fromhex('57 8b0d'))
+        instructions.extend(struct.pack('<I', 0xC77BB98))
+        def call(address):
+            instructions.extend(b'\xe8'+struct.pack('<i', address-entry-len(instructions)-5))
+        call(0x830AC0)
+        instructions.extend(b'\xbe'+struct.pack('<I', self.lock_method))
+        call(0x730490)
+        instructions.extend(bytes.fromhex('8be5 619d e9'))
+        instructions.extend(struct.pack('<i', resume_address-entry-len(instructions)-4))
+        self.process.write(entry, bytes(instructions))
+        return entry
+
     def apply_start_event(self, start, resume_address):
         """分流权威开局结果；返回 None 表示本轮仍需检查房主请求结果。"""
         if self.current_room() != start['roomId']:
             return None
-        if start['status'] == 'starting':
-            entry = self.build_wait_notification(resume_address)
-            self.session.acknowledge_wait(start['roomId'], start['startId'])
-            return entry
         if self.member_start_id is not None and (start['status'] == 'failed'
                 or start['startId'] != self.member_start_id):
             self.member_start_id = None
@@ -317,10 +354,8 @@ class MatchBridge:
             return None
         if self.member_start_id is not None:
             return None
-        entry = self.build_host_start_call(room_pointer, resume_address)
         self.session.acknowledge_start(start['roomId'], start['startId'])
-        self.record({'formal_start': start['startId'], 'roomId': start['roomId']})
-        return entry
+        return None
 
     def begin_member_connection(self, start, room_pointer):
         """成员只排队一次；结果应用或明确失败前保留开局事件。"""
@@ -329,26 +364,34 @@ class MatchBridge:
             self.room_id, self.room_pointer = start['roomId'], room_pointer
             self.member_start_id = start['startId']
 
-    def build_wait_notification(self, resume_address):
-        """主线程通过原生 DataID 102 通知 UI；不启动房间计时器。"""
-        if self.process.read(0x7CB210, 8) != bytes.fromhex('558bec83e4f883ec'):
-            raise ValueError('原生倒计时通知 ABI 不匹配')
-        entry = self.code + 2048
-        instructions = bytearray(bytes.fromhex('9c6068000000c0'))
-        instructions.extend(b'\xe8' + struct.pack('<i', 0x7CB210-entry-len(instructions)-5))
-        instructions.extend(b'\x61\x9d\xe9' + struct.pack('<i', resume_address-entry-len(instructions)-7))
-        self.process.write(entry, bytes(instructions))
-        return entry
-
-    def build_host_start_call(self, room_pointer, resume_address):
-        """生成房主 StartMatch 调用桩，仅负责原生约定和现场恢复。"""
-        if self.process.read(0x62F840, 8) != bytes.fromhex('558becb814200000'):
-            raise ValueError('原生StartMatch调用约定不匹配')
-        entry = self.code + 1280
-        instructions = bytearray(b'\x9c\x60\xb9' + struct.pack('<I', room_pointer))
-        instructions.extend(bytes.fromhex('6a006aff6a01'))
-        instructions.extend(b'\xe8' + struct.pack('<i', 0x62F840-entry-len(instructions)-5))
-        instructions.extend(b'\x61\x9d\xe9' + struct.pack('<i', resume_address-entry-len(instructions)-7))
+    def build_countdown_receive(self, payload, resume_address):
+        """构造原生0x11消息并交给原接收器，保留本机计时和UI通知。"""
+        room_pointer = self.integer(ROOM_POINTER)
+        session_pointer = self.integer(room_pointer+0x1C)
+        identity_low, identity_high = struct.unpack('<II', self.process.read(session_pointer+0x20, 8))
+        command = self.countdown_message
+        self.process.write(command, struct.pack('<IIfI', 0xDC7630, 0x11, payload['seconds'], 0))
+        entry = self.code+2048
+        instructions = bytearray(b'\x9c\x60')
+        def push(value):
+            instructions.extend(b'\x68'+struct.pack('<I', value))
+        def call(address):
+            instructions.extend(b'\xe8'+struct.pack('<i', address-entry-len(instructions)-5))
+        push(0x24)
+        call(0xB74220)
+        instructions.extend(bytes.fromhex('83c4046a006a008bc8'))
+        call(0xB778E0)
+        instructions.extend(b'\xa3'+struct.pack('<I', command+12))
+        instructions.extend(bytes.fromhex('83c00450ff152881ca00'))
+        push(command+12)
+        instructions.extend(b'\xb9'+struct.pack('<I', command))
+        call(0x628320)
+        instructions.extend(b'\xff\x35'+struct.pack('<I', command+12))
+        for value in (0, 0, identity_high, identity_low, room_pointer):
+            push(value)
+        instructions.extend(b'\x31\xc9')
+        call(0x634870)
+        instructions.extend(b'\x61\x9d\xe9'+struct.pack('<i', resume_address-entry-len(instructions)-7))
         self.process.write(entry, bytes(instructions))
         return entry
 

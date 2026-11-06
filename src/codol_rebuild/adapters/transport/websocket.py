@@ -108,6 +108,14 @@ class WebSocketConnection:
                     except TimeoutError:
                         continue
                     delay = 1
+                    if message.get('type') == 'room_countdown_updated':
+                        payload = message.get('payload')
+                        seconds = payload.get('seconds') if isinstance(payload, dict) else None
+                        if (not isinstance(payload, dict) or not isinstance(payload.get('roomId'), str)
+                                or type(seconds) not in (int, float)
+                                or not (seconds == -1 or 0 <= seconds <= 3.4028234663852886e38)):
+                            LOGGER.warning('拒绝格式无效的倒计时广播')
+                            continue
                     if message.get('type') == 'room_members_updated':
                         try:
                             payload = message['payload']

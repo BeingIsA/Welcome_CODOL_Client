@@ -48,18 +48,117 @@ class MatchBridgeTests(unittest.TestCase):
             self.process.write(call_address, original_bytes)
         self.bridge.install(0x42000)
 
-    def test_starting_only_notifies_ui_without_consuming_ready(self):
-        self.process.write(0x7CB210, bytes.fromhex('558bec83e4f883ec'))
-        entry = self.bridge.apply_start_event(
-            {'roomId': 'room', 'startId': 'first', 'status': 'starting'}, 0x500123)
+    def test_host_request_queues_lock_before_processing_results(self):
+        self.process.write(ROOM_POINTER, struct.pack('<I', 0x40000))
+        struct.pack_into('<I', self.process.registers, 196, 0x50000)
+        self.process.write(0x50004, struct.pack('<5I', 0x27, 0, 0, 0x47470, 0x637930))
+        self.session.begin_start.return_value = True
+        self.bridge.handle(SimpleNamespace(tid=1), self.bridge.code)
+        self.assertTrue(self.bridge.host_lock_pending)
+        self.assertEqual(self.bridge.poll(0x500123), self.bridge.code+2560)
+        self.assertFalse(self.bridge.host_lock_pending)
+        self.session.poll_start.assert_not_called()
+        instructions = list(capstone.Cs(3,4).disasm(self.process.read(self.bridge.code+2560, 100), self.bridge.code+2560))
+        self.assertEqual([item.op_str for item in instructions if item.mnemonic == 'call'],
+                         ['0x830ac0', '0x730490'])
+
+    def test_rejected_request_and_departure_do_not_show_host_lock(self):
+        self.process.write(ROOM_POINTER, struct.pack('<I', 0x40000))
+        struct.pack_into('<I', self.process.registers, 196, 0x50000)
+        self.process.write(0x50004, struct.pack('<5I', 0x27, 0, 0, 0x47470, 0x637930))
+        self.session.begin_start.return_value = False
+        self.bridge.handle(SimpleNamespace(tid=1), self.bridge.code)
+        self.assertFalse(self.bridge.host_lock_pending)
+        self.bridge.host_lock_pending = True
+        self.bridge.clear_departed_room(0x500123)
+        self.assertFalse(self.bridge.host_lock_pending)
+
+    def test_movie_patch_only_exposes_original_lock_method(self):
+        from codol_rebuild.adapters.game.v1649370.matches.session_bridge import replacements
+        from codol_rebuild.adapters.game.v1649370.movie_identity import apply_rules
+        original = (Path(__file__).resolve().parents[2]/'research/client/ui-investigation/codo.gfx').read_bytes()
+        patched = apply_rules(original, replacements())
+        self.assertEqual([index for index, (before, after) in enumerate(zip(original, patched)) if before != after], [4693267])
+        self.assertEqual(original[4693266:4693270], bytes.fromhex('0701bd04'))
+        self.assertEqual(patched[4693266:4693270], bytes.fromhex('0703bd04'))
+
+    def test_host_lock_x86_call_stack(self):
+        """执行镜像中的 GetVariable/Invoke 包装；仅底层 AS 对象接口由夹具提供。"""
+        import os
+        import pefile
+        import subprocess
+        import tempfile
+        from test_room_list_native import relocate_fixture_calls
+        compiler = Path(os.environ.get('WINDIR', 'C:/Windows'))/'Microsoft.NET/Framework/v4.0.30319/csc.exe'
+        if not compiler.exists():
+            self.skipTest('需要 Windows x86 C# 编译器')
+        root = Path(__file__).resolve().parents[2]
+        workspace = root/'verification/client/workspaces/match-lock-tests'
+        workspace.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=workspace) as directory:
+            directory = Path(directory)
+            entry = self.bridge.build_host_lock(0x28000010)
+            code = bytearray(self.process.read(entry, 100))
+            relocate_fixture_calls(code, entry)
+            code = code.replace(struct.pack('<I', 0xC77BB98), struct.pack('<I', 0x21000000))
+            (directory/'lock.bin').write_bytes(code)
+            with pefile.PE(str(root/'client/bin/v1649370/codol1649370-offline.exe')) as image:
+                # 原生初始化路径确实仅压入 path 和 output，再调用 830AC0。
+                self.assertEqual(image.get_data(0x7313C8-0x400000, 17),
+                                 bytes.fromhex('8b0cbd183fe500 51 8b4d08 56 e8e7f60f00'))
+                getter = image.get_data(0x830AC0-0x400000, 17)
+                self.assertEqual(getter, bytes.fromhex('558bec8b490c8b018b80c80000005dffe0'))
+                (directory/'get-variable.bin').write_bytes(getter)
+                invoke = bytearray(image.get_data(0x730490-0x400000, 0xD9))
+                for instruction in capstone.Cs(3, 4).disasm(bytes(invoke), 0x730490):
+                    if instruction.mnemonic == 'call' and instruction.op_str.startswith('0x'):
+                        target = int(instruction.op_str, 16)
+                        self.assertIn(target, (0x5F1BC0, 0x5F1C80))
+                        offset = instruction.address-0x730490
+                        struct.pack_into('<i', invoke, offset+1,
+                                         0x28000000+(target & 0xFFFF)-(0x28000490+offset+5))
+                (directory/'invoke.bin').write_bytes(invoke)
+            executable = directory/'fixture.exe'
+            result = subprocess.run([str(compiler), '/nologo', '/platform:x86', '/out:'+str(executable),
+                                     str(root/'client/tests/native/match_lock_fixture.cs')], capture_output=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stdout)
+            result = subprocess.run([str(executable), str(directory/'lock.bin'),
+                                     str(directory/'get-variable.bin'), str(directory/'invoke.bin')],
+                                    capture_output=True, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+
+    def test_native_countdown_send_is_forwarded_once_without_native_queue(self):
+        self.process.write(ROOM_POINTER, struct.pack('<I', 0x40000))
+        struct.pack_into('<I', self.process.registers, 172, 0x40000)
+        struct.pack_into('<I', self.process.registers, 196, 0x50000)
+        self.process.write(0x50004, struct.pack('<I', 0x60000))
+        self.process.write(0x60000, struct.pack('<IIf', 0xDC7630, 0x11, 30.0))
+        self.session.broadcast_countdown.return_value = True
+        self.bridge.handle(SimpleNamespace(tid=1), self.bridge.code+64)
+        self.session.broadcast_countdown.assert_called_once_with('room', 30.0)
+        self.assertEqual(struct.unpack_from('<I', self.process.registers, 184)[0], self.bridge.code+70)
+
+    def test_other_native_notifications_keep_original_sender(self):
+        self.process.write(ROOM_POINTER, struct.pack('<I', 0x40000))
+        struct.pack_into('<I', self.process.registers, 172, 0x40000)
+        struct.pack_into('<I', self.process.registers, 196, 0x50000)
+        self.process.write(0x50004, struct.pack('<I', 0x60000))
+        self.process.write(0x60000, struct.pack('<II', 0xDC7630, 0x12))
+        self.bridge.handle(SimpleNamespace(tid=1), self.bridge.code+64)
+        self.session.broadcast_countdown.assert_not_called()
+        self.assertEqual(struct.unpack_from('<I', self.process.registers, 184)[0], self.bridge.code+65)
+
+    def test_countdown_uses_original_serializer_and_room_receiver(self):
+        self.process.write(ROOM_POINTER, struct.pack('<I', 0x40000))
+        self.process.write(0x4001c, struct.pack('<I', 0x50000))
+        entry = self.bridge.build_countdown_receive({'seconds': -1.0}, 0x500123)
         instructions = list(capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32).disasm(
-            self.process.read(entry, 19), entry))
-        self.assertEqual([instruction.op_str for instruction in instructions
-                          if instruction.mnemonic == 'call'], ['0x7cb210'])
-        self.assertEqual(instructions[-1].op_str, '0x500123')
-        self.session.acknowledge_wait.assert_called_once_with('room', 'first')
-        self.session.acknowledge_start.assert_not_called()
-        self.session.begin.assert_not_called()
+            self.process.read(entry, 160), entry))
+        self.assertEqual([instruction.op_str for instruction in instructions if instruction.mnemonic == 'call'],
+            ['0xb74220', '0xb778e0', 'dword ptr [0xca8128]', '0x628320', '0x634870'])
+        self.assertEqual(next(instruction.op_str for instruction in instructions if instruction.mnemonic == 'jmp'), '0x500123')
+        self.assertEqual(struct.unpack('<IIf', self.process.read(self.bridge.countdown_message, 12)),
+                         (0xDC7630, 0x11, -1.0))
 
     def test_allocation_uses_client_config_address_and_validates_port(self):
         self.bridge.room_id = 'room'
@@ -78,18 +177,14 @@ class MatchBridgeTests(unittest.TestCase):
                     self.assertEqual(dict(self.bridge.callback_fields)[0x18][:6],
                         IPv4Address(server_address).packed + struct.pack('<H', port))
 
-    def test_formal_ready_calls_original_start_match_with_preserved_return(self):
-        self.session.poll_start.return_value = {'roomId': 'room', 'startId': 'first', 'status': 'ready'}
+    def test_host_ready_does_not_restart_native_start_match(self):
         self.process.write(ROOM_POINTER, struct.pack('<I', 0x40000))
         self.process.write(0x4001c, struct.pack('<I', 0x50000))
         self.process.write(0x40278, b'\x01')
-        self.process.write(0x62F840, bytes.fromhex('558becb814200000'))
-        entry = self.bridge.poll(0x500123)
-        instructions = list(capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32).disasm(self.process.read(entry, 25), entry))
-        self.assertEqual([(instruction.mnemonic, instruction.op_str) for instruction in instructions], [
-            ('pushfd',''),('pushal',''),('mov','ecx, 0x40000'),('push','0'),('push','-1'),('push','1'),
-            ('call','0x62f840'),('popal',''),('popfd',''),('jmp','0x500123')])
+        self.assertIsNone(self.bridge.apply_start_event(
+            {'roomId': 'room', 'startId': 'first', 'status': 'ready'}, 0x500123))
         self.session.acknowledge_start.assert_called_once_with('room', 'first')
+        self.session.begin.assert_not_called()
 
     def test_member_ready_uses_connection_stage_without_calling_host_start(self):
         self.session.poll_start.return_value = {'roomId': 'room', 'startId': 'first', 'status': 'ready'}
@@ -225,10 +320,8 @@ class MatchBridgeTests(unittest.TestCase):
         completion = SimpleNamespace(operation='member_connect', error=None, data={})
         self.session.poll.return_value = completion
         self.bridge.apply_member_completion = Mock(return_value=0x600123)
-        self.bridge.build_host_start_call = Mock()
         self.assertEqual(self.bridge.poll(0x500123), 0x600123)
         self.bridge.apply_member_completion.assert_called_once_with(completion, 0x500123)
-        self.bridge.build_host_start_call.assert_not_called()
 
     def test_member_serialization_hands_one_reference_to_existing_frame_receiver(self):
         self.bridge.member_start_id = 'first'
@@ -428,12 +521,15 @@ class MatchBridgeTests(unittest.TestCase):
         self.assertFalse(self.bridge.notification_ready)
         self.session.begin.assert_not_called()
 
-    def test_prepared_broadcast_drives_host_native_stages_without_http(self):
+    def test_native_host_request_waits_for_prepared_broadcast(self):
         import base64
         from codol_rebuild.application.matches.service import MatchSession
         from codol_rebuild.application.realtime.dispatch import EventInbox
         inbox = EventInbox()
-        session = MatchSession(lambda: 'room', inbox)
+        gateway = Mock()
+        gateway.start_match.return_value = {'start': {'startId': 'first'}}
+        session = MatchSession(lambda: 'room', inbox, gateway)
+        self.addCleanup(session.close)
         session.connected('player')
         self.bridge.session = session
         connection = {'allocationId': 'a' * 32, 'port': 27760, 'securityId': '01' * 8,
@@ -452,11 +548,14 @@ class MatchBridgeTests(unittest.TestCase):
             return [instruction.op_str for instruction in decoder.disasm(self.process.read(entry, length), entry)
                     if instruction.mnemonic == 'call']
 
-        self.assertEqual(native_calls(self.bridge.poll(0x500123), 25), ['0x62f840'])
+        self.assertEqual(self.bridge.poll(0x500123), 0x500123)
         struct.pack_into('<I', self.process.registers, 196, 0x50000)
         self.process.write(0x50004, struct.pack('<5I', 0x27, 0, 0, 0x47470, 0x637930))
         self.bridge.handle(SimpleNamespace(tid=1), self.bridge.code)
+        session._allocation_request[1].result(timeout=2)
+        self.assertEqual(native_calls(self.bridge.poll(0x500123)), ['0x830ac0', '0x730490'])
         self.assertEqual(native_calls(self.bridge.poll(0x500123)), ['0x806b50', '0x637930'])
+        gateway.start_match.assert_called_once_with('player', 'room')
 
         def native_send(body):
             """模拟既有房主专用消息边，不改动其他接收者和原生函数。"""

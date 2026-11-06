@@ -1,5 +1,7 @@
 """交付服务端已准备的本局连接资料。"""
 from copy import deepcopy
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from codol_rebuild.application.errors import OnlineError
 
@@ -15,7 +17,7 @@ class MatchCompletion:
 
 class MatchSession:
     """保留本局已确认连接资料及原生阶段结果。"""
-    def __init__(self, current_room, inbox=None):
+    def __init__(self, current_room, inbox=None, gateway=None):
         self._inbox = inbox
         self._current_room = current_room
         self._player_id = None
@@ -23,19 +25,32 @@ class MatchSession:
         self._observed_room = None
         self._consumed_starts = set()
         self._available_start = None
-        self._waiting_start = None
-        self._shown_waits = set()
+        self._gateway = gateway
+        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="match-commands")
+        self._command_results = deque()
+        self._countdowns = deque()
+        self._allocation_request = None
+        self._failed_start = None
         self._prepared_start = None
 
     def connected(self, player_id: str):
         """由既有登录完成路径传入身份，不创建新身份或重复登录。"""
         self._player_id = player_id
 
+    def begin_start(self, room_id):
+        """接管原生房主 DS 申请；请求开局后等待同一局的准备结果。"""
+        if (not self._player_id or room_id != self._current_room() or self._gateway is None
+                or self._allocation_request is not None or self._pending is not None):
+            return False
+        self._allocation_request = (room_id, self._executor.submit(
+            self._gateway.start_match, self._player_id, room_id))
+        return True
+
     def begin(self, operation: str, room_id: str, allocation_id=None, security_id=None, start_id=None) -> bool:
-        """按原生阶段交付已确认资料；不重新分配、预订或发送开局请求。"""
+        """交付已确认的连接及后续阶段结果；开局请求由 begin_start 单独承担。"""
         if not self._player_id or room_id != self._current_room() or self._pending is not None:
             return False
-        if operation not in ('member_connect', 'allocate', 'book', 'start'):
+        if operation not in ('member_connect', 'book', 'start'):
             raise ValueError('未知对局请求')
         prepared_start = self._prepared_start
         if prepared_start is None or prepared_start['roomId'] != room_id:
@@ -49,7 +64,7 @@ class MatchSession:
         if not matches:
             completion = MatchCompletion(operation, room_id,
                 error=OnlineError('START_CHANGED', '原生请求与已确认开局不匹配'))
-        elif operation in ('member_connect', 'allocate'):
+        elif operation == 'member_connect':
             completion = MatchCompletion(operation, room_id,
                 data=dict(deepcopy(connection), startId=prepared_start['startId']))
         else:
@@ -62,6 +77,29 @@ class MatchSession:
 
     def poll(self) -> MatchCompletion | None:
         """在既有原生轮询时机消费一次结果，拒绝离房或换局后的旧阶段。"""
+        if self._allocation_request is not None:
+            requested_room, future = self._allocation_request
+            if requested_room != self._current_room():
+                self._allocation_request = None
+                return MatchCompletion('allocate', requested_room,
+                    error=OnlineError('ROOM_CHANGED', '开局期间房间已改变'))
+            if future.done():
+                try:
+                    response = future.result()
+                    requested_start_id = response['start']['startId']
+                except OnlineError as error:
+                    self._allocation_request = None
+                    return MatchCompletion('allocate', requested_room, error=error)
+                prepared = self._prepared_start
+                if prepared is not None and prepared['startId'] == requested_start_id:
+                    self._allocation_request = None
+                    return MatchCompletion('allocate', requested_room,
+                        data=dict(deepcopy(prepared['connection']), startId=prepared['startId']))
+                failed = self._failed_start
+                if failed is not None and failed['startId'] == requested_start_id and failed['status'] == 'failed':
+                    self._allocation_request = None
+                    return MatchCompletion('allocate', requested_room,
+                        error=OnlineError('START_FAILED', failed.get('error') or '开局失败'))
         if self._pending is None:
             return None
         start_id, completion = self._pending
@@ -81,17 +119,10 @@ class MatchSession:
         start_id = start.get('startId')
         if (not room_id or room_id != self._current_room()
                 or not isinstance(start_id, str) or not start_id
-                or start.get('status') not in ('starting', 'ready', 'failed')):
-            return
-        if start['status'] == 'starting':
-            identity = (room_id, start_id)
-            if (identity not in self._shown_waits and identity not in self._consumed_starts
-                    and not (self._available_start is not None
-                             and self._available_start['startId'] == start_id)):
-                self._waiting_start = deepcopy(dict(start, roomId=room_id))
+                or start.get('status') not in ('ready', 'failed')):
             return
         prepared_start = self._prepared_start
-        # 房主在 StartMatch 前已确认通知；其后的失败仍须撤销尚未交付的成功。
+        # 房主可能已确认就绪通知；其后的失败仍须撤销尚未交付的成功。
         revokes_prepared_start = (start['status'] == 'failed' and prepared_start is not None
                                  and prepared_start['startId'] == start_id)
         if (room_id, start_id) in self._consumed_starts and not revokes_prepared_start:
@@ -104,6 +135,7 @@ class MatchSession:
         if prepared_start is not None and prepared_start['startId'] != start_id:
             self._consumed_starts.add((room_id, prepared_start['startId']))
             self._pending = None
+        self._failed_start = accepted_start if accepted_start['status'] == 'failed' else None
         self._prepared_start = accepted_start if accepted_start['status'] == 'ready' else None
         self._available_start = accepted_start
         return True
@@ -118,24 +150,21 @@ class MatchSession:
             self._prepared_start = None
             self._pending = None
             self._consumed_starts.clear()
-            self._shown_waits.clear()
-            self._waiting_start = None
+            self._countdowns.clear()
+            self._failed_start = None
         if self._inbox is not None:
             message = self._inbox.poll_event()
             while message is not None:
+                if message.get('type') == 'room_countdown_updated':
+                    payload = message.get('payload', {})
+                    if payload.get('roomId') == room_id:
+                        self._countdowns.append(deepcopy(payload))
                 if message.get('type') == 'room_start_updated':
                     start = message.get('payload', {})
                     if isinstance(start, dict) and start.get('roomId') == room_id:
                         self._accept_start(room_id, start)
                 message = self._inbox.poll_event()
-        return self._waiting_start or self._available_start
-
-    def acknowledge_wait(self, room_id, start_id):
-        """等待提示已交给原生；不消费同局后续的就绪通知。"""
-        self._shown_waits.add((room_id, start_id))
-        if (self._waiting_start is not None
-                and (self._waiting_start['roomId'], self._waiting_start['startId']) == (room_id, start_id)):
-            self._waiting_start = None
+        return self._available_start
 
     def acknowledge_start(self, room_id, start_id):
         """原生已接收或显示失败后才消费；重复推送不重复启动。"""
@@ -143,3 +172,35 @@ class MatchSession:
         if (self._available_start is not None
                 and (self._available_start['roomId'], self._available_start['startId']) == (room_id, start_id)):
             self._available_start = None
+
+
+    def broadcast_countdown(self, room_id, seconds):
+        """原生房主命令排队发送；单线程保持开始、取消及开局请求顺序。"""
+        if not self._player_id or room_id != self._current_room() or self._gateway is None:
+            return False
+        self._command_results.append((room_id, self._executor.submit(
+            self._gateway.broadcast_countdown, self._player_id, room_id, seconds)))
+        return True
+
+    def poll_countdown(self):
+        """只返回当前房间的广播，原生接收由适配层执行。"""
+        while self._countdowns:
+            payload = self._countdowns.popleft()
+            if payload['roomId'] == self._current_room():
+                return payload
+        return None
+
+    def poll_command_error(self):
+        """消费倒计时请求结果，不重试或伪造广播成功。"""
+        while self._command_results and self._command_results[0][1].done():
+            room_id, future = self._command_results.popleft()
+            try:
+                future.result()
+            except OnlineError as error:
+                if room_id == self._current_room():
+                    return error
+        return None
+
+    def close(self):
+        """释放对局命令执行器。"""
+        self._executor.shutdown(wait=False, cancel_futures=True)
