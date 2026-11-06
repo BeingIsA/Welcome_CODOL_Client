@@ -1,111 +1,134 @@
-"""对局协调的重复提交与离房迟到结果回归，不代替原生客户端验收。"""
-from concurrent.futures import Future
+"""开局资料本地交付回归，不代替原生客户端验收。"""
 from pathlib import Path
 import sys
 import unittest
-from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'src'))
-from codol_rebuild.application.matches.service import MatchSession
 from codol_rebuild.application.errors import OnlineError
+from codol_rebuild.application.matches.service import MatchSession
+from codol_rebuild.application.realtime.dispatch import EventInbox
 
 
 class MatchSessionTests(unittest.TestCase):
+    """验证完整推送、本地交付和消息先后顺序。"""
     def setUp(self):
         self.room_id = 'confirmed-room'
-        self.future = Future()
-        self.executor = Mock()
-        self.executor.submit.return_value = self.future
-        self.gateway = Mock()
-        with patch('codol_rebuild.application.matches.service.ThreadPoolExecutor', return_value=self.executor):
-            self.session = MatchSession(self.gateway, lambda: self.room_id)
-        self.addCleanup(self.session.close)
+        self.inbox = EventInbox()
+        self.connection = {'allocationId': 'a' * 32, 'port': 27760,
+                           'securityId': '01' * 8, 'securityKey': '02' * 16,
+                           'serverUserId': '5', 'serverName': 'fixture',
+                           'map': 'mp_killhouse', 'mode': 'dm', 'maxPlayers': 6}
+        self.session = MatchSession(lambda: self.room_id, self.inbox)
+        self.session.connected('player')
 
-    def test_requires_identity_and_confirmed_room_and_rejects_duplicate(self):
+    def push(self, start_id='first', status='ready', room_id=None, connection=True):
+        """完整通知代表已准备的本人连接；不完整通知不能启动。"""
+        payload = {'roomId': room_id or self.room_id, 'startId': start_id,
+                   'status': status, 'error': '启动失败' if status == 'failed' else None}
+        if connection and status == 'ready':
+            payload['connection'] = dict(self.connection)
+        self.inbox.receive({'type': 'room_start_updated', 'payload': payload})
+
+
+    def test_requires_identity_and_prepared_current_room(self):
         self.assertFalse(self.session.begin('allocate', self.room_id))
-        self.session.connected('existing-player')
+        self.push()
+        self.session.poll_start()
+        self.session.connected(None)
+        self.assertFalse(self.session.begin('allocate', self.room_id))
+        self.session.connected('player')
         self.assertFalse(self.session.begin('allocate', 'other-room'))
         self.assertTrue(self.session.begin('allocate', self.room_id))
         self.assertFalse(self.session.begin('allocate', self.room_id))
-        self.executor.submit.assert_called_once_with(self.gateway.allocate_game, 'existing-player', self.room_id)
-        self.future.set_result({'allocationId': 'confirmed-allocation'})
-        self.assertEqual(self.session.poll().data, {'allocationId': 'confirmed-allocation'})
+        self.assertEqual(self.session.poll().data['allocationId'], self.connection['allocationId'])
         self.assertIsNone(self.session.poll())
 
-    def test_late_result_after_leaving_does_not_publish_allocation(self):
-        self.session.connected('existing-player')
+    def test_host_stages_survive_acknowledgment_without_http(self):
+        self.push()
+        self.session.poll_start()
+        self.session.acknowledge_start(self.room_id, 'first')
+        self.assertIsNone(self.session.poll_start())
+        self.assertTrue(self.session.begin('allocate', self.room_id))
+        self.assertEqual(self.session.poll().data, dict(self.connection, startId='first'))
+        self.assertTrue(self.session.begin('book', self.room_id,
+                        self.connection['allocationId'], self.connection['securityId']))
+        self.assertEqual(self.session.poll().data,
+                         {'allocationId': self.connection['allocationId'], 'booked': True})
+        self.assertTrue(self.session.begin('start', self.room_id,
+                        self.connection['allocationId']))
+        self.assertEqual(self.session.poll().data,
+                         {'allocationId': self.connection['allocationId'], 'started': True})
+
+    def test_member_connect_delivers_same_start_without_http(self):
+        self.push()
+        self.session.poll_start()
+        self.assertTrue(self.session.begin('member_connect', self.room_id, start_id='first'))
+        self.assertFalse(self.session.begin('member_connect', self.room_id, start_id='first'))
+        self.assertEqual(self.session.poll().data, dict(self.connection, startId='first'))
+
+    def test_request_identity_mismatch_is_failure(self):
+        self.push()
+        self.session.poll_start()
+        requests = [dict(operation='member_connect', start_id='wrong'),
+                    dict(operation='book', allocation_id='wrong', security_id=self.connection['securityId']),
+                    dict(operation='book', allocation_id=self.connection['allocationId'], security_id='wrong'),
+                    dict(operation='start', allocation_id='wrong')]
+        for request in requests:
+            with self.subTest(request=request):
+                self.assertTrue(self.session.begin(room_id=self.room_id, **request))
+                completion = self.session.poll()
+                self.assertIsNone(completion.data)
+                self.assertIsInstance(completion.error, OnlineError)
+
+    def test_departure_rejects_pending_and_clears_prepared_data(self):
+        self.push()
+        self.session.poll_start()
         self.session.begin('allocate', self.room_id)
+        previous_room = self.room_id
         self.room_id = None
-        self.future.set_result({'allocationId': 'stale-allocation'})
-        completion = self.session.poll()
-        self.assertIsNone(completion.data)
-        self.assertIsInstance(completion.error, OnlineError)
+        self.assertIsInstance(self.session.poll().error, OnlineError)
+        self.session.poll_start()
+        self.room_id = previous_room
+        self.assertFalse(self.session.begin('allocate', self.room_id))
 
-    def test_booking_failure_remains_failure(self):
-        self.session.connected('existing-player')
-        self.session.begin('book', self.room_id, 'allocation', 'security-id')
-        failure = OnlineError('BOOKING_REJECTED', '预订被拒绝')
-        self.future.set_exception(failure)
-        completion = self.session.poll()
-        self.assertIs(completion.error, failure)
-        self.assertIsNone(completion.data)
+    def test_new_start_replaces_pending_and_rejects_late_old_push(self):
+        self.push()
+        self.session.poll_start()
+        self.session.begin('allocate', self.room_id)
+        self.connection['allocationId'] = 'b' * 32
+        self.push(start_id='second')
+        self.assertEqual(self.session.poll_start()['startId'], 'second')
         self.assertIsNone(self.session.poll())
+        self.assertTrue(self.session.begin('member_connect', self.room_id, start_id='second'))
+        self.assertEqual(self.session.poll().data['allocationId'], 'b' * 32)
+        self.push(start_id='first')
+        self.assertEqual(self.session.poll_start()['startId'], 'second')
 
+    def test_failure_after_host_acknowledgment_revokes_success(self):
+        self.push()
+        self.session.poll_start()
+        self.session.acknowledge_start(self.room_id, 'first')
+        self.session.begin('allocate', self.room_id)
+        self.push(status='failed')
+        self.assertEqual(self.session.poll_start()['status'], 'failed')
+        self.assertIsInstance(self.session.poll().error, OnlineError)
+        self.assertFalse(self.session.begin('allocate', self.room_id))
 
-class FormalStartNotificationTests(MatchSessionTests):
-    """详情恢复只交付当前开局，原生确认前不会丢失结果。"""
-    def test_ready_result_waits_for_native_acknowledgment(self):
-        self.session.connected('player')
-        self.assertIsNone(self.session.poll_start())
-        self.future.set_result({'start': {'startId': 'start-one', 'status': 'ready', 'error': None}})
+    def test_returned_connection_cannot_mutate_next_stage(self):
+        self.push()
+        self.session.poll_start()
+        self.session.begin('allocate', self.room_id)
+        self.session.poll().data['allocationId'] = 'changed'
+        self.session.begin('book', self.room_id, self.connection['allocationId'], self.connection['securityId'])
+        self.assertTrue(self.session.poll().data['booked'])
+
+    def test_ready_waits_for_acknowledgment_and_duplicate_does_not_restart(self):
+        self.push()
         first = self.session.poll_start()
-        self.assertEqual(first['startId'], 'start-one')
         self.assertEqual(self.session.poll_start(), first)
-        self.session.acknowledge_start(self.room_id, 'start-one')
-        self.assertIsNone(self.session.poll_start())
-
-    def test_old_room_result_cannot_start_new_room(self):
-        self.session.connected('player')
-        self.session.poll_start()
-        self.room_id = 'new-room'
-        self.future.set_result({'start': {'startId': 'old', 'status': 'ready'}})
-        self.assertIsNone(self.session.poll_start())
-
-
-class StartPushTests(unittest.TestCase):
-    """开局推送与一次性恢复查询的顺序及请求次数。"""
-    def setUp(self):
-        MatchSessionTests.setUp(self)
-        from codol_rebuild.application.realtime.dispatch import EventInbox
-        self.inbox = EventInbox()
-        self.session._inbox = self.inbox
-        self.session.connected('player')
-
-    def push(self, start_id='new', status='ready', room_id=None):
-        self.inbox.receive({'type': 'room_start_updated', 'payload': {
-            'roomId': room_id or self.room_id, 'startId': start_id,
-            'status': status, 'error': '启动失败' if status == 'failed' else None}})
-
-    def test_idle_and_starting_do_not_repeat_queries(self):
-        self.session.poll_start()
-        self.future.set_result({'start': {'startId': 'new', 'status': 'starting'}})
-        for iteration in range(100):
-            self.assertIsNone(self.session.poll_start())
-        self.executor.submit.assert_called_once_with(self.gateway.room_detail, 'player', self.room_id)
-        self.push()
-        self.assertEqual(self.session.poll_start()['startId'], 'new')
-        self.assertEqual(self.executor.submit.call_count, 1)
-
-    def test_push_wins_over_late_query_and_duplicates(self):
-        self.session.poll_start()
-        self.push()
-        self.assertEqual(self.session.poll_start()['startId'], 'new')
-        self.future.set_result({'start': {'startId': 'old', 'status': 'ready'}})
-        self.assertEqual(self.session.poll_start()['startId'], 'new')
-        self.session.acknowledge_start(self.room_id, 'new')
+        self.session.acknowledge_start(self.room_id, 'first')
         self.push()
         self.assertIsNone(self.session.poll_start())
-        self.assertEqual(self.executor.submit.call_count, 1)
 
     def test_failure_and_late_message_after_leaving(self):
         self.push(status='failed')
@@ -114,41 +137,21 @@ class StartPushTests(unittest.TestCase):
         self.room_id = None
         self.push(room_id=previous_room)
         self.assertIsNone(self.session.poll_start())
-        self.future.set_result({'start': {'startId': 'old', 'status': 'ready'}})
-        self.assertIsNone(self.session.poll_start())
 
-    def test_reconnect_queries_once_and_recovers_missed_result(self):
-        self.session.poll_start()
-        self.future.set_result({'start': None})
-        self.session.poll_start()
-        recovery = Future()
-        self.executor.submit.return_value = recovery
-        self.inbox.receive({'type': 'realtime_reconnected', 'payload': {}})
-        self.assertIsNone(self.session.poll_start())
-        recovery.set_result({'start': {'startId': 'missed', 'status': 'ready'}})
-        self.assertEqual(self.session.poll_start()['startId'], 'missed')
-        self.session.acknowledge_start(self.room_id, 'missed')
-        for iteration in range(100):
-            self.assertIsNone(self.session.poll_start())
-        self.assertEqual(self.executor.submit.call_count, 2)
 
-    def test_notification_before_room_confirmation_is_recovered_on_entry(self):
-        self.room_id = None
-        self.push(room_id='joined')
+    def test_entry_reconnect_and_status_only_notification_cannot_start(self):
         self.assertIsNone(self.session.poll_start())
-        self.executor.submit.assert_not_called()
-        self.room_id = 'joined'
-        self.session.poll_start()
-        self.future.set_result({'start': {'startId': 'new', 'status': 'ready'}})
-        self.assertEqual(self.session.poll_start()['startId'], 'new')
-
-    def test_query_failure_does_not_restart_polling(self):
-        self.session.poll_start()
-        self.future.set_exception(OnlineError('OFFLINE', '连接失败'))
-        with self.assertLogs('codol_rebuild.application.matches.service', level='WARNING'):
-            self.session.poll_start()
-        for iteration in range(100):
-            self.assertIsNone(self.session.poll_start())
-        self.assertEqual(self.executor.submit.call_count, 1)
+        self.inbox.receive({'type': 'realtime_reconnected'})
+        self.push(connection=False)
+        self.assertIsNone(self.session.poll_start())
+        self.assertFalse(self.session.begin('allocate', self.room_id))
         self.push()
-        self.assertEqual(self.session.poll_start()['startId'], 'new')
+        self.assertEqual(self.session.poll_start()['startId'], 'first')
+
+    def test_notification_before_room_confirmation_is_not_recovered(self):
+        self.room_id = None
+        self.push(room_id='confirmed-room')
+        self.assertIsNone(self.session.poll_start())
+        self.room_id = 'confirmed-room'
+        self.assertIsNone(self.session.poll_start())
+        self.assertFalse(self.session.begin('allocate', self.room_id))

@@ -92,8 +92,8 @@ def run_session(args, reporter):
             multiplayer = RoomSession(gateway, identity_store, gateway.server, inbox=room_inbox)
             from codol_rebuild.application.matches.service import MatchSession
             match_inbox = EventInbox()
-            realtime_dispatcher.register(('room_start_updated', 'realtime_reconnected'), match_inbox)
-            match_session = MatchSession(HttpGateway(args.server_url, 30), multiplayer.confirmed_room_id, match_inbox)
+            realtime_dispatcher.register(('room_start_updated',), match_inbox)
+            match_session = MatchSession(multiplayer.confirmed_room_id, match_inbox)
             online_session = OnlineSession(gateway, identity_store, gateway.server, fingerprint(),
                                            multiplayer, realtime_connection)
             chat_session = ChatSession(realtime_connection, chat_inbox, multiplayer.confirmed_room_id)
@@ -124,10 +124,6 @@ def run_session(args, reporter):
                     try:rename_session.close()
                     except Exception as error:
                         log['rename_cleanup_error']=str(error)
-                if match_session:
-                    try:match_session.close()
-                    except Exception as error:
-                        log['match_cleanup_error'] = str(error)
                 if broadcast_session:
                     try:broadcast_session.close()
                     except Exception as error:

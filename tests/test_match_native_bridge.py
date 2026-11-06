@@ -69,12 +69,165 @@ class MatchBridgeTests(unittest.TestCase):
         self.session.poll_start.return_value = {'roomId': 'room', 'startId': 'first', 'status': 'ready'}
         self.process.write(ROOM_POINTER, struct.pack('<I', 0x40000))
         self.process.write(0x4001c, struct.pack('<I', 0x50000))
+        self.process.write(0x40278, b'\x01')
         self.process.write(0x62F840, bytes.fromhex('558becb814200000'))
         entry = self.bridge.poll(0x500123)
         instructions = list(capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32).disasm(self.process.read(entry, 25), entry))
         self.assertEqual([(instruction.mnemonic, instruction.op_str) for instruction in instructions], [
             ('pushfd',''),('pushal',''),('mov','ecx, 0x40000'),('push','0'),('push','-1'),('push','1'),
             ('call','0x62f840'),('popal',''),('popfd',''),('jmp','0x500123')])
+        self.session.acknowledge_start.assert_called_once_with('room', 'first')
+
+    def test_member_ready_uses_connection_stage_without_calling_host_start(self):
+        self.session.poll_start.return_value = {'roomId': 'room', 'startId': 'first', 'status': 'ready'}
+        self.session.poll.return_value = None
+        self.process.write(ROOM_POINTER, struct.pack('<I', 0x40000))
+        self.process.write(0x4001c, struct.pack('<I', 0x50000))
+        self.assertEqual(self.bridge.poll(0x500123), 0x500123)
+        self.bridge.poll(0x500123)
+        self.session.begin.assert_called_once_with('member_connect', 'room', start_id='first')
+        self.session.acknowledge_start.assert_not_called()
+        self.assertEqual(self.process.read(0x40278, 1), b'\x00')
+
+    def test_member_serializer_uses_native_lifecycle_and_preserves_resume(self):
+        self.bridge.callback_fields = ()
+        entry = self.bridge.member_notification(0x500123)
+        instructions = list(capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32).disasm(
+            self.process.read(entry, 160), entry))
+        calls = [instruction.op_str for instruction in instructions if instruction.mnemonic == 'call']
+        self.assertEqual(calls, ['0x806b50', '0xb74220', '0xb778e0', 'dword ptr [0xca8128]', '0x625be0'])
+        self.assertEqual(next(instruction.op_str for instruction in instructions if instruction.mnemonic == 'jmp'), '0x500123')
+
+    def test_member_notification_executes_with_balanced_x86_stack(self):
+        import os
+        import subprocess
+        import tempfile
+        compiler = Path(os.environ.get('WINDIR', 'C:/Windows'))/'Microsoft.NET/Framework/v4.0.30319/csc.exe'
+        if not compiler.exists():
+            self.skipTest('需要 Windows x86 C# 编译器')
+        project = Path(__file__).resolve().parents[2]
+        workspace_root = project/'verification/client/workspaces/member-notification'
+        workspace_root.mkdir(parents=True, exist_ok=True)
+        self.bridge.constructed = True
+        self.bridge.callback_fields = ()
+        entry = self.bridge.member_notification(0x22002000)
+        code = bytearray(self.process.read(entry, 160))
+        relocated = {0xB74220: 0x29004220, 0xB778E0: 0x290078E0, 0x625BE0: 0x28005BE0}
+        for instruction in capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32).disasm(code, entry):
+            if instruction.mnemonic == 'call' and instruction.bytes[0] == 0xE8:
+                target = int(instruction.op_str, 16)
+                if target in relocated:
+                    struct.pack_into('<i', code, instruction.address-entry+1, relocated[target]-instruction.address-5)
+        code = code.replace(struct.pack('<I', 0xCA8128), struct.pack('<I', 0x2A008128))
+        for address, phase in self.bridge.traps.items():
+            if phase == 'member_serialized':
+                code[address-entry] = 0x90
+        with tempfile.TemporaryDirectory(dir=workspace_root) as directory:
+            workspace = Path(directory)
+            (workspace/'member.bin').write_bytes(code)
+            executable = workspace/'member.exe'
+            compiled = subprocess.run([str(compiler), '/nologo', '/platform:x86', '/out:'+str(executable),
+                str(project/'client/tests/native/match_member_fixture.cs')], capture_output=True, timeout=30)
+            self.assertEqual(compiled.returncode, 0, compiled.stdout)
+            executed = subprocess.run([str(executable), str(workspace/'member.bin')], capture_output=True, timeout=15)
+            self.assertEqual(executed.returncode, 0, executed.stdout+executed.stderr)
+
+    def test_member_stale_result_does_not_construct_notification(self):
+        self.bridge.member_start_id = 'first'
+        self.bridge.room_id, self.bridge.room_pointer = 'room', 0x40000
+        self.bridge.current_room = lambda: 'other'
+        self.session.poll.return_value = SimpleNamespace(operation='member_connect', error=None, data={})
+        self.assertEqual(self.bridge.poll(0x500123), 0x500123)
+        self.assertIsNone(self.bridge.member_start_id)
+        self.assertIsNone(self.bridge.start_notification)
+
+    def test_member_failure_is_reported_without_native_delivery(self):
+        self.bridge.member_start_id = 'first'
+        self.bridge.room_id, self.bridge.room_pointer = 'room', 0x40000
+        self.process.write(ROOM_POINTER, struct.pack('<I', 0x40000))
+        self.session.poll.return_value = SimpleNamespace(operation='member_connect',
+            error=ValueError('rejected'), data=None)
+        self.bridge.notify = Mock()
+        self.assertEqual(self.bridge.poll(0x500123), 0x500123)
+        self.bridge.notify.assert_called_once()
+        self.session.acknowledge_start.assert_called_once_with('room', 'first')
+        self.assertIsNone(self.bridge.start_notification)
+
+    def test_waiting_member_still_polls_events_and_consumes_results_once(self):
+        self.bridge.member_start_id = 'first'
+        self.bridge.room_id, self.bridge.room_pointer = 'room', 0x40000
+        self.process.write(ROOM_POINTER, struct.pack('<I', 0x40000))
+        self.session.poll.return_value = None
+        self.assertEqual(self.bridge.poll(0x500123), 0x500123)
+        self.session.poll_start.assert_called_once_with()
+        self.session.poll.assert_called_once_with()
+        self.session.begin.assert_not_called()
+
+    def test_departure_clears_state_before_network_request_completes(self):
+        self.bridge.member_start_id = 'first'
+        self.bridge.room_id, self.bridge.room_pointer = 'room', 0x40000
+        self.bridge.current_room = lambda: 'other'
+        self.bridge.allocation = {'allocationId': 'old'}
+        self.bridge.delivered_allocation = 'old'
+        self.bridge.pending_start_phase = 'start_received'
+        self.session.poll.return_value = None
+        self.assertEqual(self.bridge.poll(0x500123), 0x500123)
+        self.assertIsNone(self.bridge.member_start_id)
+        self.assertIsNone(self.bridge.allocation)
+        self.assertIsNone(self.bridge.delivered_allocation)
+        self.assertIsNone(self.bridge.pending_start_phase)
+        self.session.poll.assert_called_once_with()
+        self.session.poll_start.assert_called_once_with()
+
+    def test_departure_releases_notification_before_consuming_network_result(self):
+        self.bridge.member_start_id = 'first'
+        self.bridge.room_id, self.bridge.room_pointer = 'room', 0x40000
+        self.bridge.current_room = lambda: 'other'
+        self.bridge.start_notification = 0x63000
+        self.assertNotEqual(self.bridge.poll(0x500123), 0x500123)
+        self.session.poll.assert_not_called()
+        self.assertIsNone(self.bridge.start_notification)
+        self.assertIsNone(self.bridge.member_start_id)
+
+    def test_failure_event_invalidates_pending_member_result_before_dispatch(self):
+        self.bridge.member_start_id = 'first'
+        self.bridge.room_id, self.bridge.room_pointer = 'room', 0x40000
+        self.process.write(ROOM_POINTER, struct.pack('<I', 0x40000))
+        self.session.poll_start.return_value = {'roomId': 'room', 'startId': 'first', 'status': 'failed'}
+        self.session.poll.return_value = SimpleNamespace(operation='member_connect', error=None,
+                                                        data={'startId': 'first'})
+        self.bridge.member_notification = Mock()
+        self.assertEqual(self.bridge.poll(0x500123), 0x500123)
+        self.bridge.member_notification.assert_not_called()
+        self.session.acknowledge_start.assert_called_once_with('room', 'first')
+        self.session.poll.assert_called_once_with()
+
+    def test_member_result_dispatch_does_not_depend_on_latest_owner_flag(self):
+        self.bridge.member_start_id = 'first'
+        self.bridge.room_id, self.bridge.room_pointer = 'room', 0x40000
+        self.process.write(ROOM_POINTER, struct.pack('<I', 0x40000))
+        self.process.write(0x4001c, struct.pack('<I', 0x50000))
+        self.process.write(0x40278, b'\x01')
+        self.session.poll_start.return_value = {'roomId': 'room', 'startId': 'first', 'status': 'ready'}
+        completion = SimpleNamespace(operation='member_connect', error=None, data={})
+        self.session.poll.return_value = completion
+        self.bridge.apply_member_completion = Mock(return_value=0x600123)
+        self.bridge.build_host_start_call = Mock()
+        self.assertEqual(self.bridge.poll(0x500123), 0x600123)
+        self.bridge.apply_member_completion.assert_called_once_with(completion, 0x500123)
+        self.bridge.build_host_start_call.assert_not_called()
+
+    def test_member_serialization_hands_one_reference_to_existing_frame_receiver(self):
+        self.bridge.member_start_id = 'first'
+        self.bridge.room_id, self.bridge.room_pointer = 'room', 0x40000
+        self.bridge.callback_fields = ()
+        self.bridge.member_notification(0x500123)
+        self.process.write(self.bridge.member_message+12, struct.pack('<I', 0x63000))
+        address = next(address for address, phase in self.bridge.traps.items() if phase == 'member_serialized')
+        self.bridge.handle(SimpleNamespace(tid=1), address)
+        self.assertEqual(self.bridge.start_notification, 0x63000)
+        self.assertTrue(self.bridge.notification_ready)
+        self.assertIsNone(self.bridge.member_start_id)
         self.session.acknowledge_start.assert_called_once_with('room', 'first')
 
     def test_other_message_recipient_falls_through(self):
@@ -87,7 +240,7 @@ class MatchBridgeTests(unittest.TestCase):
         self.bridge.handle(SimpleNamespace(tid=1), self.bridge.code+32)
         self.assertEqual(struct.unpack_from('<I', self.process.registers, 184)[0], self.bridge.code+33)
         self.session.begin.assert_not_called()
-        self.assertIsNone(self.bridge.pending_start)
+        self.assertIsNone(self.bridge.pending_start_phase)
 
     def test_connection_identity_uses_existing_mapping_and_preserves_context(self):
         self.bridge.room_id, self.bridge.room_pointer = 'room', 0x40000
@@ -167,7 +320,7 @@ class MatchBridgeTests(unittest.TestCase):
     def test_notification_only_captured_at_booking_callsite(self):
         self.bridge.room_id, self.bridge.room_pointer = 'room', 0x40000
         self.bridge.allocation = {'allocationId': 'allocation'}
-        self.bridge.pending_start = {'command': 'mmstart '}
+        self.bridge.pending_start_phase = 'start_received'
         struct.pack_into('<I', self.process.registers, 172, 0x40000)
         struct.pack_into('<I', self.process.registers, 196, 0x50000)
         self.process.write(0x50000, struct.pack('<II', 0x60000, 0x61000))
@@ -244,3 +397,75 @@ class MatchBridgeTests(unittest.TestCase):
         self.assertFalse(any(instruction.op_str == '0x634870' for instruction in instructions))
         self.assertIsNone(self.bridge.start_notification)
         self.assertFalse(self.bridge.notification_ready)
+
+    def test_failure_event_releases_queued_host_notification_without_connecting(self):
+        self.bridge.room_id, self.bridge.room_pointer = 'room', 0x40000
+        self.bridge.allocation = {'allocationId': 'allocation'}
+        self.bridge.pending_start_phase = 'start_received'
+        self.bridge.start_notification = 0x63000
+        self.bridge.notification_ready = True
+        self.process.write(ROOM_POINTER, struct.pack('<I', 0x40000))
+        self.session.poll_start.return_value = {'roomId': 'room', 'startId': 'first', 'status': 'failed'}
+        entry = self.bridge.poll(0x500123)
+        instructions = list(capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32).disasm(
+            self.process.read(entry, 35), entry))
+        self.assertFalse(any(instruction.op_str == '0x634870' for instruction in instructions))
+        self.assertIsNone(self.bridge.pending_start_phase)
+        self.assertIsNone(self.bridge.start_notification)
+        self.assertFalse(self.bridge.notification_ready)
+        self.session.begin.assert_not_called()
+
+    def test_prepared_broadcast_drives_host_native_stages_without_http(self):
+        import base64
+        from codol_rebuild.application.matches.service import MatchSession
+        from codol_rebuild.application.realtime.dispatch import EventInbox
+        inbox = EventInbox()
+        session = MatchSession(lambda: 'room', inbox)
+        session.connected('player')
+        self.bridge.session = session
+        connection = {'allocationId': 'a' * 32, 'port': 27760, 'securityId': '01' * 8,
+                      'securityKey': '02' * 16, 'serverUserId': '5', 'serverName': 'fixture', 'maxPlayers': 6}
+        inbox.receive({'type': 'room_start_updated', 'payload': {
+            'roomId': 'room', 'startId': 'first', 'status': 'ready', 'connection': connection}})
+        self.process.write(ROOM_POINTER, struct.pack('<I', 0x40000))
+        self.process.write(0x4001c, struct.pack('<I', 0x41000))
+        self.process.write(0x41020, struct.pack('<II', 5, 6))
+        self.process.write(0x40278, b'\x01')
+        self.process.write(0x62F840, bytes.fromhex('558becb814200000'))
+        decoder = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
+
+        def native_calls(entry, length=128):
+            """检查阶段交付仍使用原生入口，不把调用桩当成实际游戏执行。"""
+            return [instruction.op_str for instruction in decoder.disasm(self.process.read(entry, length), entry)
+                    if instruction.mnemonic == 'call']
+
+        self.assertEqual(native_calls(self.bridge.poll(0x500123), 25), ['0x62f840'])
+        struct.pack_into('<I', self.process.registers, 196, 0x50000)
+        self.process.write(0x50004, struct.pack('<5I', 0x27, 0, 0, 0x47470, 0x637930))
+        self.bridge.handle(SimpleNamespace(tid=1), self.bridge.code)
+        self.assertEqual(native_calls(self.bridge.poll(0x500123)), ['0x806b50', '0x637930'])
+
+        def native_send(body):
+            """模拟既有房主专用消息边，不改动其他接收者和原生函数。"""
+            struct.pack_into('<I', self.process.registers, 172, 0x40000)
+            self.process.write(0x50004, struct.pack('<6I', 0x60000, len(body), 5, 0, 0, 0))
+            self.process.write(0x60000, body)
+            self.bridge.handle(SimpleNamespace(tid=1), self.bridge.code+32)
+            return struct.unpack_from('<I', self.process.registers, 176)[0]
+
+        native_send(b'mmbook 0 ' + base64.b64encode(bytes.fromhex(connection['securityId'])) + b' 0')
+        self.assertEqual(native_calls(self.bridge.poll(0x500123)), ['0x632680'])
+        self.assertEqual(native_send(b'mmban\0'), 0)
+        self.assertEqual(native_send(b'mmstart native'), 1)
+        self.assertEqual(native_send(b'mmstart duplicate'), 0)
+        self.assertEqual(native_send(b'mmban\0'), 1)
+        self.assertEqual(native_send(b'mmban\0'), 0)
+        self.bridge.record.assert_any_call({'match_native_start': 'mmstart native'})
+        self.bridge.record.assert_any_call({'match_native_item_bans': b'mmban\0'.hex()})
+        self.bridge.start_notification = 0x63000
+        self.assertEqual(self.bridge.poll(0x500123), 0x500123)
+        self.assertEqual(self.bridge.poll(0x500123), 0x500123)
+        self.assertTrue(self.bridge.notification_ready)
+        self.bridge.handle(SimpleNamespace(tid=1), self.bridge.frame_trap)
+        entry = struct.unpack_from('<I', self.process.registers, 184)[0]
+        self.assertEqual(native_calls(entry, 46), ['0x634870'])

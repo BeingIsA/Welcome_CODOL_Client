@@ -1,7 +1,7 @@
-"""单人对局原生边界：保留查找、预订、开局及连接顺序，只替换服务端通信。
+"""对局原生边界：房主保留预订流程，成员应用已确认的连接通知。
 
 查找限62932F专用调用边；控制消息限当前房间及已分配DS身份。所有进程操作
-发生在主线程暂停点，HTTP请求由应用会话处理。未接管消息继续原方法。
+发生在主线程暂停点，各阶段使用应用会话已确认资料。未接管消息继续原方法。
 """
 import base64
 import struct
@@ -25,12 +25,13 @@ class MatchBridge:
         self.allocation = None
         self.room_id = None
         self.room_pointer = None
-        self.pending_start = None
+        self.pending_start_phase = None
         self.constructed = False
         self.callback_fields = None
         self.start_notification = None
         self.delivered_allocation = None
         self.notification_ready = False
+        self.member_start_id = None
         self.notify = lambda message: self.record({'match_start_error': message})
 
     def integer(self, address):
@@ -54,6 +55,7 @@ class MatchBridge:
         self.native_record = self.process.allocate(0x238)
         self.message = self.process.allocate(256)
         self.notification_flag = self.process.allocate(4)
+        self.member_message = self.process.allocate(16)
         self.process.write(self.message, b'mmbook accepted\0CODOL Local\0')
         # trap处尚未执行指令，寄存器/栈保持原始调用约定。
         for offset, phase, original, cleanup in ((0, 'find', 0x7F44B0, 0), (32, 'send', 0x629730, 24),
@@ -108,7 +110,7 @@ class MatchBridge:
                 native_room = struct.unpack_from('<I', context, 172)[0]
                 # 仅预订回复中 632809 的专用调用；其他房间通知原样执行。
                 if (self.integer(stack) == 0x63280B and native_room == self.room_pointer
-                        and self.current_room() == self.room_id and self.pending_start is not None
+                        and self.current_room() == self.room_id and self.pending_start_phase is not None
                         and self.start_notification is None and self.allocation is not None
                         and self.delivered_allocation != self.allocation['allocationId']):
                     container = self.integer(stack+4)
@@ -129,6 +131,12 @@ class MatchBridge:
                     self.process.write(entry, instructions)
                     next_instruction = entry
                     self.record({'match_start_notification': 'retained'})
+            elif phase == 'member_serialized':
+                self.start_notification = self.integer(self.member_message+12)
+                self.notification_ready = True
+                self.process.write(self.notification_flag, struct.pack('<I', 1))
+                self.session.acknowledge_start(self.room_id, self.member_start_id)
+                self.member_start_id = None
             elif phase == 'constructed':
                 for offset, value in self.callback_fields:
                     self.process.write(self.native_record+offset, value)
@@ -157,13 +165,14 @@ class MatchBridge:
                             accepted = self.session.begin('book', self.room_id, self.allocation['allocationId'], self.allocation['securityId'])
                             self.record({'match_request': 'book', 'queued': accepted})
                     elif body.startswith(b'mmstart '):
-                        if self.pending_start is None and self.current_room() == self.room_id:
-                            self.pending_start = {'command': body.decode('ascii'), 'itemBans': None}
+                        if self.pending_start_phase is None and self.current_room() == self.room_id:
+                            native_command = body.decode('ascii')
+                            self.pending_start_phase = 'start_received'
                             accepted = True
-                            self.record({'match_native_start': self.pending_start['command']})
+                            self.record({'match_native_start': native_command})
                     elif body.startswith(b'mmban\0'):
-                        if self.pending_start is not None and self.pending_start['itemBans'] is None:
-                            self.pending_start['itemBans'] = base64.b64encode(body).decode('ascii')
+                        if self.pending_start_phase == 'start_received':
+                            self.pending_start_phase = 'item_bans_received'
                             accepted = True
                             self.record({'match_native_item_bans': body.hex()})
                     else:
@@ -210,70 +219,194 @@ class MatchBridge:
         self.process.write(entry, bytes(instructions))
         return entry
 
+    def member_notification(self, resume_address):
+        """复用原生对象构造与 type=3 序列化，持有一个引用交给下一帧接收器。"""
+        entry = self.code+1536
+        instructions = bytearray(b'\x9c\x60')
+        def push(value):
+            instructions.extend(b'\x68'+struct.pack('<I', value))
+        def call(value):
+            instructions.extend(b'\xe8'+struct.pack('<i', value-entry-len(instructions)-5))
+        if not self.constructed:
+            push(1)
+            instructions.extend(b'\xb9'+struct.pack('<I', self.native_record))
+            call(0x806B50)
+            self.traps[entry+len(instructions)] = 'constructed'
+            instructions.extend(b'\xcc')
+        else:
+            for offset, value in self.callback_fields:
+                self.process.write(self.native_record+offset, value)
+        self.process.write(self.member_message, struct.pack('<4I', 0xDC751C, 3, self.native_record, 0))
+        # 与 62ABF0 相同的分配器和 bdBitBuffer(0, false)，构造后引用数为零。
+        push(0x24)
+        call(0xB74220)
+        instructions.extend(bytes.fromhex('83c404 6a00 6a00 8bc8'))
+        call(0xB778E0)
+        instructions.extend(b'\xa3'+struct.pack('<I', self.member_message+12))
+        instructions.extend(bytes.fromhex('83c004 50 ff152881ca00'))
+        push(self.member_message+12)
+        instructions.extend(b'\xb9'+struct.pack('<I', self.member_message))
+        call(0x625BE0)
+        self.traps[entry+len(instructions)] = 'member_serialized'
+        instructions.extend(b'\xcc\x61\x9d\xe9'+struct.pack('<i', resume_address-entry-len(instructions)-8))
+        self.process.write(entry, bytes(instructions))
+        return entry
+
     def poll(self, resume_address):
-        """仅消费已完成结果；离房后不向新原生房间投递旧回调。"""
+        """每轮检查生命周期和事件；结果只消费一次，仅原生调用暂停本轮调度。"""
+        next_address = self.clear_departed_room(resume_address)
+        if next_address is not None:
+            return next_address
         start = self.session.poll_start()
         if start is not None:
-            if start['status'] == 'failed':
-                self.notify(start.get('error') or '开局失败，请重新准备')
-                self.session.acknowledge_start(start['roomId'], start['startId'])
-            elif self.current_room() == start['roomId']:
-                room_pointer = self.integer(ROOM_POINTER)
-                if room_pointer >= 0x10000 and self.integer(room_pointer + 0x1C):
-                    if self.process.read(0x62F840, 8) != bytes.fromhex('558becb814200000'):
-                        raise ValueError('原生StartMatch调用约定不匹配')
-                    entry = self.code + 1280
-                    instructions = bytearray(b'\x9c\x60\xb9' + struct.pack('<I', room_pointer))
-                    instructions.extend(bytes.fromhex('6a006aff6a01'))
-                    instructions.extend(b'\xe8' + struct.pack('<i', 0x62F840-entry-len(instructions)-5))
-                    instructions.extend(b'\x61\x9d\xe9' + struct.pack('<i', resume_address-entry-len(instructions)-7))
-                    self.process.write(entry, bytes(instructions))
-                    self.session.acknowledge_start(start['roomId'], start['startId'])
-                    self.record({'formal_start': start['startId'], 'roomId': start['roomId']})
-                    return entry
+            next_address = self.apply_start_event(start, resume_address)
+            if next_address is not None:
+                return next_address
         completion = self.session.poll()
         if completion is not None:
-            self.record({'match_completion': completion.operation, 'succeeded': completion.error is None,
-                         'error': str(completion.error) if completion.error else None})
-            if self.current_room() != self.room_id or self.integer(ROOM_POINTER) != self.room_pointer:
-                self.pending_start = None
-                return self.notification_callback(resume_address, False)
-            if completion.operation == 'allocate':
-                success = completion.error is None
-                if success:
-                    allocation = completion.data
-                    try:
-                        self.callback_fields = allocation_fields(self.server_address, allocation['port'],
-                            bytes.fromhex(allocation['securityId']), bytes.fromhex(allocation['securityKey']),
-                            int(allocation['serverUserId']), allocation['serverName'], allocation['maxPlayers'])
-                        self.allocation = allocation
-                    except (KeyError, TypeError, ValueError) as error:
-                        self.record({'match_allocation_rejected': str(error)})
-                        success = False
-                return self.callback(resume_address, success)
-            if completion.operation == 'book' and completion.error is None:
-                if completion.data.get('booked') is True and completion.data.get('allocationId') == self.allocation['allocationId']:
-                    return self.callback(resume_address, True, booking=True)
-                self.record({'match_booking_rejected': '服务端确认与当前分配不匹配'})
-            if completion.operation == 'start':
-                accepted = (completion.error is None and completion.data.get('started') is True
-                            and completion.data.get('allocationId') == self.allocation['allocationId'])
-                if accepted and self.start_notification is not None:
-                    self.notification_ready = True
-                    self.process.write(self.notification_flag, struct.pack('<I', 1))
-                    self.record({'match_start_notification': 'queued_for_native_frame'})
-                    return resume_address
-                return self.notification_callback(resume_address, accepted)
-        if self.start_notification is not None and (self.current_room() != self.room_id
-                or self.integer(ROOM_POINTER) != self.room_pointer):
-            self.pending_start = None
+            next_address = self.apply_completion(completion, resume_address)
+            if next_address is not None:
+                return next_address
+        return self.poll_start_confirmation(resume_address)
+
+    def clear_departed_room(self, resume_address):
+        """不等待网络返回就撤销旧房间状态；持有通知时先执行原生释放。"""
+        if self.current_room() == self.room_id and self.integer(ROOM_POINTER) == self.room_pointer:
+            return None
+        self.member_start_id = None
+        self.pending_start_phase = None
+        self.allocation = None
+        self.delivered_allocation = None
+        if self.start_notification is not None:
             return self.notification_callback(resume_address, False)
-        if self.pending_start is not None:
-            payload = self.pending_start
-            if self.session.begin('start', self.room_id, self.allocation['allocationId'], control_payload=payload):
-                self.pending_start = None
+        return None
+
+    def apply_start_event(self, start, resume_address):
+        """分流权威开局结果；返回 None 表示本轮仍需检查房主请求结果。"""
+        if self.current_room() != start['roomId']:
+            return None
+        if self.member_start_id is not None and (start['status'] == 'failed'
+                or start['startId'] != self.member_start_id):
+            self.member_start_id = None
+        if start['status'] == 'failed':
+            self.pending_start_phase = None
+            self.notify(start.get('error') or '开局失败，请重新准备')
+            self.session.acknowledge_start(start['roomId'], start['startId'])
+            if self.start_notification is not None:
+                return self.notification_callback(resume_address, False)
+            return None
+        room_pointer = self.integer(ROOM_POINTER)
+        if room_pointer < 0x10000 or not self.integer(room_pointer + 0x1C):
+            return None
+        if not self.process.read(room_pointer+0x278, 1)[0]:
+            self.begin_member_connection(start, room_pointer)
+            return None
+        if self.member_start_id is not None:
+            return None
+        entry = self.build_host_start_call(room_pointer, resume_address)
+        self.session.acknowledge_start(start['roomId'], start['startId'])
+        self.record({'formal_start': start['startId'], 'roomId': start['roomId']})
+        return entry
+
+    def begin_member_connection(self, start, room_pointer):
+        """成员只排队一次；结果应用或明确失败前保留开局事件。"""
+        if self.member_start_id is None and self.session.begin(
+                'member_connect', start['roomId'], start_id=start['startId']):
+            self.room_id, self.room_pointer = start['roomId'], room_pointer
+            self.member_start_id = start['startId']
+
+    def build_host_start_call(self, room_pointer, resume_address):
+        """生成房主 StartMatch 调用桩，仅负责原生约定和现场恢复。"""
+        if self.process.read(0x62F840, 8) != bytes.fromhex('558becb814200000'):
+            raise ValueError('原生StartMatch调用约定不匹配')
+        entry = self.code + 1280
+        instructions = bytearray(b'\x9c\x60\xb9' + struct.pack('<I', room_pointer))
+        instructions.extend(bytes.fromhex('6a006aff6a01'))
+        instructions.extend(b'\xe8' + struct.pack('<i', 0x62F840-entry-len(instructions)-5))
+        instructions.extend(b'\x61\x9d\xe9' + struct.pack('<i', resume_address-entry-len(instructions)-7))
+        self.process.write(entry, bytes(instructions))
+        return entry
+
+    def apply_completion(self, completion, resume_address):
+        """检查房间生命周期后按请求种类分派；None 保留后续待提交处理。"""
+        self.record({'match_completion': completion.operation, 'succeeded': completion.error is None,
+                     'error': str(completion.error) if completion.error else None})
+        if self.current_room() != self.room_id or self.integer(ROOM_POINTER) != self.room_pointer:
+            return None
+        if completion.operation == 'member_connect':
+            return self.apply_member_completion(completion, resume_address)
+        if completion.operation == 'allocate':
+            return self.apply_allocation_completion(completion, resume_address)
+        if completion.operation == 'book':
+            return self.apply_booking_completion(completion, resume_address)
+        if completion.operation == 'start':
+            return self.apply_start_completion(completion, resume_address)
+        return None
+
+    def apply_allocation_completion(self, completion, resume_address):
+        """转换分配字段并通过原生回调报告成功或失败。"""
+        success = completion.error is None
+        if success:
+            allocation = completion.data
+            try:
+                self.callback_fields = allocation_fields(self.server_address, allocation['port'],
+                    bytes.fromhex(allocation['securityId']), bytes.fromhex(allocation['securityKey']),
+                    int(allocation['serverUserId']), allocation['serverName'], allocation['maxPlayers'])
+                self.allocation = allocation
+            except (KeyError, TypeError, ValueError) as error:
+                self.record({'match_allocation_rejected': str(error)})
+                success = False
+        return self.callback(resume_address, success)
+
+    def apply_booking_completion(self, completion, resume_address):
+        """匹配本人预订后安排原生回复；失败沿用后续轮询流程。"""
+        if completion.error is None:
+            if completion.data.get('booked') is True and completion.data.get('allocationId') == self.allocation['allocationId']:
+                return self.callback(resume_address, True, booking=True)
+            self.record({'match_booking_rejected': '服务端确认与当前分配不匹配'})
+        return None
+
+    def apply_start_completion(self, completion, resume_address):
+        """开局确认只安排安全帧投递；未确认时释放保留通知。"""
+        accepted = (completion.error is None and completion.data.get('started') is True
+                    and completion.data.get('allocationId') == self.allocation['allocationId'])
+        if accepted and self.start_notification is not None:
+            self.notification_ready = True
+            self.process.write(self.notification_flag, struct.pack('<I', 1))
+            self.record({'match_start_notification': 'queued_for_native_frame'})
+            return None
+        if self.start_notification is not None:
+            return self.notification_callback(resume_address, accepted)
+        return None
+
+    def poll_start_confirmation(self, resume_address):
+        """原生已生成开局消息后，按既有轮询时机交付本局确认。"""
+        if self.pending_start_phase is not None:
+            if self.session.begin('start', self.room_id, self.allocation['allocationId']):
+                self.pending_start_phase = None
                 self.record({'match_request': 'start'})
         return resume_address
+
+    def apply_member_completion(self, completion, resume_address):
+        """成员失败明确提示，成功只构造通知；连接仍由原生帧接收器执行。"""
+        if self.member_start_id is None:
+            return None
+        try:
+            if completion.error is not None:
+                raise ValueError(str(completion.error))
+            allocation = completion.data
+            if completion.operation != 'member_connect' or allocation.get('startId') != self.member_start_id:
+                raise ValueError('成员连接结果与当前开局不匹配')
+            self.callback_fields = allocation_fields(self.server_address, allocation['port'],
+                bytes.fromhex(allocation['securityId']), bytes.fromhex(allocation['securityKey']),
+                int(allocation['serverUserId']), allocation['serverName'], allocation['maxPlayers'])
+            self.allocation = allocation
+        except (KeyError, TypeError, ValueError) as error:
+            self.notify('成员入局失败：'+str(error))
+            self.session.acknowledge_start(self.room_id, self.member_start_id)
+            self.member_start_id = None
+            return None
+        return self.member_notification(resume_address)
 
     def notification_callback(self, resume_address, deliver):
         """主线程转交或释放原生消息；接收器负责解码、通知和连接及最终引用释放。"""

@@ -7,7 +7,11 @@ from codol_rebuild.adapters.game.v1649370.accounts.profile_bridge import LocalPr
 
 class GameSessionBridge:
     """仅拥有版本状态；进程和账号实现由装配入口注入。"""
-    def __init__(self, args, run_dir, image, pe, log, record, phase_done, process: ProcessAccess, account_factory, account_errors, multiplayer=None, rename_session=None, broadcast_session=None, realtime_dispatcher=None, chat_session=None, online_session=None, match_session=None):
+    def __init__(self, args, run_dir, image, pe, log, record, phase_done,
+                 process: ProcessAccess, account_factory, account_errors,
+                 multiplayer=None, rename_session=None, broadcast_session=None,
+                 realtime_dispatcher=None, chat_session=None, online_session=None,
+                 match_session=None):
         self.args=args; self.run_dir=run_dir; self.image=image; self.pe=pe
         self.log=log; self.record=record; self.phase_done=phase_done; self.process=process
         self.account_factory=account_factory; self.account_errors=account_errors
