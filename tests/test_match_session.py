@@ -30,6 +30,26 @@ class MatchSessionTests(unittest.TestCase):
         self.inbox.receive({'type': 'room_start_updated', 'payload': payload})
 
 
+    def test_wait_precedes_ready_and_duplicate_wait_cannot_restart_it(self):
+        self.push(status='starting')
+        self.push()
+        self.assertEqual(self.session.poll_start()['status'], 'starting')
+        self.session.acknowledge_wait(self.room_id, 'first')
+        self.assertEqual(self.session.poll_start()['status'], 'ready')
+        self.push(status='starting')
+        self.assertEqual(self.session.poll_start()['status'], 'ready')
+        self.session.acknowledge_start(self.room_id, 'first')
+        self.push(status='starting')
+        self.assertIsNone(self.session.poll_start())
+
+    def test_wait_alone_does_not_supply_connection(self):
+        self.push(status='starting')
+        self.assertEqual(self.session.poll_start()['status'], 'starting')
+        self.assertFalse(self.session.begin('allocate', self.room_id))
+        self.session.acknowledge_wait(self.room_id, 'first')
+        self.push(status='starting')
+        self.assertIsNone(self.session.poll_start())
+
     def test_requires_identity_and_prepared_current_room(self):
         self.assertFalse(self.session.begin('allocate', self.room_id))
         self.push()

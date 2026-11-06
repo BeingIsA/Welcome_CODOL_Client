@@ -48,6 +48,19 @@ class MatchBridgeTests(unittest.TestCase):
             self.process.write(call_address, original_bytes)
         self.bridge.install(0x42000)
 
+    def test_starting_only_notifies_ui_without_consuming_ready(self):
+        self.process.write(0x7CB210, bytes.fromhex('558bec83e4f883ec'))
+        entry = self.bridge.apply_start_event(
+            {'roomId': 'room', 'startId': 'first', 'status': 'starting'}, 0x500123)
+        instructions = list(capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32).disasm(
+            self.process.read(entry, 19), entry))
+        self.assertEqual([instruction.op_str for instruction in instructions
+                          if instruction.mnemonic == 'call'], ['0x7cb210'])
+        self.assertEqual(instructions[-1].op_str, '0x500123')
+        self.session.acknowledge_wait.assert_called_once_with('room', 'first')
+        self.session.acknowledge_start.assert_not_called()
+        self.session.begin.assert_not_called()
+
     def test_allocation_uses_client_config_address_and_validates_port(self):
         self.bridge.room_id = 'room'
         self.bridge.room_pointer = 0

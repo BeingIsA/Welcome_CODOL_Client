@@ -16,6 +16,16 @@ IDENTITY_CALLS = ((0x5BF864, bytes.fromhex('e8d7812400')),
                   (0x5C07BE, bytes.fromhex('e87d722400')))
 
 
+def replacements():
+    """仅替换倒计时回调的调试前导；-2 专用于服务端开局等待。
+
+    保留作用域和原 isRankedMatch 调用的接收者，普通参数跳回偏移18；
+    专用参数调用既有 lockMatch 后返回，不启动计时或最终投票。
+    """
+    return [(4705764, bytes.fromhex('f107f0df06d030ef01b60300df06f0e206d0'),
+             bytes.fromhex('d030d0d166c40224fe140500004f93030047'))]
+
+
 class MatchBridge:
     """一个受控原生记录对应一个分配；不拥有玩家或房间权威状态。"""
     def __init__(self, process, session, current_room, server_address, record):
@@ -285,6 +295,10 @@ class MatchBridge:
         """分流权威开局结果；返回 None 表示本轮仍需检查房主请求结果。"""
         if self.current_room() != start['roomId']:
             return None
+        if start['status'] == 'starting':
+            entry = self.build_wait_notification(resume_address)
+            self.session.acknowledge_wait(start['roomId'], start['startId'])
+            return entry
         if self.member_start_id is not None and (start['status'] == 'failed'
                 or start['startId'] != self.member_start_id):
             self.member_start_id = None
@@ -314,6 +328,17 @@ class MatchBridge:
                 'member_connect', start['roomId'], start_id=start['startId']):
             self.room_id, self.room_pointer = start['roomId'], room_pointer
             self.member_start_id = start['startId']
+
+    def build_wait_notification(self, resume_address):
+        """主线程通过原生 DataID 102 通知 UI；不启动房间计时器。"""
+        if self.process.read(0x7CB210, 8) != bytes.fromhex('558bec83e4f883ec'):
+            raise ValueError('原生倒计时通知 ABI 不匹配')
+        entry = self.code + 2048
+        instructions = bytearray(bytes.fromhex('9c6068000000c0'))
+        instructions.extend(b'\xe8' + struct.pack('<i', 0x7CB210-entry-len(instructions)-5))
+        instructions.extend(b'\x61\x9d\xe9' + struct.pack('<i', resume_address-entry-len(instructions)-7))
+        self.process.write(entry, bytes(instructions))
+        return entry
 
     def build_host_start_call(self, room_pointer, resume_address):
         """生成房主 StartMatch 调用桩，仅负责原生约定和现场恢复。"""
