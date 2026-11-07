@@ -134,8 +134,8 @@ class HttpGateway:
         return self._request('POST', '/api/v1/players/me/rename',
                              {'displayName': display_name}, player_id)
 
-    def create(self, player_id, username, max_players, password, settings=None, profile=None):
-        payload = {'displayName': username, 'maxPlayers': max_players, 'password': password}
+    def create(self, player_id, username, max_players, password, settings=None, profile=None, *, room_name):
+        payload = {'displayName': username, 'roomName': room_name, 'maxPlayers': max_players, 'password': password}
         if settings is not None:
             payload['settings'] = _settings_payload(settings)
         if profile is not None:
@@ -229,7 +229,7 @@ class HttpGateway:
                     raise ValueError('房间列表项无效')
                 _identifier(room.get('roomId'), 'rm')
                 _identifier(room.get('ownerPlayerId'), 'pl')
-                for key, maximum in (('ownerDisplayName', 128), ('map', 256), ('mode', 256)):
+                for key, maximum in (('roomName', 255), ('ownerDisplayName', 128), ('map', 256), ('mode', 256)):
                     value = room.get(key)
                     if (not isinstance(value, str) or len(value) > maximum
                             or '\0' in value):

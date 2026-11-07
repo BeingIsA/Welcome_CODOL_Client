@@ -94,7 +94,7 @@ class HttpGatewayTests(unittest.TestCase):
     def test_timeout_is_uncertain_and_not_retried(self):
         self.gateway._opener.open.side_effect = TimeoutError('timeout')
         with self.assertRaises(OnlineError) as caught:
-            self.gateway.create('pl_saved', '玩家', 4, None)
+            self.gateway.create('pl_saved', '玩家', 4, None, room_name='固定房间名')
         self.assertTrue(caught.exception.uncertain)
         self.gateway._opener.open.assert_called_once()
 
@@ -110,17 +110,19 @@ class HttpGatewayTests(unittest.TestCase):
             'roomId': 'rm_new', 'ownerPlayerId': 'pl_saved', 'maxPlayers': 4,
             'members': [{'playerId': 'pl_saved', 'displayName': '玩家', 'isOwner': True}],
             'settings': settings}})
-        created = self.gateway.create('pl_saved', '玩家', 4, None, settings)
+        created = self.gateway.create('pl_saved', '玩家', 4, None, settings, room_name='固定房间名')
         self.assertNotIn('revision', created)
         request = self.gateway._opener.open.call_args.args[0]
         self.assertEqual(json.loads(request.data)['settings'], settings)
+        self.assertEqual(json.loads(request.data)['roomName'], '固定房间名')
+        self.assertEqual(json.loads(request.data)['displayName'], '玩家')
         # 回显不一致时视为可疑响应，不静默接受。
         self.gateway._opener.open.return_value = Response({'apiVersion': '1', 'data': {
             'roomId': 'rm_new', 'ownerPlayerId': 'pl_saved', 'maxPlayers': 4,
             'members': [{'playerId': 'pl_saved', 'displayName': '玩家', 'isOwner': True}],
             'settings': {'mode': 'dm'}}})
         with self.assertRaises(OnlineError) as caught:
-            self.gateway.create('pl_saved', '玩家', 4, None, settings)
+            self.gateway.create('pl_saved', '玩家', 4, None, settings, room_name='固定房间名')
         self.assertEqual(caught.exception.code, 'INVALID_RESPONSE')
 
     def test_update_settings_without_revision(self):
@@ -153,6 +155,6 @@ class HttpGatewayTests(unittest.TestCase):
         self.gateway._opener.open.return_value = Response({'apiVersion': '1', 'data': {
             'roomId': 'rm_other', 'ownerPlayerId': 'pl_other', 'maxPlayers': 4, 'members': []}})
         with self.assertRaises(OnlineError) as caught:
-            self.gateway.create('pl_saved', '玩家', 4, None)
+            self.gateway.create('pl_saved', '玩家', 4, None, room_name='固定房间名')
         self.assertEqual(caught.exception.code, 'INVALID_RESPONSE')
         self.assertTrue(caught.exception.uncertain)

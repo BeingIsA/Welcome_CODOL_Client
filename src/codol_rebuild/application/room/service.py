@@ -178,7 +178,7 @@ class RoomSession:
 
     def begin(self, operation: str, username: str, *, max_players: int = 4,
               password: str | None = None, settings: dict | None = None,
-              room_id: str | None = None, profile: dict | None = None) -> bool:
+              room_id: str | None = None, profile: dict | None = None, room_name: str | None = None) -> bool:
         """提交单个用例，重复点击不会重复发送请求。
 
         设置同步与主流程（创建/退出）互不阻塞：原生改设置在本地
@@ -198,7 +198,7 @@ class RoomSession:
             raise ValueError('未知联机用例')
         self._discard_profile_updates()
         self._pending = self._executor.submit(self._execute, operation, username,
-                                              max_players, password, settings, room_id, deepcopy(profile))
+                                              max_players, password, settings, room_id, deepcopy(profile), room_name)
         return True
 
     def poll(self) -> Completion | None:
@@ -451,7 +451,7 @@ class RoomSession:
         self._is_owner = data.get('ownerPlayerId') == previous.player_id
         return data
 
-    def _execute(self, operation, username, max_players, password, settings=None, room_id=None, profile=None):
+    def _execute(self, operation, username, max_players, password, settings=None, room_id=None, profile=None, room_name=None):
         try:
             if self._record is None:
                 raise OnlineError('NO_IDENTITY', '尚未完成启动登录')
@@ -466,7 +466,7 @@ class RoomSession:
                 self._save(replace(self._record, uncertain_create=True))
                 try:
                     data = self._gateway.create(self._record.player_id, username,
-                                                max_players, password, settings,
+                                                max_players, password, settings, room_name=room_name,
                                                 **({'profile': profile} if profile is not None else {}))
                 except OnlineError as error:
                     if not error.uncertain:

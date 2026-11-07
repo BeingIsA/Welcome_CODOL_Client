@@ -43,7 +43,7 @@ def created_snapshot():
     """创建完成替身使用完整服务端契约。"""
     settings = {key: 0 for key in bridge.SETTING_SCALARS}
     settings.update(mode='td', map='mp_crash')
-    return {'roomId': 'rm_test', 'ownerPlayerId': 'pl_me', 'ownerDisplayName': '测试玩家',
+    return {'roomName': '固定房间名', 'roomId': 'rm_test', 'ownerPlayerId': 'pl_me', 'ownerDisplayName': '测试玩家',
             'maxPlayers': 4, 'playerCount': 1, 'settings': settings,
             'members': [{'playerId': 'pl_me', 'displayName': '测试玩家', 'isOwner': True,
                          'team': 'tf141', 'readyState': False}]}
@@ -100,6 +100,27 @@ class SettingsChannelPort:
 
 
 class MultiplayerBridgeTests(unittest.TestCase):
+    def test_join_uses_fixed_name_and_member_update_does_not_replace_it(self):
+        """入房名称独立于房主；成员回显不重新应用房间名称。"""
+        memory, adapter, data, room, session = self.join_fixture()
+        adapter._prepare_join_snapshot(data)
+        self.assertEqual(bridge.native_string(memory.read, adapter.join_scratch+512), data['roomName'])
+        memory.word(room+0x1C, session)
+        memory.word(session+0x25C8, room)
+        memory.write(session, b'\x01')
+        adapter.current_room_id = data['roomId']
+        adapter.pending = ('join', room, session)
+        adapter._publish_join_snapshot()
+        original_name_field = bytes.fromhex('1234567800000000')
+        memory.write(room+0x10600, original_name_field)
+        data['ownerPlayerId'] = 'pl_me'
+        data['ownerDisplayName'] = '队友'
+        data['members'] = [data['members'][1]]
+        adapter._apply_room_members(data)
+        self.assertTrue(adapter.is_owner)
+        self.assertEqual(memory.read(room+0x10600, 8), original_name_field)
+        self.assertEqual(memory.read(adapter.join_scratch+512, 1), b'\0')
+
     def test_departure_message_is_queued_only_after_native_cleanup(self):
         adapter, memory, port, room, session = self.setup_bridge()
         adapter.current_room_id = 'rm_current'
@@ -181,7 +202,7 @@ class MultiplayerBridgeTests(unittest.TestCase):
         settings = {key: (0.0 if form == '<f' else 0)
                     for key, (offset, form) in bridge.SETTING_SCALARS.items()}
         settings.update(mode='td', map='mp_crash')
-        data = {'roomId': 'rm_target', 'ownerPlayerId': 'pl_owner', 'ownerDisplayName': '房主',
+        data = {'roomName': '固定房间名', 'roomId': 'rm_target', 'ownerPlayerId': 'pl_owner', 'ownerDisplayName': '房主',
                 'revision': 1, 'maxPlayers': 4, 'playerCount': 2, 'settings': settings,
                 'members': [{'playerId': 'pl_owner', 'displayName': '房主', 'isOwner': True},
                             {'playerId': 'pl_me', 'displayName': '队友', 'isOwner': False}]}
@@ -531,6 +552,8 @@ class MultiplayerBridgeTests(unittest.TestCase):
         # 创建与后续设置是独立请求；即使配置相同，也不能按内容去重。
         value, process, port, room, session = self.setup_bridge()
         write_full_config(process, room, mode='td', map_name='mp_x')
+        process.write(0x28000000, '创建时的房间名'.encode('utf-8')+b'\0')
+        process.word(room+0x10600, 0x28000000)
         ctx = bytearray(716)
         struct.pack_into('<I', ctx, 184, 0x50000010)
         struct.pack_into('<I', ctx, 196, 0x30000000)
@@ -545,6 +568,7 @@ class MultiplayerBridgeTests(unittest.TestCase):
         with mock.patch.object(bridge, 'username', lambda read: '测试玩家'):
             value.handle(event, 0x50000010)
         self.assertEqual(port.begin.call_args.args[0], 'create')
+        self.assertEqual(port.begin.call_args.kwargs['room_name'], '创建时的房间名')
         baseline = port.begin.call_args.kwargs['settings']
         # 大厅再次应用同一份配置：仍产生 settings 提交。
         ctx2 = bytearray(716)

@@ -31,12 +31,12 @@ class Gateway:
             raise OnlineError('BANNED', '已封禁')
         return {'playerId': player_id or 'pl_test', 'displayName': username}
 
-    def create(self, player_id, username, max_players, password, settings=None):
+    def create(self, player_id, username, max_players, password, settings=None, *, room_name):
         self.calls.append(('create', player_id, max_players, password, settings))
         if self.rooms:
             raise OnlineError('ALREADY_IN_OTHER_ROOM', '已有房间')
         self.serial += 1
-        room = {'roomId': 'rm_'+str(self.serial), 'ownerPlayerId': player_id,
+        room = {'roomName': room_name, 'roomId': 'rm_'+str(self.serial), 'ownerPlayerId': player_id,
                 'settings': settings or {}}
         self.rooms[room['roomId']] = room
         if self.fail_create:
@@ -212,6 +212,8 @@ class RoomTests(unittest.TestCase):
         if operation == 'login':
             self.assertTrue(self.online.begin_login('测试玩家'))
             return self.consume_login()
+        if operation == 'create':
+            kwargs.setdefault('room_name', '固定房间名')
         self.assertTrue(self.session.begin(operation, '测试玩家', **kwargs))
         return self.consume()
 
@@ -237,6 +239,7 @@ class RoomTests(unittest.TestCase):
         self.assertIsNone(self.result('login').error)
         first = self.result('create', max_players=6, password='口令')
         self.assertIsNone(first.error)
+        self.assertEqual(first.data['roomName'], '固定房间名')
         self.assertEqual(self.store.load('http://localhost:8080').room_id, first.data['roomId'])
         self.assertIsNone(self.result('leave').error)
         self.assertIsNone(self.store.load('http://localhost:8080').room_id)

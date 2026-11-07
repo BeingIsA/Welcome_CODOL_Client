@@ -52,8 +52,8 @@ class Gateway(Protocol):
 
     def create(self, player_id: str, username: str, max_players: int,
                password: str | None, settings: dict | None = None,
-               profile: dict | None = None) -> dict:
-        """创建房间并返回成员快照；settings 为可选的对局设置快照。"""
+               profile: dict | None = None, *, room_name: str) -> dict:
+        """以创建时确定的名称创建房间并返回成员快照；settings 为可选的对局设置快照。"""
         ...
 
     def member_profile(self, player_id: str, room_id: str, member_id: str) -> dict | None:
@@ -109,7 +109,7 @@ class RoomPort(Protocol):
 
     def begin(self, operation: str, username: str, *, max_players: int = 4,
               password: str | None = None, settings: dict | None = None,
-              room_id: str | None = None, profile: dict | None = None) -> bool:
+              room_id: str | None = None, profile: dict | None = None, room_name: str | None = None) -> bool:
         """发起创建、加入、退出或同步设置；有未消费操作时返回 False。"""
         ...
 

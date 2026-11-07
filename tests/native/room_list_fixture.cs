@@ -74,7 +74,7 @@ class RoomListFixture {
         var rows = (List<Dictionary<string,object>>)objects[Read(args+16)];
         if (rows.Count!=Read(State+4)) throw new Exception("row count mismatch");
         for (int i=0; i<rows.Count; i++) {
-            if ((string)rows[i]["name"]!="中文房主" || (int)rows[i]["index"]!=i)
+            if ((string)rows[i]["name"]!="固定房间名" || (int)rows[i]["index"]!=i)
                 throw new Exception("wrong text/index");
             if ((string)rows[i]["password"]!="*" || (int)rows[i]["currentPlayers"]!=2)
                 throw new Exception("wrong display fields");

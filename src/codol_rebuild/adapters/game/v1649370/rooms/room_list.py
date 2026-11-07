@@ -73,7 +73,7 @@ def encode_rows(rooms, mode, base):
 
     struct.pack_into('<I', data, MODE_KEY, string('currentMatchMode'))
     for index, room in enumerate(selected):
-        values = (room['roomId'], index, room['ownerDisplayName'],
+        values = (room['roomId'], index, room['roomName'],
                   '*' if room['hasPassword'] else '', room['playerCount'],
                   room['maxPlayers'], 0, False, False, room['map'], room['mode'])
         # 最后一项属于嵌套模式对象，不能把带点的属性名当成对象结构。

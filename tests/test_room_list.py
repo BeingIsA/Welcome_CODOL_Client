@@ -10,7 +10,7 @@ from codol_rebuild.application.room.contracts import Completion
 
 
 def room(identity='rm_one', mode='td'):
-    return dict(roomId=identity, ownerPlayerId='pl_owner', ownerDisplayName='中文房主',
+    return dict(roomName='固定房间名', roomId=identity, ownerPlayerId='pl_owner', ownerDisplayName='中文房主',
                 playerCount=2, maxPlayers=12, hasPassword=True,
                 map='mp_crash', mode=mode)
 
@@ -46,7 +46,7 @@ class RoomListTests(unittest.TestCase):
             text = lambda ptr: data[ptr-base:].split(b'\0')[0].decode('utf8')
             self.assertEqual(interface, 0)
             fields[text(key)] = text(value) if kind == 6 else value
-        self.assertEqual(fields['name'], '中文房主')
+        self.assertEqual(fields['name'], '固定房间名')
         self.assertEqual(fields['password'], '*')
         self.assertEqual(fields['currentPlayers'], 2)
         self.assertEqual(fields['currentMaxPlayers'], 12)
@@ -77,7 +77,7 @@ class RoomListTests(unittest.TestCase):
     def test_oversize_and_embedded_null_are_rejected(self):
         with self.assertRaises(ValueError):
             listing.encode_rows([room()] * 1001, '', 0x21000000)
-        bad = room(); bad['ownerDisplayName'] = 'a\0b'
+        bad = room(); bad['roomName'] = 'a\0b'
         with self.assertRaises(ValueError):
             listing.encode_rows([bad], '', 0x21000000)
 

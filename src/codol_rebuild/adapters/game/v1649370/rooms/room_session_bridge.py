@@ -525,8 +525,10 @@ class RoomSessionBridge:
                 raise ValueError('房间设置数值无效：'+key)
             scalars.append((offset, struct.pack(form, value)))
         strings = bytearray(4096)
-        for offset, text in ((0, settings['mode']), (256, settings['map']),
-                             (512, data.get('ownerDisplayName', '房间'))):
+        initial_strings = ((0, settings['mode']), (256, settings['map']))
+        if self.pending[0] != 'members':
+            initial_strings += ((512, data['roomName']),)
+        for offset, text in initial_strings:
             raw = text.encode('utf-8')
             if len(raw) > 255 or b'\0' in raw:
                 raise ValueError('房间展示字符串无效')
@@ -667,6 +669,7 @@ class RoomSessionBridge:
                 maximum, password, settings = room_options(read, room)
                 submitted = self.port.begin(operation, username(read),
                                             max_players=maximum, password=password,
+                                            room_name=native_string(read, u32(read, room+0x10600)),
                                             settings=settings,
                                             profile=member_profile.capture_snapshot(read, self.profile_buffer))
             else:
