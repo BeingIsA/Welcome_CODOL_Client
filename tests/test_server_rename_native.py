@@ -21,7 +21,7 @@ class NativeRenameTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=workspace_root) as directory:
             workspace = Path(directory)
             addresses = {name: getattr(player_name, name)+0x40000000 for name in (
-                'HANDLER', 'SETTER', 'COMPLETE', 'USERNAME', 'DW', 'ERROR_STRING',
+                'HANDLER', 'SETTER', 'COMPLETE', 'USERNAME', 'GAME_NAME', 'DW', 'ERROR_STRING',
                 'EMPTY_STRING', 'REFRESH_INVENTORY', 'REFRESH_PREVIEW')}
             with patch.multiple(player_name, **addresses):
                 plan = player_name.build_adapter(0x20000000, 0x21000000, 0x22000000,

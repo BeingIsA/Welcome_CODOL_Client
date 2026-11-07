@@ -83,6 +83,8 @@ class NameBridgeTests(unittest.TestCase):
         for a,s in ((self.state,136),(self.frame,44),(self.params,24),(self.args,32),
                     (self.dvar,80),(self.lang,32)):
             self.write(a,bytes(s))
+        self.u32(n.GAME_NAME,0x34000000);self.u32(0x3400000c,0x35000000)
+        self.write(0x35000000,b'OldGameName\0')
         self.u32(n.USERNAME,self.dvar);self.u32(self.dvar,0x30000000)
         self.write(0x30000000,b'dw_username\0');self.write(self.dvar+8,b'\x07')
         self.u32(self.dvar+12,0x31000000);self.write(0x31000000,b'OldName\0')
@@ -126,12 +128,39 @@ class NameBridgeTests(unittest.TestCase):
         self.assertEqual(self.read(self.state+8,64).split(b'\0')[0],'本地玩家'.encode('gbk'))
         with self.assertRaises(ValueError):n.verify_applied(self.read,self.state)
         self.u32(self.dvar+12,self.state+8)
+        self.u32(0x3400000c,self.state+n.GAME_NAME_NEW)
         n.verify_applied(self.read,self.state)
         self.u32(self.dvar+12,self.state+72)
+        self.u32(0x3400000c,self.state+n.GAME_NAME_OLD)
         n.verify_applied(self.read,self.state,rollback=True)
         self.assertEqual(n.native_name(self.read),b'OldName')
         self.u32(n.DIRECT_STRING_MODE,1)
         self.assertEqual(n.encode_name(self.read,'本地玩家'),'本地玩家'.encode())
+
+    def test_display_encoding_does_not_change_game_name_encoding(self):
+        """大厅直接显示 UTF-8，入场副本仍为 CP936，旧副本独立保存。"""
+        self.u32(n.DIRECT_STRING_MODE,1)
+        n.stage_name(self.read,self.write,self.state,'本地玩家')
+        self.assertEqual(self.read(self.state+8,64).split(b'\0')[0],'本地玩家'.encode('utf-8'))
+        self.assertEqual(self.read(self.state+n.GAME_NAME_NEW,64).split(b'\0')[0],'本地玩家'.encode('gbk'))
+        self.assertEqual(self.read(self.state+n.GAME_NAME_OLD,64).split(b'\0')[0],b'OldGameName')
+        self.u32(self.dvar+12,self.state+8)
+        with self.assertRaisesRegex(ValueError,'入场昵称'):
+            n.verify_applied(self.read,self.state)
+
+    def test_generated_adapter_sets_both_names_before_each_notification(self):
+        """应用、回滚和恢复均先调用两个 setter，再交接宿主校验。"""
+        import capstone
+        for deferred in (False,True):
+            plan=n.build_adapter(0x20000000,self.state,self.ready,0x23000000,deferred=deferred)
+            instructions=list(capstone.Cs(capstone.CS_ARCH_X86,capstone.CS_MODE_32).disasm(plan['code'],0x20000000))
+            for phase in ('applied','rolled_back','restored'):
+                trap_address=next(address for address,name in plan['traps'].items() if name==phase)
+                preceding=[instruction for instruction in instructions if instruction.address<trap_address]
+                setters=[instruction for instruction in preceding if instruction.mnemonic=='call' and instruction.op_str==hex(n.SETTER)]
+                self.assertGreaterEqual(len(setters),2)
+                variable_loads=[instruction.op_str for instruction in preceding if instruction.mnemonic=='mov' and instruction.op_str.startswith('esi, dword ptr')]
+                self.assertEqual(variable_loads[-2:],[f'esi, dword ptr [{hex(n.USERNAME)}]',f'esi, dword ptr [{hex(n.GAME_NAME)}]'])
 
     def test_invalid_utf8_and_unterminated_input(self):
         for value in (b'\xff\0',b'x'*64):

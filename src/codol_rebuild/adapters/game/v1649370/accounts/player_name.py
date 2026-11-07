@@ -12,6 +12,10 @@ HANDLER = 0x6988B0
 SETTER = 0x771240
 COMPLETE = 0x698750
 USERNAME = 0x8269854
+GAME_NAME = 0x76446D8
+# 保留异步结果和错误消息的既有偏移；单独保存入场昵称的新旧值。
+GAME_NAME_NEW = 656
+GAME_NAME_OLD = 720
 DW = 0x849B874
 ROOM = 0x82E13FC
 LANGUAGE = 0x7ACE410
@@ -123,6 +127,13 @@ def read_request(read, frame, ready):
 def stage_name(read, write, state, value):
     """发布一次独立请求，保留旧名用于数据库拒绝或setter失败时回滚。"""
     raw, previous = encode_name(read, value), native_name(read)
+    game_name_pointer = _u32(read, GAME_NAME)
+    game_name_previous = _string(read, _u32(read, game_name_pointer+12))
+    game_name_bytes = value.encode('gbk', errors='strict')
+    game_name_payload = game_name_bytes.ljust(64, b'\0')+game_name_previous.ljust(64, b'\0')
+    write(state+GAME_NAME_NEW, game_name_payload)
+    if read(state+GAME_NAME_NEW, 128) != game_name_payload:
+        raise ValueError('入场昵称请求发布回读失败')
     payload = struct.pack('<II', 1, 0)+raw.ljust(64, b'\0')+previous.ljust(64, b'\0')
     write(state, payload)
     if read(state, STATE_SIZE) != payload:
@@ -134,6 +145,9 @@ def verify_applied(read, state, *, rollback=False):
     expected = read(state+(72 if rollback else 8), 64).split(b'\0', 1)[0]
     if native_name(read) != expected:
         raise ValueError('昵称原生回读失败'+('（回滚）' if rollback else ''))
+    game_name_expected = read(state+(GAME_NAME_OLD if rollback else GAME_NAME_NEW), 64).split(b'\0', 1)[0]
+    if _string(read, _u32(read, _u32(read, GAME_NAME)+12)) != game_name_expected:
+        raise ValueError('入场昵称原生回读失败'+('（回滚）' if rollback else ''))
 
 
 def validate_contract(read):
@@ -174,8 +188,8 @@ def build_adapter(entry, state, ready, initializer, *, deferred=False):
         emit(op); word((target-entry-len(code)-4) & 0xffffffff)
     def trap(name):
         emit('8be5'); traps[entry+len(code)] = name; emit('cc')
-    def setter(offset):
-        emit('83e4f0 83ec0c 8b35'); word(USERNAME)
+    def setter(offset, variable=USERNAME):
+        emit('83e4f0 83ec0c 8b35'); word(variable)
         emit('68'); word(state+offset); native('e8', SETTER)
         emit('8be5')
     label('request')
@@ -194,9 +208,9 @@ def build_adapter(entry, state, ready, initializer, *, deferred=False):
         emit('833d'); word(state+136); emit('00'); branch('0f84', 'poll_done')
         emit('833d'); word(state+136); emit('02'); branch('0f84', 'failure')
     emit('833d'); word(state); emit('01'); branch('0f85', 'failure')
-    setter(8); trap('applied')
+    setter(8); setter(GAME_NAME_NEW, GAME_NAME); trap('applied')
     emit('833d'); word(state+4); emit('01'); branch('0f84', 'success')
-    setter(72); trap('rolled_back')
+    setter(72); setter(GAME_NAME_OLD, GAME_NAME); trap('rolled_back')
     label('failure')
     emit('83e4f0 83ec04 6a00 68'); word(state+144 if deferred else ERROR_STRING); emit('6a00')
     branch('e9', 'complete')
@@ -219,7 +233,7 @@ def build_adapter(entry, state, ready, initializer, *, deferred=False):
     label('initialize')
     emit('9c60 8bec 83e4f0'); native('e8', initializer)
     emit('833d'); word(state); emit('01'); branch('0f85', 'initialized')
-    setter(8); trap('restored')
+    setter(8); setter(GAME_NAME_NEW, GAME_NAME); trap('restored')
     label('initialized'); emit('8be5 619d c3')
     for position, name in refs:
         struct.pack_into('<i', code, position, labels[name]-position-4)

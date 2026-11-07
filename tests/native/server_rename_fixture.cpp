@@ -11,6 +11,7 @@ DWORD scenario, completion_count, setter_count, request_count, applied_count;
 DWORD rollback_count, poll_count, error_count, setter_object;
 void* entry_point;
 char current_name[64];
+char game_name[64];
 }
 static DWORD* state_words = reinterpret_cast<DWORD*>(0x21000000);
 static char* staged_name = reinterpret_cast<char*>(0x21000008);
@@ -18,6 +19,7 @@ static char* previous_name = reinterpret_cast<char*>(0x21000048);
 
 extern "C" void apply_name(const char* value) {
     ++setter_count;
+    if (setter_object == 0x25000200) { strcpy(game_name, value); return; }
     if (setter_object != 0x25000000) ++error_count;
     if (scenario != 3 || setter_count > 1) strcpy(current_name, value);
 }
@@ -47,6 +49,8 @@ static LONG WINAPI on_trap(EXCEPTION_POINTERS* exception) {
         if (poll_count == 3 && scenario != 5) {
             strcpy(staged_name, "NewName");
             strcpy(previous_name, current_name);
+            strcpy(reinterpret_cast<char*>(0x21000290), "NewName");
+            strcpy(reinterpret_cast<char*>(0x210002d0), game_name);
             state_words[0] = 1;
             state_words[34] = scenario == 1 ? 2 : 1;
             state_words[35] = scenario < 4;
@@ -55,10 +59,11 @@ static LONG WINAPI on_trap(EXCEPTION_POINTERS* exception) {
     } else if (address == TRAP_APPLIED) {
         ++applied_count;
         if (scenario != 3 && strcmp(current_name, "NewName")) ++error_count;
+        if (strcmp(game_name, "NewName")) ++error_count;
         state_words[1] = scenario != 2 && scenario != 3;
     } else if (address == TRAP_ROLLED_BACK) {
         ++rollback_count;
-        if (strcmp(current_name, "OldName")) ++error_count;
+        if (strcmp(current_name, "OldName") || strcmp(game_name, "OldGameName")) ++error_count;
     } else {
         return EXCEPTION_CONTINUE_SEARCH;
     }
@@ -101,7 +106,7 @@ static void redirect(DWORD address, void* function) {
 }
 int main() {
     const DWORD pages[] = {0x20000000,0x21000000,0x22000000,0x23000000,0x25000000,
-        0x48490000,0x48260000,0x40690000,0x40770000,0x40dc0000,0x40da0000,0x405e0000};
+        0x47640000,0x48490000,0x48260000,0x40690000,0x40770000,0x40dc0000,0x40da0000,0x405e0000};
     for (DWORD address : pages) allocate_page(address);
     memcpy(reinterpret_cast<void*>(0x20000000), helper_code, sizeof helper_code);
     redirect(N_SETTER,reinterpret_cast<void*>(&native_setter));
@@ -111,13 +116,14 @@ int main() {
     redirect(N_REFRESH_PREVIEW,reinterpret_cast<void*>(&refresh));
     redirect(0x23000000,reinterpret_cast<void*>(&initialize));
     *reinterpret_cast<DWORD*>(N_USERNAME)=0x25000000;
+    *reinterpret_cast<DWORD*>(N_GAME_NAME)=0x25000200;
     *reinterpret_cast<DWORD*>(N_DW)=0x25000100;
     *reinterpret_cast<DWORD*>(0x22000000)=1;
     AddVectoredExceptionHandler(1,on_trap);
     unsigned case_count=0;
     for (scenario=0;scenario<7;++scenario) for (stack_padding=0;stack_padding<16;stack_padding+=4) {
         completion_count=setter_count=request_count=applied_count=rollback_count=poll_count=error_count=0;
-        memset(state_words,0,4096); strcpy(current_name,"OldName");
+        memset(state_words,0,4096); strcpy(current_name,"OldName"); strcpy(game_name,"OldGameName");
         if (scenario<4) invoke(0x20000000,true);
         if (setter_count || completion_count) ++error_count;
         invoke(POLL_ENTRY,false); invoke(POLL_ENTRY,false);
@@ -126,7 +132,7 @@ int main() {
         bool applies=scenario!=1 && scenario!=5;
         bool rolls_back=scenario==2 || scenario==3;
         if (completion_count!=DWORD(scenario<4) || applied_count!=DWORD(applies) ||
-            rollback_count!=DWORD(rolls_back) || setter_count!=DWORD(applies)+DWORD(rolls_back) ||
+            rollback_count!=DWORD(rolls_back) || setter_count!=2*(DWORD(applies)+DWORD(rolls_back)) ||
             request_count!=DWORD(scenario<4) ||
             strcmp(current_name, applies&&!rolls_back?"NewName":"OldName")) ++error_count;
         if (error_count) {
