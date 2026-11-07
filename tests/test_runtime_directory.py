@@ -117,7 +117,6 @@ class RuntimeDirectoryTests(unittest.TestCase):
         with contextlib.ExitStack() as mocks:
             mocks.enter_context(patch.object(resource_setup, 'ROOT', self.root))
             mocks.enter_context(patch.object(resource_setup, 'USER_DATA_ROOT', self.project / 'userdata'))
-            mocks.enter_context(patch.object(resource_setup, 'accounts_dir', return_value=self.project / 'accounts'))
             mocks.enter_context(patch.object(native_library, 'read_manifest', return_value=(b'manifest', manifest)))
             mocks.enter_context(patch.object(resource_setup, 'prepare_library'))
             mocks.enter_context(patch.object(resource_setup, 'protect_cache'))
