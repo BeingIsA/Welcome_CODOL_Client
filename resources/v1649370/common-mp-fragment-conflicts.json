@@ -1,0 +1,158 @@
+{
+  "schema": 1,
+  "scope": "所有同名编码冲突都经严格解码再比较；不选择覆盖优先级。",
+  "resources": {
+    "main/models/ves_qqbackpack_pirce_sc_s_lod310": {
+      "candidates": [
+        {
+          "archive": "lf_init_common_mp_2_V35.ifs",
+          "encoded_sha256": "d6b336460506249f1e3ef84bda9dc6036c712d503d284fd502ff665624358fef",
+          "decoded_size": 75916,
+          "decoded_sha256": "88f84e1b165135aca68998f6ed5233bb8f2a3aa53c43876d375171791092ed62",
+          "strict_zlib_verified": true
+        },
+        {
+          "archive": "lf_init_common_mp_2_V35.1.ifs",
+          "encoded_sha256": "8c090f6ec88539a449ed7007f6605da3dad6cadeb51c4d027a2d66dcf9f5936a",
+          "decoded_size": 75916,
+          "decoded_sha256": "6ecb02240725fa06850737732e89feeb3144af587aeddfac2fff8fab9a715194",
+          "strict_zlib_verified": true
+        }
+      ],
+      "decoded_content_identical": false
+    },
+    "main/models/ves_qqbackpack_pirce_tf_s_lod010": {
+      "candidates": [
+        {
+          "archive": "lf_init_common_mp_2_V35.ifs",
+          "encoded_sha256": "7ddc51c05a0f733b19a8f024fb11d7641cc2f1802e30c83c7b8db086e6d63115",
+          "decoded_size": 280616,
+          "decoded_sha256": "51b7820029fb71ad04a6f8a0cf8a392cec9b4e8da19b5174341afb8652efedad",
+          "strict_zlib_verified": true
+        },
+        {
+          "archive": "lf_init_common_mp_2_V35.1.ifs",
+          "encoded_sha256": "5bf65a5a0c3bf2d62ad73e0eb98b5e93fe9b4a6b6c5f3e5bb5bede33f1556e8c",
+          "decoded_size": 281028,
+          "decoded_sha256": "f0c4b92269d89ec1ec79bef4e1e3832c72617c90f29e42e954f94d0ba30710a8",
+          "strict_zlib_verified": true
+        }
+      ],
+      "decoded_content_identical": false
+    },
+    "main/models/ves_qqbackpack_pirce_tf_s_lod110": {
+      "candidates": [
+        {
+          "archive": "lf_init_common_mp_2_V35.ifs",
+          "encoded_sha256": "880bdc87d486e89e03aa21a510237eaff7bf7c70e94854e279a6074a9f2b1bea",
+          "decoded_size": 183268,
+          "decoded_sha256": "908e1d6dc0c57af01349fd820ec1284b4bd563872c3f3d0d6da961cad7a79573",
+          "strict_zlib_verified": true
+        },
+        {
+          "archive": "lf_init_common_mp_2_V35.1.ifs",
+          "encoded_sha256": "41b6fb2148b6a605b61f55266cac91b9e40457c99dd3b76a82ec5ed9c750f1b3",
+          "decoded_size": 183268,
+          "decoded_sha256": "6e1c02e665d2b3260db4d9869e89ab3fe38e312bbd8e97a3392753b6cd6dedf1",
+          "strict_zlib_verified": true
+        }
+      ],
+      "decoded_content_identical": false
+    },
+    "main/models/ves_qqbackpack_pirce_tf_s_lod210": {
+      "candidates": [
+        {
+          "archive": "lf_init_common_mp_2_V35.ifs",
+          "encoded_sha256": "870e93ecefe94366b6785fac7a864d2223856b2f95cde0a43e7299bd872f1120",
+          "decoded_size": 127180,
+          "decoded_sha256": "b6c5d9dd3c84e48588ffac6c39921ff18d14f8fae279ed8f72f13bff84eea180",
+          "strict_zlib_verified": true
+        },
+        {
+          "archive": "lf_init_common_mp_2_V35.1.ifs",
+          "encoded_sha256": "c9b1da667b61767ad03326d5e0f6fb7b86980711258334ad3ef7f9606c97c91e",
+          "decoded_size": 127172,
+          "decoded_sha256": "8611546bb166fec481fb6ccb148c1dcf28baec1f6cc9b1124bbdbb02ad588e42",
+          "strict_zlib_verified": true
+        }
+      ],
+      "decoded_content_identical": false
+    },
+    "main/models/ves_qqbackpack_pirce_sc_s_lod110": {
+      "candidates": [
+        {
+          "archive": "lf_init_common_mp_3_V38.1.ifs",
+          "encoded_sha256": "b83c7190f85464c2f393446431e1c2833634864cae90b5abfa8e06cd69e35dc0",
+          "decoded_size": 172728,
+          "decoded_sha256": "b0bb20c8d4359a9f2a852fa306c4a4f73e995b27f8eea049642bef066219cd85",
+          "strict_zlib_verified": true
+        },
+        {
+          "archive": "lf_init_common_mp_3_V38.2.ifs",
+          "encoded_sha256": "20248d9a9f8b7d6245d9f5a039e85e9735f3b0069c5ef1360eacfaf41ebf128a",
+          "decoded_size": 172728,
+          "decoded_sha256": "f3d7139394baa73abe7b377da27ccf271818ac25917a31b453c7a6bc2c5d0e6f",
+          "strict_zlib_verified": true
+        }
+      ],
+      "decoded_content_identical": false
+    },
+    "main/models/ves_qqbackpack_pirce_sc_s_lod210": {
+      "candidates": [
+        {
+          "archive": "lf_init_common_mp_3_V38.1.ifs",
+          "encoded_sha256": "a29dd2184afb8db0c3bef5c2aa48102c2c0e567c5785ac5545f2533739705f96",
+          "decoded_size": 120100,
+          "decoded_sha256": "fefb76036627030143b7d6402d063f3fcf074ee52a5fae0afea18a66ab389a22",
+          "strict_zlib_verified": true
+        },
+        {
+          "archive": "lf_init_common_mp_3_V38.2.ifs",
+          "encoded_sha256": "63ee1ec48bcac81493992e83bdf9b60e557616915fbf17658a234c7a987fa30f",
+          "decoded_size": 120100,
+          "decoded_sha256": "a9c3fdf583d856ba53e4beda40ca1c81f9453f878ef08b3dae3740dd971e96f8",
+          "strict_zlib_verified": true
+        }
+      ],
+      "decoded_content_identical": false
+    },
+    "main/models/ves_qqbackpack_pirce_tf_s_lod310": {
+      "candidates": [
+        {
+          "archive": "lf_init_common_mp_3_V38.1.ifs",
+          "encoded_sha256": "ec117ccbce8da9769f83a20581646acd8cc35172282bd21ced39c4e27ac3f1cd",
+          "decoded_size": 82988,
+          "decoded_sha256": "deaa692e15578deb54fd72e66fcd6b93b331178a6507e9a18986f8d04fa7b4dd",
+          "strict_zlib_verified": true
+        },
+        {
+          "archive": "lf_init_common_mp_3_V38.2.ifs",
+          "encoded_sha256": "3d814cbf10326f2134f44efc367e17580a60eb3270ce960e1e9b36bace8367a5",
+          "decoded_size": 82988,
+          "decoded_sha256": "8e021ec7ce4a5c88e5c0191b29d67efac9cccabaa43526cf53c2e117d479b880",
+          "strict_zlib_verified": true
+        }
+      ],
+      "decoded_content_identical": false
+    },
+    "main/images/hud_cannonball.iwi": {
+      "candidates": [
+        {
+          "archive": "lf_init_common_mp_5_V36.ifs",
+          "encoded_sha256": "e49090a434449eddb546105e89666f596be99fe8bbb792280867b04d7ee733af",
+          "decoded_size": 16416,
+          "decoded_sha256": "5e2c53dfb370c111d0ea86f865a14665ee8574243f983991f4ee7fda12efcb27",
+          "strict_zlib_verified": true
+        },
+        {
+          "archive": "lf_init_common_mp_5_V36.1.ifs",
+          "encoded_sha256": "7708b082c815f13f6c1761e25bb9b45da47592bb74a228206168fbf918d6c315",
+          "decoded_size": 16416,
+          "decoded_sha256": "48cecc642114fd2e0c751cf07e427e297119b61ef3ab8e962873f2ae86980442",
+          "strict_zlib_verified": true
+        }
+      ],
+      "decoded_content_identical": false
+    }
+  }
+}

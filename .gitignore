@@ -1,10 +1,19 @@
 __pycache__/
 *.pyc
 workspaces/
-resources/
+/resources/*
+!/resources/v1649370/
+/resources/v1649370/*
+!/resources/v1649370/README.md
+!/resources/v1649370/offline-menu-patches.json
+!/resources/v1649370/iips-patch-priority-final.json
+!/resources/v1649370/startup-non-iwi-resources.json
+!/resources/v1649370/startup-resource-content-conflicts-v2.json
+!/resources/v1649370/common-mp-fragment-conflicts.json
 !src/codol_rebuild/resources/
 data/
 *.zone
 .idea/
 *.zip
+*.z[0-9][0-9]
 

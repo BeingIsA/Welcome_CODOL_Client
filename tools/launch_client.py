@@ -27,6 +27,9 @@ PATCH_BYTES = (
     ('0x7e993d', 'e8de8ce5ff', '9090909090'),
     ('0xe579f0', '18cddb00', '4c08dc00'),
     ('0xdbccf8', '7365742032343531', '7365742032343339'),
+    # 跳过横纵灵敏度的下限覆盖，保留原生缩放与浮点栈清理。
+    ('0x5b1809', '75', 'eb'),
+    ('0x5b1816', '75', 'eb'),
 )
 
 
@@ -61,7 +64,7 @@ def build_plan(options: argparse.Namespace) -> dict:
     if (not isinstance(rows, list) or len(rows) != len(PATCH_BYTES)
             or any(not isinstance(row, dict) for row in rows)
             or [(row.get('va'), row.get('before'), row.get('after')) for row in rows] != list(PATCH_BYTES)):
-        raise ValueError('要求已验证的五项补丁：地址、修改前后字节必须完全一致')
+        raise ValueError('要求已验证的补丁清单：地址、修改前后字节必须完全一致')
     session = datetime.now().strftime('offline-%Y%m%d-%H%M%S-') + uuid.uuid4().hex[:8]
     arguments = ['--name', session]
     required = {'--name', '--image', '--patches', '--breakpoint'}

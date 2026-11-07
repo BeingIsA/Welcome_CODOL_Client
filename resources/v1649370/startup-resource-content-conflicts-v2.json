@@ -1,0 +1,910 @@
+{
+  "schema": 2,
+  "scope": "仅原始配置中已明确纳入的33个gfx/marketplace1..5/common_mp1..5主包及所有分片；未扩大地图、hires或gametype范围。",
+  "configured_archive_count": 33,
+  "all_declared_group_archives_have_actual_receipts": true,
+  "source_sha256_reverified": true,
+  "actual_resource_sets_and_sizes_reverified": true,
+  "all_raw_content_hashes_reverified": false,
+  "note": "全部内容摘要由批量库复核；本探测复核全部源包/清单/文件集合/尺寸，并严格解码每个重复路径的实际候选。",
+  "archives": [
+    {
+      "archive": "lf_init_common_gfx_V63.ifs",
+      "file_item_index": 792,
+      "source_size": 61946593,
+      "source_sha256": "b544f992fe962247845f57094d4c8a52ab616c4b003f8c2dcb73b87c89a842b4",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_gfx_V63\\extraction-inventory.json",
+      "receipt_sha256": "a2caeac1ad25c02026ac1f5803ecc5f820334cc39f0af11bb2f4c32d2a27d1ee",
+      "listing": {
+        "name": "lf_init_common_gfx.lst",
+        "sha256": "20d89f7567ffc352d191080f91ffa1e263cd4b29821ffc6ee8329f38230ad0cd"
+      },
+      "actual_resource_count": 525
+    },
+    {
+      "archive": "lf_init_common_marketplace_1_V49.ifs",
+      "file_item_index": 793,
+      "source_size": 623533234,
+      "source_sha256": "4a05f961670a8590c0473af363bce85fb3666c8ea67c51b9cb071fab5f3740b6",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_marketplace_1_V49\\extraction-inventory.json",
+      "receipt_sha256": "054ccdbc429d81b914eafc97c35c391593f128ab62c15c549d843ea49ec5897d",
+      "listing": {
+        "name": "lf_init_common_marketplace_1.lst",
+        "sha256": "3d9dadb36f5e55a518fce72eb197a7fa8d6eeea86ca201522dbf85e13847232a"
+      },
+      "actual_resource_count": 7135
+    },
+    {
+      "archive": "lf_init_common_marketplace_1_V49.1.ifs",
+      "file_item_index": 794,
+      "source_size": 1262893,
+      "source_sha256": "0d63d96897f43f75b7dfd7fad97ac05dd2cb794cb093b8110d0848f6f58f540f",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_marketplace_1_V49.1\\extraction-inventory.json",
+      "receipt_sha256": "335a1b58db520d476e968944102bb962d219128c6793ccc9b969144786824330",
+      "listing": {
+        "name": "lf_init_common_marketplace_1.lst",
+        "sha256": "121ff6c832beb111351871f8b316b6f12ad755f56aa2d47e2df04e37cab486aa"
+      },
+      "actual_resource_count": 15
+    },
+    {
+      "archive": "lf_init_common_marketplace_2_V46.ifs",
+      "file_item_index": 795,
+      "source_size": 595257910,
+      "source_sha256": "85a36ac727ec46c9ab6f67e265a07bf26dfd982d11cd0533a1bec4b3078561ef",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_marketplace_2_V46\\extraction-inventory.json",
+      "receipt_sha256": "f83f8163dd96f21f83c822b361c68fed254c315e800e44481cfcd23692c8c0fd",
+      "listing": {
+        "name": "lf_init_common_marketplace_2.lst",
+        "sha256": "7e9ef79563c70071988830a3de07808b7c9ea1267685c91d91d1abe582628309"
+      },
+      "actual_resource_count": 6904
+    },
+    {
+      "archive": "lf_init_common_marketplace_2_V46.1.ifs",
+      "file_item_index": 796,
+      "source_size": 2279755,
+      "source_sha256": "41038a32aa7d56e3c0bf1eb620eb890732ff58ffe9a8a2e5fb8d79c6ef9a6c36",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_marketplace_2_V46.1\\extraction-inventory.json",
+      "receipt_sha256": "f64b5c924742973cb54530ffb7d686bfa1743b4e42501674ff1fea0e8c23f4da",
+      "listing": {
+        "name": "lf_init_common_marketplace_2.lst",
+        "sha256": "68656ced7f8f3f54460d7eadf5a80e37710131baed95cc9b707b9bd572cf809f"
+      },
+      "actual_resource_count": 12
+    },
+    {
+      "archive": "lf_init_common_marketplace_2_V46.2.ifs",
+      "file_item_index": 797,
+      "source_size": 5723965,
+      "source_sha256": "fc28d5ba6270a911bf227c0d5726e4375ed90c9063458fdad84d268f8ce71af2",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_marketplace_2_V46.2\\extraction-inventory.json",
+      "receipt_sha256": "c8749a99ca146462e4bb7d0a52399445ef6a28cc6fac46c1063134600fea38cf",
+      "listing": {
+        "name": "lf_init_common_marketplace_2.lst",
+        "sha256": "a076ad623b2dbe7e59860f8debccf93ba988dcb48e89c142bb906be5aeb394ae"
+      },
+      "actual_resource_count": 31
+    },
+    {
+      "archive": "lf_init_common_marketplace_2_V46.3.ifs",
+      "file_item_index": 798,
+      "source_size": 705259,
+      "source_sha256": "2c66a4e4b63cf4d1f77e8b666749237b99cd136bffd1d57472de9cc7d2266db1",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_marketplace_2_V46.3\\extraction-inventory.json",
+      "receipt_sha256": "34e21156910ef9bb88dae477192d42214b674013b36fe898ba20afb86a56f8ed",
+      "listing": {
+        "name": "lf_init_common_marketplace_2.lst",
+        "sha256": "41be2c3ca5c110444e4991e5ad1e93b957d47e28dc3e0aae56728213a6679723"
+      },
+      "actual_resource_count": 6
+    },
+    {
+      "archive": "lf_init_common_marketplace_3_V50.ifs",
+      "file_item_index": 799,
+      "source_size": 600621037,
+      "source_sha256": "1e631ade6fe5778c08098ccf73577b03e4b8d4b9e4f01884b844e32611547e10",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_marketplace_3_V50\\extraction-inventory.json",
+      "receipt_sha256": "3f19f1125827ef21abdebaa0679826fe40bf7cecd37fd9f72138cb9f41a4d11d",
+      "listing": {
+        "name": "lf_init_common_marketplace_3.lst",
+        "sha256": "35d787bc2503006b452d1d83921dd61d1a72f4323ef1a256210c3a688381debb"
+      },
+      "actual_resource_count": 6789
+    },
+    {
+      "archive": "lf_init_common_marketplace_3_V50.1.ifs",
+      "file_item_index": 800,
+      "source_size": 3198211,
+      "source_sha256": "1688198bf0a9cd4bf40daed33d67a3d08a5fdbb05e69f789fceb533c5df84a51",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_marketplace_3_V50.1\\extraction-inventory.json",
+      "receipt_sha256": "cac79415c4c29070f3fa4815a5b4a31f371bd2b0bdeeac19e5b80d3c05698af6",
+      "listing": {
+        "name": "lf_init_common_marketplace_3.lst",
+        "sha256": "0cf1c46bae1b39ea7930e4849cb0b1c478da5c644f5d79b0906e3834a70321b2"
+      },
+      "actual_resource_count": 19
+    },
+    {
+      "archive": "lf_init_common_marketplace_3_V50.2.ifs",
+      "file_item_index": 801,
+      "source_size": 6117589,
+      "source_sha256": "1c4c67188b222e9627157945c58e1d440578d564c6b7b5da0020eaeed545f908",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_marketplace_3_V50.2\\extraction-inventory.json",
+      "receipt_sha256": "b866213c59743c824db2cb648d9d6aadc1f6d6c2fb569608e170c4688cef3781",
+      "listing": {
+        "name": "lf_init_common_marketplace_3.lst",
+        "sha256": "f4e2d9e58a45b3b81a51037bd98096f224f2e55ae91ea68a84f68deb6cd36f6c"
+      },
+      "actual_resource_count": 32
+    },
+    {
+      "archive": "lf_init_common_marketplace_3_V50.3.ifs",
+      "file_item_index": 802,
+      "source_size": 475645,
+      "source_sha256": "2c2453c9347aa416a5ce4353431ff49d619041c04366c5567a156dc5d8f5bb25",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_marketplace_3_V50.3\\extraction-inventory.json",
+      "receipt_sha256": "53342debb34613dc5758a5cb2bae9aa1be06650e86d341950eef5f946ed53b9b",
+      "listing": {
+        "name": "lf_init_common_marketplace_3.lst",
+        "sha256": "943cbae6a5093a4d3f51addfba73cd3702126fb204025bbd326ccc7b7dab6fdf"
+      },
+      "actual_resource_count": 8
+    },
+    {
+      "archive": "lf_init_common_marketplace_4_V46.ifs",
+      "file_item_index": 803,
+      "source_size": 613725436,
+      "source_sha256": "e24ecf12fd89d67b1d1a7c2eb38b81b5c610a7f4433b26a7824ddfcab682d973",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_marketplace_4_V46\\extraction-inventory.json",
+      "receipt_sha256": "a432d16d1555c3d5075a6b70bedd39be5fc285ae0b4dda87a59410142b9f9080",
+      "listing": {
+        "name": "lf_init_common_marketplace_4.lst",
+        "sha256": "21e58909b464a8ff90a8a468bf8642e36398a3f0371d451724f803d737e2bc34"
+      },
+      "actual_resource_count": 6920
+    },
+    {
+      "archive": "lf_init_common_marketplace_4_V46.1.ifs",
+      "file_item_index": 804,
+      "source_size": 3542632,
+      "source_sha256": "96e165c1b7e0a6397c6aa565fb9ceddedcdca95bdced491da8a6ce417c8af1fe",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_marketplace_4_V46.1\\extraction-inventory.json",
+      "receipt_sha256": "35765c645df3d0576f79cc9deb5857445d505740c490d3948f2b64e0e7af38aa",
+      "listing": {
+        "name": "lf_init_common_marketplace_4.lst",
+        "sha256": "faaac75013f20e4390aad76686eceb6fcd690471d554f4cf396019323a2fa1ba"
+      },
+      "actual_resource_count": 24
+    },
+    {
+      "archive": "lf_init_common_marketplace_4_V46.2.ifs",
+      "file_item_index": 805,
+      "source_size": 4362682,
+      "source_sha256": "ace0d5bc8c280b49bf82bf8d1b59220446faa5f7f9446e1b2a8b65d590569d15",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_marketplace_4_V46.2\\extraction-inventory.json",
+      "receipt_sha256": "40e9dc781137544e48fdc3294e1aebc9a56ce8e30db3e7445805e19a3f355da5",
+      "listing": {
+        "name": "lf_init_common_marketplace_4.lst",
+        "sha256": "f1de99692b276e991f118d4b5935f31ea99865189c44d0a611058de28e799196"
+      },
+      "actual_resource_count": 29
+    },
+    {
+      "archive": "lf_init_common_marketplace_4_V46.3.ifs",
+      "file_item_index": 806,
+      "source_size": 869269,
+      "source_sha256": "f67adb0737c4e35e8ef511328aa550ef36da17b5f01cdba5ecce18333548b411",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_marketplace_4_V46.3\\extraction-inventory.json",
+      "receipt_sha256": "d0b051732d69b90269239f82d25ce40341a84354a75e0859b683ea1bca925ec3",
+      "listing": {
+        "name": "lf_init_common_marketplace_4.lst",
+        "sha256": "128f24541d918ff40c83fb54badb44df229e8ad154ce7ab676a6418336e1fe60"
+      },
+      "actual_resource_count": 10
+    },
+    {
+      "archive": "lf_init_common_marketplace_5_V45.ifs",
+      "file_item_index": 807,
+      "source_size": 563718787,
+      "source_sha256": "2509097276fdc7493b9bcc6c3b6bfd91a1d42746c5a795566a5c458c68890c32",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_marketplace_5_V45\\extraction-inventory.json",
+      "receipt_sha256": "4a17876d83542f4d374d4db08b939d4e38a72d7e965c31c0b0a79de5ab9feba7",
+      "listing": {
+        "name": "lf_init_common_marketplace_5.lst",
+        "sha256": "36607b9042d662a268adebd19a7714b23e1d9feb9d8b08fa22ec4bc76f1a12c4"
+      },
+      "actual_resource_count": 6926
+    },
+    {
+      "archive": "lf_init_common_marketplace_5_V45.1.ifs",
+      "file_item_index": 808,
+      "source_size": 2148547,
+      "source_sha256": "9705b8bbfd58965595221376812ca24533d7c75ddee7619c012e14f66ee1890a",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_marketplace_5_V45.1\\extraction-inventory.json",
+      "receipt_sha256": "9328fe7efc7d2198411c02efdc362f6fa2ae6b3620f241b26dfd93ebfb871237",
+      "listing": {
+        "name": "lf_init_common_marketplace_5.lst",
+        "sha256": "dd3c233805be0135a9bb332d04f7a91ec206c624deba2dabda84411307786269"
+      },
+      "actual_resource_count": 19
+    },
+    {
+      "archive": "lf_init_common_marketplace_5_V45.2.ifs",
+      "file_item_index": 809,
+      "source_size": 2525770,
+      "source_sha256": "e98de90a68700737f7f5ae7a48f565b55bdb1a910cd88427f837e8317b743cd4",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_marketplace_5_V45.2\\extraction-inventory.json",
+      "receipt_sha256": "c5a82204741972a2e512532f3440358803aefe954915e467e775cb6ce9e63e37",
+      "listing": {
+        "name": "lf_init_common_marketplace_5.lst",
+        "sha256": "9cc9e66746f54f567c36447243a1fd9b9253e7c37792301553bbda081156a033"
+      },
+      "actual_resource_count": 33
+    },
+    {
+      "archive": "lf_init_common_marketplace_5_V45.3.ifs",
+      "file_item_index": 810,
+      "source_size": 508447,
+      "source_sha256": "4e64bfda5d231c5dc9da8f2520571238afef41bf4d7cb18b5508bb92b78f83ca",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_marketplace_5_V45.3\\extraction-inventory.json",
+      "receipt_sha256": "5d44d418f6d568c39fa03cf8bf2403fde8eb6d89b12116e2a34c8f3a6576e949",
+      "listing": {
+        "name": "lf_init_common_marketplace_5.lst",
+        "sha256": "ea0e076dcac6c57d7a387e77fab269dbece98f2b961c59ab6916295751098c93"
+      },
+      "actual_resource_count": 3
+    },
+    {
+      "archive": "lf_init_common_mp_1_V35.ifs",
+      "file_item_index": 811,
+      "source_size": 136931965,
+      "source_sha256": "117a95b44395d10d18e46d8be210afd214773d2ce7b18391753a887a8adf6d0d",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_mp_1_V35\\extraction-inventory.json",
+      "receipt_sha256": "f72caff4d895258bd59374f812fafd2ef1ffbcca2d894e9eb336b693612c495d",
+      "listing": {
+        "name": "lf_init_common_mp_1.lst",
+        "sha256": "bccdfa18e7db379a91a633d198a2a245d26cb4f07a86fbb55d16d3e0c525f44e"
+      },
+      "actual_resource_count": 1156
+    },
+    {
+      "archive": "lf_init_common_mp_2_V35.ifs",
+      "file_item_index": 812,
+      "source_size": 133159735,
+      "source_sha256": "0d9335afb8ede33ae9307aa89f32364379b4eaeda2dca706e064e13ebe14719b",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_mp_2_V35\\extraction-inventory.json",
+      "receipt_sha256": "90f221ed38bb76748f6434d2a372d07a6d38fa40d9d055eebb70a0db5b81c399",
+      "listing": {
+        "name": "lf_init_common_mp_2.lst",
+        "sha256": "541789549c7bf8e1fd92fb809bb8d103da4e38698ff06a3f8c12b95df5bc57a4"
+      },
+      "actual_resource_count": 1079
+    },
+    {
+      "archive": "lf_init_common_mp_2_V35.1.ifs",
+      "file_item_index": 813,
+      "source_size": 508447,
+      "source_sha256": "b1e2afa8cfc4d1590909f60c3a44bc468e157c3ac0668279356ad35fbfc3299a",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_mp_2_V35.1\\extraction-inventory.json",
+      "receipt_sha256": "cf05ea4071f2f1c9602861c3ae876a46239a2ca9286b4c7a6634252abf43deb2",
+      "listing": {
+        "name": "lf_init_common_mp_2.lst",
+        "sha256": "54188f5431a6f074543d327afc228e88bd447026260600dbd12eaec3c7be7245"
+      },
+      "actual_resource_count": 16
+    },
+    {
+      "archive": "lf_init_common_mp_2_V35.2.ifs",
+      "file_item_index": 814,
+      "source_size": 65620,
+      "source_sha256": "a0910bdf622fdf556470e4bddded0375bc7b91cc888978050599b94f9ee2d1b5",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_mp_2_V35.2\\extraction-inventory.json",
+      "receipt_sha256": "e9dd44a9055e2fe3b6d76243333f5c2a1f62951aea90ce3cf8711f22711dbddf",
+      "listing": {
+        "name": "lf_init_common_mp_2.lst",
+        "sha256": "84dadcc4151daefa52a4e56c86027764f287c67d41aedcd64b3f072926fe04d1"
+      },
+      "actual_resource_count": 1
+    },
+    {
+      "archive": "lf_init_common_mp_3_V38.ifs",
+      "file_item_index": 815,
+      "source_size": 110542756,
+      "source_sha256": "207a9165cc911eab223594a0d7e4b7a3ee7d4268419ee39288e0a6ec7022145d",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_mp_3_V38\\extraction-inventory.json",
+      "receipt_sha256": "bacd3c1fd33b7b17b09063b1a862eeb98f47f1afdf73b36f2b20419942933074",
+      "listing": {
+        "name": "lf_init_common_mp_3.lst",
+        "sha256": "7fa162384ccfb3f4638e8e7dbb06524f1e5708aa8579c58064f78a17294cc3de"
+      },
+      "actual_resource_count": 1075
+    },
+    {
+      "archive": "lf_init_common_mp_3_V38.1.ifs",
+      "file_item_index": 816,
+      "source_size": 1984537,
+      "source_sha256": "51eff2e0a8784900279e3503122ca79d44c56bf6532c7fee4b14518eadac7536",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_mp_3_V38.1\\extraction-inventory.json",
+      "receipt_sha256": "bf0f4b7e65bde2b7fd3f3bdbae550a2e1a527916e12fbef7d6c85719bda4d895",
+      "listing": {
+        "name": "lf_init_common_mp_3.lst",
+        "sha256": "fa6b4d1261eacc5cde4b7f76370163153d9e81924dfd56cc466fcbc74db7f5e7"
+      },
+      "actual_resource_count": 10
+    },
+    {
+      "archive": "lf_init_common_mp_3_V38.2.ifs",
+      "file_item_index": 817,
+      "source_size": 311635,
+      "source_sha256": "d74577ff1b0df80a6b4458f79bc0f903e8c7dbf3ad261126a4388679e50deae3",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_mp_3_V38.2\\extraction-inventory.json",
+      "receipt_sha256": "fa2b0bf26998c8b424ba3ff2db2413d1e0a53c5c183ad8d841d611b2fdd3ccc2",
+      "listing": {
+        "name": "lf_init_common_mp_3.lst",
+        "sha256": "993e07c2a1a48107eb644e143e6e35c985f500252dfa1a651dc54c3bb5e2d0fa"
+      },
+      "actual_resource_count": 13
+    },
+    {
+      "archive": "lf_init_common_mp_3_V38.3.ifs",
+      "file_item_index": 818,
+      "source_size": 16417,
+      "source_sha256": "dfbbc07d631fe4ea9f98d63baae2eab675577248184a4eac454a0e957e8242a6",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_mp_3_V38.3\\extraction-inventory.json",
+      "receipt_sha256": "620325177d7c37e91422866cc855f8334ceb800cd499ba1de7414bf33c1f2362",
+      "listing": {
+        "name": "lf_init_common_mp_3_V38.3.extract.tsv",
+        "sha256": "9b5206440b484b54cb13220a2eb188d8b612f1a8b6bcf3c5559192b3c0ea5621",
+        "kind": "extractor_actual_path_tsv_from_internal_listfile"
+      },
+      "actual_resource_count": 3
+    },
+    {
+      "archive": "lf_init_common_mp_4_V31.ifs",
+      "file_item_index": 819,
+      "source_size": 95453836,
+      "source_sha256": "895d654179a7fc47ba6409eef936ffbc37f3a2beb13a4ed34a6a3588e979922d",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_mp_4_V31\\extraction-inventory.json",
+      "receipt_sha256": "4155edad9abbc124c8dd5403a5f96766723df8e9f873c0949e32e4444454a881",
+      "listing": {
+        "name": "lf_init_common_mp_4.lst",
+        "sha256": "1157f0918acea51e3eaaa0a726ecdef8149d4990a28f44ab99ff311a34062267"
+      },
+      "actual_resource_count": 1054
+    },
+    {
+      "archive": "lf_init_common_mp_4_V31.1.ifs",
+      "file_item_index": 820,
+      "source_size": 65620,
+      "source_sha256": "692d9bf5a5d70928a6c9c9b3ab644df49763c6f5e657a0fa377b2b31e4571234",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_mp_4_V31.1\\extraction-inventory.json",
+      "receipt_sha256": "1646090bd04ed24648267042f710e6425ff23b6e84b0d496a72f55d7c52dc71f",
+      "listing": {
+        "name": "lf_init_common_mp_4.lst",
+        "sha256": "dfcc5efeef59e70751720bdf32ac6797895a148b95c50ce0aea5465713e9f2f2"
+      },
+      "actual_resource_count": 1
+    },
+    {
+      "archive": "lf_init_common_mp_4_V31.2.ifs",
+      "file_item_index": 821,
+      "source_size": 16417,
+      "source_sha256": "4059c2d1862d15f281ac2680804e2bc4050ab8185b80ec50f8c0fa60a1a1c08e",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_mp_4_V31.2\\extraction-inventory.json",
+      "receipt_sha256": "0c172d0baa5039267a8f1bc101e26b60984b1826a55de324aec6f90a789028a2",
+      "listing": {
+        "name": "lf_init_common_mp_4_V31.2.extract.tsv",
+        "sha256": "032ca8ab6c9148238ab096468f05ca36eb40e8865013481df04ecd98e539ebab",
+        "kind": "extractor_actual_path_tsv_from_internal_listfile"
+      },
+      "actual_resource_count": 1
+    },
+    {
+      "archive": "lf_init_common_mp_5_V36.ifs",
+      "file_item_index": 822,
+      "source_size": 125057641,
+      "source_sha256": "c303010ad6094a699e7915e301f4dfd78ad11f8dfb329b7d93394fadefd66543",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_mp_5_V36\\extraction-inventory.json",
+      "receipt_sha256": "cf017e6249e01bc031ce194b59ea268808019d594d2afffcaf44e554c3c477a2",
+      "listing": {
+        "name": "lf_init_common_mp_5.lst",
+        "sha256": "68d5273b6973b94d7d70ef5020f0a4815e3e97dd86760d6f8e943b02a85349c9"
+      },
+      "actual_resource_count": 1030
+    },
+    {
+      "archive": "lf_init_common_mp_5_V36.1.ifs",
+      "file_item_index": 823,
+      "source_size": 114823,
+      "source_sha256": "381b968d8aa500eeb656e80a358ab0e0b10d461687b38123a032499265ab4635",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_mp_5_V36.1\\extraction-inventory.json",
+      "receipt_sha256": "9e9fc39522e5a6b3411bb0b576f5c6927bb5a10a438cc857b90c6b644d645f47",
+      "listing": {
+        "name": "lf_init_common_mp_5.lst",
+        "sha256": "99c4513f33cb6fe77d69b701e107fd3233d272c99ac83638e726e0b37655e9e5"
+      },
+      "actual_resource_count": 10
+    },
+    {
+      "archive": "lf_init_common_mp_5_V36.2.ifs",
+      "file_item_index": 824,
+      "source_size": 16417,
+      "source_sha256": "fadef6940e506ccaa54f1c5489df79a683738a6e18e7ea72a54d6dce51bec2cf",
+      "receipt_path": "D:\\Games\\CODOL_Final\\rebuild\\workspaces\\offline-resource-raw\\lf_init_common_mp_5_V36.2\\extraction-inventory.json",
+      "receipt_sha256": "e87894950845a91434b7906f69f3e6c8062f0fc3728646437b15d67fab94973c",
+      "listing": {
+        "name": "lf_init_common_mp_5_V36.2.extract.tsv",
+        "sha256": "0252be366ea914d06e24129e506592d144f36793821ff5d5f82bad92315acc85",
+        "kind": "extractor_actual_path_tsv_from_internal_listfile"
+      },
+      "actual_resource_count": 2
+    }
+  ],
+  "actual_resource_count": 40891,
+  "unique_resource_count": 40873,
+  "unique_main_iwi_count": 22719,
+  "resources": {
+    "main/models/fja_shadow_arm_ss_s_vmchar50": {
+      "candidates": [
+        {
+          "archive": "lf_init_common_marketplace_2_V46.ifs",
+          "file_item_index": 795,
+          "encoded_sha256": "67661fef2c56b4e5a3499ee5b6d66e1e4e6202d1391a2f52833ba95eb468857e",
+          "encoded_size": 29457,
+          "decoded_size": 53138,
+          "decoded_sha256": "d450c3f4e30cacf82cec3b6667ae5909da26de18579ee3d602bb83d8f2076308",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": null
+        },
+        {
+          "archive": "lf_init_common_marketplace_2_V46.1.ifs",
+          "file_item_index": 796,
+          "encoded_sha256": "dc30ce49417aa322f7c63054ae18880be3a2220f8ab15a5f0423c19a80ea0dea",
+          "encoded_size": 29536,
+          "decoded_size": 52798,
+          "decoded_sha256": "c3e9da4a1a0f190494b0201d80df69221e3a3c83d23dec6a6a707808691957c2",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": null
+        }
+      ],
+      "decoded_content_identical": false,
+      "last_mounted_actual_candidate": "lf_init_common_marketplace_2_V46.1.ifs"
+    },
+    "main/models/han_fingerless_ss_s_vmchar50": {
+      "candidates": [
+        {
+          "archive": "lf_init_common_marketplace_3_V50.ifs",
+          "file_item_index": 799,
+          "encoded_sha256": "3725e977961dca92f060e51b64b5d85f5c3e219e1e75171e9faad65d2973aab3",
+          "encoded_size": 60983,
+          "decoded_size": 115320,
+          "decoded_sha256": "f87516ddeb4965979f7ddfeda41fe11241ae57a3d18a2f43de730b22396df77b",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": null
+        },
+        {
+          "archive": "lf_init_common_marketplace_3_V50.2.ifs",
+          "file_item_index": 801,
+          "encoded_sha256": "0dfa7005b5090edeb54dcfd8ed5026dd50adfde17c4273875e14a54ebf614e81",
+          "encoded_size": 60566,
+          "decoded_size": 114276,
+          "decoded_sha256": "e23a371a8f1388fb385e110128da3b29268d32ed7dcd1225c5903215aa18f571",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": null
+        }
+      ],
+      "decoded_content_identical": false,
+      "last_mounted_actual_candidate": "lf_init_common_marketplace_3_V50.2.ifs"
+    },
+    "main/models/han_eve_ss_f_vmchar50": {
+      "candidates": [
+        {
+          "archive": "lf_init_common_marketplace_5_V45.ifs",
+          "file_item_index": 807,
+          "encoded_sha256": "5ec8b3e40279e48be7c2e25fafafcce199760adfd464d6dbad3427c4706f3f35",
+          "encoded_size": 152936,
+          "decoded_size": 334438,
+          "decoded_sha256": "837c25bf254381b5398d0c3f24f794c058e4b755123c26de79e25c1aff2f4589",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": null
+        },
+        {
+          "archive": "lf_init_common_marketplace_5_V45.1.ifs",
+          "file_item_index": 808,
+          "encoded_sha256": "04b52d12d1455ac32693901d6c06db1c33430817816a55591b22b3dd8ba2b4b4",
+          "encoded_size": 177403,
+          "decoded_size": 379460,
+          "decoded_sha256": "aa94acb2c1b0fa73249859b9c0c068a4b86722c34f7523489ffba7bfbd0ec712",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": null
+        }
+      ],
+      "decoded_content_identical": false,
+      "last_mounted_actual_candidate": "lf_init_common_marketplace_5_V45.1.ifs"
+    },
+    "main/models/han_shadowadvanced_tf_f_vmchar50": {
+      "candidates": [
+        {
+          "archive": "lf_init_common_marketplace_5_V45.ifs",
+          "file_item_index": 807,
+          "encoded_sha256": "17f334079b528fc5b40ff2cc5f9e0e7b88f836cb195afecaae99fc1cf8d3887c",
+          "encoded_size": 520047,
+          "decoded_size": 1104824,
+          "decoded_sha256": "155af6cc74bd2f7da4cf0303bbb3a78b701c963aadb76baeb2b6595ad046daa1",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": null
+        },
+        {
+          "archive": "lf_init_common_marketplace_5_V45.1.ifs",
+          "file_item_index": 808,
+          "encoded_sha256": "103449c72ed10dc986f339f4a7ec65c1f2fc52410c18804dba733486723ed5a2",
+          "encoded_size": 513508,
+          "decoded_size": 1102332,
+          "decoded_sha256": "ba1a586b679ef315115c12a6c83af4259b896be1cd6e3950ced6aa56e82774b5",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": null
+        }
+      ],
+      "decoded_content_identical": false,
+      "last_mounted_actual_candidate": "lf_init_common_marketplace_5_V45.1.ifs"
+    },
+    "main/models/ves_qqbackpack_pirce_sc_s_lod310": {
+      "candidates": [
+        {
+          "archive": "lf_init_common_mp_2_V35.ifs",
+          "file_item_index": 812,
+          "encoded_sha256": "d6b336460506249f1e3ef84bda9dc6036c712d503d284fd502ff665624358fef",
+          "encoded_size": 40279,
+          "decoded_size": 75916,
+          "decoded_sha256": "88f84e1b165135aca68998f6ed5233bb8f2a3aa53c43876d375171791092ed62",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": null
+        },
+        {
+          "archive": "lf_init_common_mp_2_V35.1.ifs",
+          "file_item_index": 813,
+          "encoded_sha256": "8c090f6ec88539a449ed7007f6605da3dad6cadeb51c4d027a2d66dcf9f5936a",
+          "encoded_size": 40278,
+          "decoded_size": 75916,
+          "decoded_sha256": "6ecb02240725fa06850737732e89feeb3144af587aeddfac2fff8fab9a715194",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": null
+        }
+      ],
+      "decoded_content_identical": false,
+      "last_mounted_actual_candidate": "lf_init_common_mp_2_V35.1.ifs"
+    },
+    "main/models/ves_qqbackpack_pirce_tf_s_lod010": {
+      "candidates": [
+        {
+          "archive": "lf_init_common_mp_2_V35.ifs",
+          "file_item_index": 812,
+          "encoded_sha256": "7ddc51c05a0f733b19a8f024fb11d7641cc2f1802e30c83c7b8db086e6d63115",
+          "encoded_size": 158444,
+          "decoded_size": 280616,
+          "decoded_sha256": "51b7820029fb71ad04a6f8a0cf8a392cec9b4e8da19b5174341afb8652efedad",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": null
+        },
+        {
+          "archive": "lf_init_common_mp_2_V35.1.ifs",
+          "file_item_index": 813,
+          "encoded_sha256": "5bf65a5a0c3bf2d62ad73e0eb98b5e93fe9b4a6b6c5f3e5bb5bede33f1556e8c",
+          "encoded_size": 158121,
+          "decoded_size": 281028,
+          "decoded_sha256": "f0c4b92269d89ec1ec79bef4e1e3832c72617c90f29e42e954f94d0ba30710a8",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": null
+        }
+      ],
+      "decoded_content_identical": false,
+      "last_mounted_actual_candidate": "lf_init_common_mp_2_V35.1.ifs"
+    },
+    "main/models/ves_qqbackpack_pirce_tf_s_lod110": {
+      "candidates": [
+        {
+          "archive": "lf_init_common_mp_2_V35.ifs",
+          "file_item_index": 812,
+          "encoded_sha256": "880bdc87d486e89e03aa21a510237eaff7bf7c70e94854e279a6074a9f2b1bea",
+          "encoded_size": 97298,
+          "decoded_size": 183268,
+          "decoded_sha256": "908e1d6dc0c57af01349fd820ec1284b4bd563872c3f3d0d6da961cad7a79573",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": null
+        },
+        {
+          "archive": "lf_init_common_mp_2_V35.1.ifs",
+          "file_item_index": 813,
+          "encoded_sha256": "41b6fb2148b6a605b61f55266cac91b9e40457c99dd3b76a82ec5ed9c750f1b3",
+          "encoded_size": 97299,
+          "decoded_size": 183268,
+          "decoded_sha256": "6e1c02e665d2b3260db4d9869e89ab3fe38e312bbd8e97a3392753b6cd6dedf1",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": null
+        }
+      ],
+      "decoded_content_identical": false,
+      "last_mounted_actual_candidate": "lf_init_common_mp_2_V35.1.ifs"
+    },
+    "main/models/ves_qqbackpack_pirce_tf_s_lod210": {
+      "candidates": [
+        {
+          "archive": "lf_init_common_mp_2_V35.ifs",
+          "file_item_index": 812,
+          "encoded_sha256": "870e93ecefe94366b6785fac7a864d2223856b2f95cde0a43e7299bd872f1120",
+          "encoded_size": 66448,
+          "decoded_size": 127180,
+          "decoded_sha256": "b6c5d9dd3c84e48588ffac6c39921ff18d14f8fae279ed8f72f13bff84eea180",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": null
+        },
+        {
+          "archive": "lf_init_common_mp_2_V35.1.ifs",
+          "file_item_index": 813,
+          "encoded_sha256": "c9b1da667b61767ad03326d5e0f6fb7b86980711258334ad3ef7f9606c97c91e",
+          "encoded_size": 66552,
+          "decoded_size": 127172,
+          "decoded_sha256": "8611546bb166fec481fb6ccb148c1dcf28baec1f6cc9b1124bbdbb02ad588e42",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": null
+        }
+      ],
+      "decoded_content_identical": false,
+      "last_mounted_actual_candidate": "lf_init_common_mp_2_V35.1.ifs"
+    },
+    "main/images/compassping_sentry_enemy.iwi": {
+      "candidates": [
+        {
+          "archive": "lf_init_common_mp_3_V38.ifs",
+          "file_item_index": 815,
+          "encoded_sha256": "ed7f0025231ba21b4f485db6c7718cf449f794123cc93669540205f40a245545",
+          "encoded_size": 343,
+          "decoded_size": 1056,
+          "decoded_sha256": "23b7f326dae06da398f1ceb5c1419848edccd4316a5de8148c6412b696a6f12d",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": true
+        },
+        {
+          "archive": "lf_init_common_mp_3_V38.3.ifs",
+          "file_item_index": 818,
+          "encoded_sha256": "154cd366ac8bfcd6708c6f65b72d27992192441924b610e8394a76e1501b8c8e",
+          "encoded_size": 394,
+          "decoded_size": 1056,
+          "decoded_sha256": "6ef6222170b9f41c90b91a85c46b358f92f5bb858c195b33e9f74b53dbd33fd7",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": true
+        }
+      ],
+      "decoded_content_identical": false,
+      "last_mounted_actual_candidate": "lf_init_common_mp_3_V38.3.ifs"
+    },
+    "main/images/compassping_sentry_friendly.iwi": {
+      "candidates": [
+        {
+          "archive": "lf_init_common_mp_3_V38.ifs",
+          "file_item_index": 815,
+          "encoded_sha256": "73ff6f0a18f55b323ee4421f7cdf4c6d8e3e4c8a1ff138686c697fcd25a0338c",
+          "encoded_size": 339,
+          "decoded_size": 1056,
+          "decoded_sha256": "77be686e798097a538c4aa5b87b401d8c33775ce0bde82bdb6c4b32fa36d62bd",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": true
+        },
+        {
+          "archive": "lf_init_common_mp_3_V38.3.ifs",
+          "file_item_index": 818,
+          "encoded_sha256": "0b2df688118c4af8e838085d4d6533d218cd833bab89b29ef805bc21ab5926ac",
+          "encoded_size": 390,
+          "decoded_size": 1056,
+          "decoded_sha256": "8937a534fd6f7fa4babf7f53702d9bec672df104d5d6958859689877ce26296a",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": true
+        }
+      ],
+      "decoded_content_identical": false,
+      "last_mounted_actual_candidate": "lf_init_common_mp_3_V38.3.ifs"
+    },
+    "main/images/compassping_sentry_friendly_firing.iwi": {
+      "candidates": [
+        {
+          "archive": "lf_init_common_mp_3_V38.ifs",
+          "file_item_index": 815,
+          "encoded_sha256": "0f3c5e31f34c3ede171c605ef68ba37f762b179039428efdfc158dc9ee2982c8",
+          "encoded_size": 605,
+          "decoded_size": 1056,
+          "decoded_sha256": "8a206307d10f9a2a14f44e4735b067ff1f77ab93781b8733e3611e03001354b5",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": true
+        },
+        {
+          "archive": "lf_init_common_mp_3_V38.3.ifs",
+          "file_item_index": 818,
+          "encoded_sha256": "dc826e1b67df6ded06259ed339725b1bc4d3bb20072956efae118554e1c9e6af",
+          "encoded_size": 694,
+          "decoded_size": 1056,
+          "decoded_sha256": "a71dabc88aadf4891c1200e5639e8716861cce71828d7649a7d71e8589ba6105",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": true
+        }
+      ],
+      "decoded_content_identical": false,
+      "last_mounted_actual_candidate": "lf_init_common_mp_3_V38.3.ifs"
+    },
+    "main/models/ves_qqbackpack_pirce_sc_s_lod110": {
+      "candidates": [
+        {
+          "archive": "lf_init_common_mp_3_V38.1.ifs",
+          "file_item_index": 816,
+          "encoded_sha256": "b83c7190f85464c2f393446431e1c2833634864cae90b5abfa8e06cd69e35dc0",
+          "encoded_size": 92179,
+          "decoded_size": 172728,
+          "decoded_sha256": "b0bb20c8d4359a9f2a852fa306c4a4f73e995b27f8eea049642bef066219cd85",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": null
+        },
+        {
+          "archive": "lf_init_common_mp_3_V38.2.ifs",
+          "file_item_index": 817,
+          "encoded_sha256": "20248d9a9f8b7d6245d9f5a039e85e9735f3b0069c5ef1360eacfaf41ebf128a",
+          "encoded_size": 92183,
+          "decoded_size": 172728,
+          "decoded_sha256": "f3d7139394baa73abe7b377da27ccf271818ac25917a31b453c7a6bc2c5d0e6f",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": null
+        }
+      ],
+      "decoded_content_identical": false,
+      "last_mounted_actual_candidate": "lf_init_common_mp_3_V38.2.ifs"
+    },
+    "main/models/ves_qqbackpack_pirce_sc_s_lod210": {
+      "candidates": [
+        {
+          "archive": "lf_init_common_mp_3_V38.1.ifs",
+          "file_item_index": 816,
+          "encoded_sha256": "a29dd2184afb8db0c3bef5c2aa48102c2c0e567c5785ac5545f2533739705f96",
+          "encoded_size": 63515,
+          "decoded_size": 120100,
+          "decoded_sha256": "fefb76036627030143b7d6402d063f3fcf074ee52a5fae0afea18a66ab389a22",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": null
+        },
+        {
+          "archive": "lf_init_common_mp_3_V38.2.ifs",
+          "file_item_index": 817,
+          "encoded_sha256": "63ee1ec48bcac81493992e83bdf9b60e557616915fbf17658a234c7a987fa30f",
+          "encoded_size": 63509,
+          "decoded_size": 120100,
+          "decoded_sha256": "a9c3fdf583d856ba53e4beda40ca1c81f9453f878ef08b3dae3740dd971e96f8",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": null
+        }
+      ],
+      "decoded_content_identical": false,
+      "last_mounted_actual_candidate": "lf_init_common_mp_3_V38.2.ifs"
+    },
+    "main/models/ves_qqbackpack_pirce_tf_s_lod310": {
+      "candidates": [
+        {
+          "archive": "lf_init_common_mp_3_V38.1.ifs",
+          "file_item_index": 816,
+          "encoded_sha256": "ec117ccbce8da9769f83a20581646acd8cc35172282bd21ced39c4e27ac3f1cd",
+          "encoded_size": 43078,
+          "decoded_size": 82988,
+          "decoded_sha256": "deaa692e15578deb54fd72e66fcd6b93b331178a6507e9a18986f8d04fa7b4dd",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": null
+        },
+        {
+          "archive": "lf_init_common_mp_3_V38.2.ifs",
+          "file_item_index": 817,
+          "encoded_sha256": "3d814cbf10326f2134f44efc367e17580a60eb3270ce960e1e9b36bace8367a5",
+          "encoded_size": 43075,
+          "decoded_size": 82988,
+          "decoded_sha256": "8e021ec7ce4a5c88e5c0191b29d67efac9cccabaa43526cf53c2e117d479b880",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": null
+        }
+      ],
+      "decoded_content_identical": false,
+      "last_mounted_actual_candidate": "lf_init_common_mp_3_V38.2.ifs"
+    },
+    "main/images/impact_asphalt01_col#0.iwi": {
+      "candidates": [
+        {
+          "archive": "lf_init_common_mp_4_V31.ifs",
+          "file_item_index": 819,
+          "encoded_sha256": "d16ce62c30ae804192f9a4ff77c4ff813151db2f1a7f6c02aad7ae5caf7b3230",
+          "encoded_size": 1163,
+          "decoded_size": 1424,
+          "decoded_sha256": "faf7b1e8de79d79fba58bc93bd8e543fcc54275fc987f8734b645a39756e8fcb",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": true
+        },
+        {
+          "archive": "lf_init_common_mp_4_V31.2.ifs",
+          "file_item_index": 821,
+          "encoded_sha256": "cd2cb29837e0de69d42b1d279446497a27cecc56037ccd24beb8a7d1eeb9c59d",
+          "encoded_size": 1184,
+          "decoded_size": 1424,
+          "decoded_sha256": "fe34d01011d17e5a1b5a25ccfb299b1da8753aa339666e9c1355617067d02b0b",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": true
+        }
+      ],
+      "decoded_content_identical": false,
+      "last_mounted_actual_candidate": "lf_init_common_mp_4_V31.2.ifs"
+    },
+    "main/images/defusebomb.iwi": {
+      "candidates": [
+        {
+          "archive": "lf_init_common_mp_5_V36.ifs",
+          "file_item_index": 822,
+          "encoded_sha256": "fdc17eeb9309db2671659b61b9d647267b8a345a25db511bc8f85fb234b23856",
+          "encoded_size": 5497,
+          "decoded_size": 16416,
+          "decoded_sha256": "73231351eee76b8efd41ef17baf790d58b86cc445fe1c9b61084c10004e70663",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": true
+        },
+        {
+          "archive": "lf_init_common_mp_5_V36.2.ifs",
+          "file_item_index": 824,
+          "encoded_sha256": "89ef0ccb4aac2570c4b9a2b1c56c93a648d35fb09b4911db257a69b07403554a",
+          "encoded_size": 5814,
+          "decoded_size": 16416,
+          "decoded_sha256": "d918e8223d6c02df78af1cd6b57d5ed806bc9b852e910be8e450bd2a697830d8",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": true
+        }
+      ],
+      "decoded_content_identical": false,
+      "last_mounted_actual_candidate": "lf_init_common_mp_5_V36.2.ifs"
+    },
+    "main/images/hud_cannonball.iwi": {
+      "candidates": [
+        {
+          "archive": "lf_init_common_mp_5_V36.ifs",
+          "file_item_index": 822,
+          "encoded_sha256": "e49090a434449eddb546105e89666f596be99fe8bbb792280867b04d7ee733af",
+          "encoded_size": 2825,
+          "decoded_size": 16416,
+          "decoded_sha256": "5e2c53dfb370c111d0ea86f865a14665ee8574243f983991f4ee7fda12efcb27",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": true
+        },
+        {
+          "archive": "lf_init_common_mp_5_V36.1.ifs",
+          "file_item_index": 823,
+          "encoded_sha256": "7708b082c815f13f6c1761e25bb9b45da47592bb74a228206168fbf918d6c315",
+          "encoded_size": 3268,
+          "decoded_size": 16416,
+          "decoded_sha256": "48cecc642114fd2e0c751cf07e427e297119b61ef3ab8e962873f2ae86980442",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": true
+        },
+        {
+          "archive": "lf_init_common_mp_5_V36.2.ifs",
+          "file_item_index": 824,
+          "encoded_sha256": "e49090a434449eddb546105e89666f596be99fe8bbb792280867b04d7ee733af",
+          "encoded_size": 2825,
+          "decoded_size": 16416,
+          "decoded_sha256": "5e2c53dfb370c111d0ea86f865a14665ee8574243f983991f4ee7fda12efcb27",
+          "strict_zlib_verified": true,
+          "iwi_version9_verified": true
+        }
+      ],
+      "decoded_content_identical": false,
+      "last_mounted_actual_candidate": "lf_init_common_mp_5_V36.2.ifs"
+    }
+  },
+  "differing_decoded_iwi_paths": [
+    "main/images/compassping_sentry_enemy.iwi",
+    "main/images/compassping_sentry_friendly.iwi",
+    "main/images/compassping_sentry_friendly_firing.iwi",
+    "main/images/impact_asphalt01_col#0.iwi",
+    "main/images/defusebomb.iwi",
+    "main/images/hud_cannonball.iwi"
+  ],
+  "missing_archive_receipts": []
+}
