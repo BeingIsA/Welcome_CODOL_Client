@@ -7,10 +7,58 @@ from pathlib import Path
 import shutil
 import subprocess
 import os
+import re
+import time
+from collections import deque
 
 
 CLIENT_ROOT = Path(__file__).resolve().parents[1]
 VOLUME_LIMIT = 2_500_000_000
+
+
+def run_with_progress(command: list[str], directory: Path, label: str, file_count: int = 0) -> None:
+    """转译压缩器输出为进度条；失败保留末尾日志，不提前显示完成。"""
+    started_files = 0
+    percentage = 0.0
+    recent_lines = deque(maxlen=20)
+    last_update = 0.0
+
+    def display_progress() -> None:
+        """在终端同一行更新当前阶段进度。"""
+        filled_columns = int(percentage * 30 / 100)
+        progress_bar = '#' * filled_columns + '-' * (30 - filled_columns)
+        count_text = f' 已开始 {started_files}/{file_count} 个文件' if file_count else ''
+        print(f'\r{label} [{progress_bar}] {percentage:6.1f}%{count_text}', end='', flush=True)
+
+    display_progress()
+    with subprocess.Popen(command, cwd=directory, stdout=subprocess.PIPE,
+                          stderr=subprocess.STDOUT, text=True, encoding='utf-8',
+                          errors='replace') as process:
+        try:
+            for line in process.stdout:
+                recent_lines.append(line.rstrip())
+                if file_count and line.startswith('Compressing:'):
+                    started_files += 1
+                    percentage = min(99.9, 100 * max(0, started_files - 1) / file_count)
+                elif not file_count:
+                    match = re.search(r'\d+(?:\.\d+)?%\s*/\s*(\d+(?:\.\d+)?)%', line)
+                    if match:
+                        percentage = min(99.9, float(match.group(1)))
+                if time.monotonic() - last_update >= 0.2:
+                    display_progress()
+                    last_update = time.monotonic()
+            return_code = process.wait()
+        except BaseException:
+            process.terminate()
+            process.wait()
+            print()
+            raise
+    if return_code:
+        print('\n' + '\n'.join(recent_lines))
+        raise subprocess.CalledProcessError(return_code, command)
+    percentage = 100.0
+    display_progress()
+    print()
 
 
 def collect_resources(client_root: Path) -> list[Path]:
@@ -51,20 +99,20 @@ def write_archive(client_root: Path, resources: list[Path], output: Path, limit:
         raise ValueError('输出分卷或工作目录已存在，拒绝覆盖')
     staging.mkdir(parents=True)
     staged_output = staging / output.name
-    command = ['c', '-fmt:zip', '-l:1', f'-v:{limit}', str(staged_output)]
+    command = ['c', '-consolemode:utf8', '-fmt:zip', '-l:1', f'-v:{limit}', str(staged_output)]
     command.extend(resource.relative_to(client_root).as_posix() for resource in resources)
     command_path = staging / 'command.txt'
     command_path.write_text(subprocess.list2cmdline(command), encoding='utf-8-sig')
     before = [(resource.stat().st_size, resource.stat().st_mtime_ns) for resource in resources]
     # 命令文件绕过 Windows 命令行长度限制；不经 shell 解释路径。
-    subprocess.run([executable, '/cmdfile', str(command_path)], cwd=client_root, check=True)
+    run_with_progress([executable, '/cmdfile', str(command_path)], client_root, '压缩（按文件数）', len(resources))
     after = [(resource.stat().st_size, resource.stat().st_mtime_ns) for resource in resources]
     if before != after:
         raise RuntimeError('打包期间资源发生变化，未发布分卷')
     volumes = sorted(staging.glob(output.stem + '.z*'))
     if not staged_output.exists() or any(volume.stat().st_size > limit for volume in volumes):
         raise ValueError('分卷不完整或超过大小限制，未发布')
-    subprocess.run([executable, 't', str(staged_output)], check=True)
+    run_with_progress([executable, 't', '-consolemode:utf8', str(staged_output)], client_root, '完整性校验')
     for volume in volumes:
         volume.rename(output.parent / volume.name)
     command_path.unlink()
@@ -76,6 +124,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, help='输出名称基准，如 D:/packages/resources.zip；生成 .z01、.z02 和 .zip')
     options = parser.parse_args()
+    print('正在扫描资源并匹配 Git 忽略规则……', flush=True)
     resources = collect_resources(CLIENT_ROOT)
     required = CLIENT_ROOT / 'resources/v1649370/native-library-manifest.json'
     if required not in resources or not any(
