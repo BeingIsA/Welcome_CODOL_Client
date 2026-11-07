@@ -11,6 +11,7 @@ from unittest.mock import Mock
 import capstone
 import pefile
 from codol_rebuild.adapters.game.v1649370.rooms import room_session_bridge as bridge
+from codol_rebuild.adapters.game.v1649370.accounts import player_name
 from codol_rebuild.adapters.game.v1649370.rooms.room import build_room_adapter
 from codol_rebuild.application.room.contracts import Completion
 
@@ -33,6 +34,7 @@ def prepare_profile(memory, adapter):
     from codol_rebuild.adapters.game.v1649370 import layout
     adapter.profile_buffer = 0x28000000
     memory.write(adapter.profile_buffer, bytes(0x140))
+    memory.write(member_profile.PUBLIC+0x11128, bytes(5))
     for address, identity in ((member_profile.PUBLIC, layout.PUBLIC_IDENTITY),
                               (member_profile.SECURE, layout.SECURE_IDENTITY)):
         memory.write(address+0x90, struct.pack('<II', identity['version'], identity['checksum'])
@@ -100,6 +102,30 @@ class SettingsChannelPort:
 
 
 class MultiplayerBridgeTests(unittest.TestCase):
+    def test_chinese_member_name_survives_session_to_list_refresh(self):
+        """入房和成员回显后，会话摘要回填不得破坏列表 UTF-8。"""
+        memory, adapter, data, room, session = self.join_fixture()
+        memory.word(player_name.DIRECT_STRING_MODE, 0)
+        memory.word(0x25000000+12, 1)
+        nickname = '天选之子六亚王'
+        data['members'][1]['displayName'] = nickname
+        adapter._prepare_join_snapshot(data)
+        memory.word(room+0x1C, session)
+        memory.word(session+0x25C8, room)
+        memory.write(session, b'\x01')
+        adapter.current_room_id = data['roomId']
+        for operation in ('join', 'members'):
+            with self.subTest(operation=operation):
+                adapter.pending = (operation, room, session)
+                if operation == 'members':
+                    adapter._prepare_join_snapshot(data, joining=False)
+                adapter._publish_join_snapshot()
+                self.assertEqual(memory.read(room+0xE370, 64), nickname.encode('utf-8').ljust(64, b'\0'))
+                self.assertEqual(memory.read(session+0x48, 64), nickname.encode('utf-8').ljust(64, b'\0'))
+                # 模拟 0x630520 按身份从摘要复制回列表的昵称字段。
+                memory.write(room+0xE370, memory.read(session+0x48, 64))
+                self.assertEqual(memory.read(room+0xE370, 64).split(b'\0')[0].decode('utf-8'), nickname)
+
     def test_join_uses_fixed_name_and_member_update_does_not_replace_it(self):
         """入房名称独立于房主；成员回显不重新应用房间名称。"""
         memory, adapter, data, room, session = self.join_fixture()
@@ -188,8 +214,8 @@ class MultiplayerBridgeTests(unittest.TestCase):
         memory.write(state, bytes(4096))
         memory.word(bridge.ROOM_POINTER, room)
         memory.word(room+0x1C, 0)
-        memory.word(bridge.LANGUAGE, 0x25000000)
-        memory.word(bridge.DIRECT_STRING_MODE, 1)
+        memory.word(player_name.LANGUAGE, 0x25000000)
+        memory.word(player_name.DIRECT_STRING_MODE, 1)
         port = Mock()
         port.begin.return_value = True
         adapter = bridge.RoomSessionBridge(memory, port, Mock())
@@ -737,8 +763,8 @@ class MultiplayerBridgeTests(unittest.TestCase):
         prepare_profile(process, value)
         value.player_id = 'pl_me'
         value.join_scratch = 0x29000000
-        process.word(bridge.LANGUAGE, 0x25000000)
-        process.word(bridge.DIRECT_STRING_MODE, 1)
+        process.word(player_name.LANGUAGE, 0x25000000)
+        process.word(player_name.DIRECT_STRING_MODE, 1)
         value.state = 0x20000000
         process.write(value.state, bytes(4096))
         value.identity_ready = True
@@ -819,3 +845,4 @@ class MultiplayerBridgeTests(unittest.TestCase):
         self.assertEqual(process.read(value.state+bridge.MESSAGE, 64).split(b'\0')[0], '缺少文件'.encode('utf-8'))
         self.assertEqual(bridge.u32(process.read, value.state+bridge.ACTION), 4)
         port.begin_login.assert_called_once()
+

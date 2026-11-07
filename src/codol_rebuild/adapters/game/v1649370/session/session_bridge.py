@@ -46,7 +46,8 @@ class GameSessionBridge:
                 process, broadcast_session, self.profiles.consume_item)
         if multiplayer is not None:
             from codol_rebuild.adapters.game.v1649370.rooms.room_session_bridge import RoomSessionBridge
-            self.multiplayer = RoomSessionBridge(process, multiplayer, record)
+            self.multiplayer = RoomSessionBridge(
+                process, multiplayer, record, lambda: self.profiles.schemas['public'])
             if rename_session is not None:
                 self.multiplayer.account_ready = lambda: rename_session.ready
 

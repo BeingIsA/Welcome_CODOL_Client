@@ -49,10 +49,11 @@ def build_profile_submit(entry, capture_entry):
 class ProfileUpdateBridge:
     """在原生已完成本地修改的上行边采集，房外回退原虚调用。"""
 
-    def __init__(self, process, capture_entry, display_buffer):
+    def __init__(self, process, capture_entry, display_buffer, public_schema=lambda: None):
         self.process = process
         self.capture_entry = capture_entry
         self.display_buffer = display_buffer
+        self.public_schema = public_schema
         self.captured_room_id = None
 
     def install(self):
@@ -82,7 +83,7 @@ class ProfileUpdateBridge:
         captured_room_id = self.captured_room_id
         self.captured_room_id = None
         if captured_room_id is not None and captured_room_id == room_id and not suppress:
-            return capture_snapshot(self.process.read, self.display_buffer)
+            return capture_snapshot(self.process.read, self.display_buffer, self.public_schema())
         return None
 
 # 固定版本 DDL 字节偏移；回归测试用原生捕获的 schema 校验。
@@ -194,11 +195,15 @@ def decode_snapshot(payload):
     return result
 
 
-def capture_snapshot(read, display_buffer):
+def capture_snapshot(read, display_buffer, public_schema=None):
     """仅在主线程暂停点采样；展示缓冲须由本次原生采集调用完整生成。"""
+    from codol_rebuild.adapters.game.v1649370.accounts.profile_codec import public_profile_plaintext
+    encoding_key, encoded = struct.unpack('<IB', read(PUBLIC+0x11128, 5))
     raw = {'public': read(PUBLIC+0x90, layout.BUFFER_CAPACITY),
            'secure': read(SECURE+0x90, layout.BUFFER_CAPACITY),
            'tf141': read(display_buffer, 0xA0), 'scar': read(display_buffer+0xA0, 0xA0)}
+    # 房间传输只包含档案数据，不携带原生对象的密钥；统一发送明文副本。
+    raw['public'] = public_profile_plaintext(raw['public'], public_schema, encoding_key, encoded)
     result = {'contentVersion': VERSION,
               **{key: base64.b64encode(value).decode('ascii') for key, value in raw.items()}}
     decode_snapshot(result)

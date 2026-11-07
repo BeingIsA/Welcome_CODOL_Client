@@ -24,6 +24,43 @@ def sample_profile():
 
 
 class MemberProfileTests(unittest.TestCase):
+    def test_capture_normalizes_encoded_cards_before_transfer_and_query(self):
+        """不同玩家密钥和连续查询使用明文档案，不改写采样进程。"""
+        from test_profile_plaintext import public_schema, encode_profile
+        from test_refactor_equivalence import MemoryProcess
+        schema = public_schema()
+        process = MemoryProcess()
+        display_buffer = process.allocate(4096)
+        snapshot = profile.decode_snapshot(sample_profile())
+        query_cache = {}
+        query = profile.ProfileQueryBridge(process, lambda: query_cache)
+        query.install()
+        frame = process.allocate(4096)
+        context = bytearray(716)
+        struct.pack_into('<I', context, 196, frame)
+        for player_index, encoding_key in enumerate((0x12345678, 0xfedcba98, 0)):
+            with self.subTest(encoding_key=encoding_key):
+                plaintext = bytearray(snapshot['public'])
+                card_values = tuple(1000 + player_index*100 + field_index for field_index in range(5))
+                for (_, offset), value in zip(profile.CARD_FIELDS, card_values):
+                    struct.pack_into('<i', plaintext, offset, value)
+                encoded = player_index != 2
+                stored = encode_profile(plaintext, schema, encoding_key) if encoded else bytes(plaintext)
+                process.write(profile.PUBLIC+0x11128, struct.pack('<IB', encoding_key, encoded))
+                process.write(profile.PUBLIC+0x90, stored)
+                process.write(profile.SECURE+0x90, snapshot['secure'])
+                process.write(display_buffer, snapshot['tf141']+snapshot['scar'])
+                transferred = profile.decode_snapshot(profile.capture_snapshot(process.read, display_buffer, schema))
+                self.assertEqual(transferred['public'], plaintext)
+                self.assertEqual(process.read(profile.PUBLIC+0x90, len(stored)), stored)
+                self.assertEqual(profile.member_summary(transferred)[1][1], struct.pack('<5H', *card_values))
+                identity = struct.pack('<Q', player_index+1)
+                query_cache[identity] = transferred
+                process.write(frame+0x18, identity)
+                query.handle('profile_query', context)
+                query.handle('profile_initialized', context)
+                self.assertEqual(process.read(query.container+0xA0, len(plaintext)), plaintext)
+
     def test_hover_summary_matches_captured_ddl_and_native_member_layout(self):
         """用真实 schema 写入不同名片值，检查原生成员摘要需要的顺序。"""
         from codol_rebuild.adapters.game.profile_format.fields import Fields

@@ -209,6 +209,10 @@ def build_initializer(entry: int, data: int, pool: int) -> dict:
     code.extend(b'\x83\xc4\x04\x33\xc0')
     call(0x6B71B0)
     code.extend(b'\xa3'+struct.pack('<I',data+68))
+    # 原生加载完成约定：缓存和库存就绪后，将公共明文档案转为运行时编码态。
+    # 7F7CD0 以 EAX 接收公共档案对象；沿用原生转换，不直接改编码标志。
+    code.extend(b'\xb8' + struct.pack('<I', PUBLIC))
+    call(0x7F7CD0)
     after=entry+len(code);code.append(0xcc)
     code.extend(bytes.fromhex('8d65e0 61 8be5 5d c3'))
     return {'code': bytes(code), 'data': bytes(payload), 'trap': trap,'after':after}

@@ -133,7 +133,11 @@ class BridgeTests(unittest.TestCase):
         instructions=list(Cs(CS_ARCH_X86,CS_MODE_32).disasm(bridge['code'],entry))
         rows=[(i.mnemonic,i.op_str) for i in instructions]
         calls=[int(i.op_str,16) for i in instructions if i.mnemonic=='call']
-        self.assertEqual(calls,[0x49CF30]*8+[0xB8CE80,0x5E66F0,0x80D770,0x50C1A0,0x4A9260,0x6B71E0,0x6B71B0])
+        self.assertEqual(calls,[0x49CF30]*8+[0xB8CE80,0x5E66F0,0x80D770,0x50C1A0,0x4A9260,0x6B71E0,0x6B71B0,0x7F7CD0])
+        encoding_position = next(position for position, instruction in enumerate(instructions)
+                                 if instruction.mnemonic == 'call' and instruction.op_str == '0x7f7cd0')
+        self.assertEqual(rows[encoding_position - 1], ('mov', 'eax, 0xe54bc58'))
+        self.assertEqual(instructions[encoding_position + 1].address, bridge['after'])
         selection=next(i for i,x in enumerate(instructions) if x.mnemonic=='call' and int(x.op_str,16)==0x6B71E0)
         self.assertEqual(rows[selection-1],('push','1'))
         self.assertEqual(rows[selection+1:selection+3],[('add','esp, 4'),('xor','eax, eax')])

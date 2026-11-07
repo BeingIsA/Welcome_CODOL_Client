@@ -6,7 +6,6 @@ HTTP 不在暂停点等待；帧陷阱只提交或消费已完成结果。字符
 import hashlib
 import struct
 from codol_rebuild.application.room.contracts import RoomPort
-from codol_rebuild.adapters.game.v1649370.accounts.player_name import LANGUAGE, DIRECT_STRING_MODE
 from codol_rebuild.adapters.game.v1649370.rooms.room import (
     JOIN_ERROR_OFFSET, JOIN_BLOCKED_ERROR, JOIN_ERROR_MESSAGE_OFFSET,
     SETTINGS_READY_OFFSET, SETTINGS_ROOM_OFFSET,
@@ -147,8 +146,9 @@ def build_settings_detours(entry):
 
 class RoomSessionBridge:
     """版本适配只拥有原生请求快照，通过联机端口触发业务。"""
-    def __init__(self, process, port: RoomPort, record):
+    def __init__(self, process, port: RoomPort, record, public_schema=lambda: None):
         self.process, self.port, self.record = process, port, record
+        self.public_schema = public_schema
         self.state = None
         self.traps = {}
         self.pending = None
@@ -272,7 +272,7 @@ class RoomSessionBridge:
         self.traps.update(team_traps)
         self.traps.update(ready_traps)
         self.profile_update = member_profile.ProfileUpdateBridge(
-            self.process, self.profile_capture, self.profile_buffer)
+            self.process, self.profile_capture, self.profile_buffer, self.public_schema)
         self.traps.update(self.profile_update.install())
         self.profile_query = member_profile.ProfileQueryBridge(
             self.process, lambda: {hashlib.sha256(key.encode('utf-8')).digest()[:8]: value
@@ -483,7 +483,7 @@ class RoomSessionBridge:
             password = native_string(read, u32(read, frame+28)) or None
             if self.room_list is not None:
                 self.room_list.cancel()
-            profile = member_profile.capture_snapshot(read, self.profile_buffer)
+            profile = member_profile.capture_snapshot(read, self.profile_buffer, self.public_schema())
             if not self.port.begin('join', username(read), room_id=room_id, password=password,
                                    profile=profile):
                 raise ValueError('已有服务端请求正在处理，请稍后重试')
@@ -533,11 +533,11 @@ class RoomSessionBridge:
             if len(raw) > 255 or b'\0' in raw:
                 raise ValueError('房间展示字符串无效')
             strings[offset:offset+len(raw)] = raw
-        language = u32(read, LANGUAGE)
-        encoding = 'utf-8' if u32(read, DIRECT_STRING_MODE) == 1 or u32(read, language+12) == 0 else 'gbk'
         names = []
         for member in members:
-            raw = member['displayName'].encode(encoding)
+            # 0x630520 从会话摘要复制昵称到成员记录，随后 0x7C74AF
+            # 直接作为 GFx UTF-8 字符串发布；两处必须使用同一种编码。
+            raw = member['displayName'].encode('utf-8')
             if b'\0' in raw or len(raw) > 63:
                 raise ValueError('成员昵称超出原生显示容量')
             names.append(raw.ljust(64, b'\0'))
@@ -671,7 +671,7 @@ class RoomSessionBridge:
                                             max_players=maximum, password=password,
                                             room_name=native_string(read, u32(read, room+0x10600)),
                                             settings=settings,
-                                            profile=member_profile.capture_snapshot(read, self.profile_buffer))
+                                            profile=member_profile.capture_snapshot(read, self.profile_buffer, self.public_schema()))
             else:
                 submitted = self.port.begin(operation, username(read))
             if not submitted:
