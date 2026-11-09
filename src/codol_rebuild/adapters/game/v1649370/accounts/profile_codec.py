@@ -140,7 +140,12 @@ class AccountCodec:
                 public_fields.write(blobs['public'],prefix+'characterIndex',0)
                 public_fields.write(blobs['public'],prefix+'name',row['name'])
                 for key,read_value in LOADOUT_DDL_FIELDS:
-                    public_fields.write(blobs['public'],prefix+key,read_value(row))
+                    item_id = read_value(row)
+                    # 技能/通配卡经 50FB30 保存 ID+1，50FC20 读出后直接使用。
+                    # 武器展示路径另有 +1 转换，不能将此约定推广到所有字段。
+                    # 空槽保持零；原生读取对零返回空物品，不做负数转换。
+                    stored_value = item_id + 1 if item_id and key.startswith(('perks.', 'wildcards.')) else item_id
+                    public_fields.write(blobs['public'],prefix+key,stored_value)
                 public_fields.write(blobs['public'],prefix+'lethalDoubleAmmo',row['lethal_double_ammo'])
                 public_fields.write(blobs['public'],prefix+'tacticalDoubleAmmo',row['tactical_double_ammo'])
         config={**policy['progression'], 'fill_unlock_flags':policy['fill_unlock_flags']}

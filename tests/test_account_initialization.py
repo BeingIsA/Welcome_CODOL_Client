@@ -17,6 +17,32 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class InitializationTests(unittest.TestCase):
+    def test_initial_perks_and_wildcards_follow_native_id_encoding(self):
+        """使用终版默认配装，验证技能读回及已有配装不被二次加一。"""
+        from codol_rebuild.adapters.game.v1649370.accounts.profile_codec import AccountCodec, LOADOUT_DDL_FIELDS
+        from codol_rebuild.adapters.game.profile_format.fields import Fields
+        captured = json.loads((ROOT/'research/account-initialization/capture/market-memory.json').read_text(encoding='utf-8'))
+        schemas = {kind: json.loads(Path(captured['schemas'][label]['schema']).read_text(encoding='utf-8'))
+                   for kind, label in [('public', 'playerdata'), ('secure', 'playersecuredata')]}
+        codec = AccountCodec(schemas, captured['tables'], captured['catalog'])
+        policy = new_account_policy(codec.initialization_data())
+        profiles, _ = codec.initialize({'profiles': {}, 'uid': 1}, policy)
+        fields = Fields(schemas['public'])
+        for loadout_index, loadout in enumerate(policy['loadouts']):
+            for field_name, read_value in LOADOUT_DDL_FIELDS:
+                item_id = read_value(loadout)
+                stored = fields.read(profiles['public'], f'weaponClasses.{loadout_index}.{field_name}')
+                if field_name.startswith(('perks.', 'wildcards.')):
+                    self.assertEqual(stored - 1 if stored > 0 else 0, item_id)
+                else:
+                    self.assertEqual(stored, item_id)
+        self.assertEqual(policy['loadouts'][0]['perks'][2], 60137)
+        self.assertEqual(fields.read(profiles['public'], 'weaponClasses.0.perks.2'), 60138)
+        self.assertEqual(fields.read(profiles['public'], 'weaponClasses.0.wildcards.0'), 0)
+        self.assertEqual(fields.read(profiles['public'], 'characterClasses.0.slots.0'), 545)
+        preserved, _ = codec.initialize({'profiles': profiles, 'uid': 1}, policy)
+        self.assertEqual(preserved['public'], profiles['public'])
+
     def test_csv_grants_and_existing_archive_preserved(self):
         from codol_rebuild.adapters.game.v1649370.accounts.profile_codec import AccountCodec
         captured = json.loads((ROOT/'research/account-initialization/capture/market-memory.json').read_text(encoding='utf-8'))
