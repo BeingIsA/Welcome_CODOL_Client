@@ -1,0 +1,2420 @@
+﻿物品ID,内部名称,中文名称,品质值,品质,产品ID列表,币种列表,类型,分类,是否在普通商城展示
+10001,m4_mp,M4A1,0,普通,64,,wea,ast,否
+10010,vector_mp,短剑,0,普通,940,,wea,smg,否
+10015,l86_mp,SA80-LSW,0,普通,78,,wea,lmg,否
+10049,m9_mp,贝瑞塔M9,0,普通,895,,wea,pst,否
+12243,defaultknife_mp,战斗匕首,0,普通,,,wea,,否
+60000,frag_grenade_mp,破片手雷,0,普通,108,,equ,let,否
+60004,flash_grenade_mp,闪光弹,0,普通,1402; 6628,GP（1）; CP（2）,equ,tac,是
+60005,smoke_grenade_mp,烟雾弹,0,普通,113; 6952,GP（1）; CP（2）,equ,tac,是
+60076,uav,无人侦察机,0,普通,198,,kis,,否
+60080,predator_missile,空地导弹,0,普通,202,,kis,,否
+60083,helicopter,武装直升机,0,普通,205,,kis,,否
+30060,pcb_default,抽象-凝烟,0,普通,234,,pcb,,否
+30059,pci_default,热血战场III徽章,0,普通,235,,pci,,否
+30710,pcn_default,新兵,0,普通,,,pcn,,否
+15961,pcn_redtext,绯红,0,普通,22539,CP（2）,pcn,,否
+15962,pcn_pinktext,桃粉,0,普通,22540,CP（2）,pcn,,否
+15963,pcn_purpletext,兰紫,0,普通,22541,CP（2）,pcn,,否
+15964,pcn_deeppurpletext,深紫,0,普通,22542,CP（2）,pcn,,否
+15965,pcn_indigotext,靛青,0,普通,22543,CP（2）,pcn,,否
+15966,pcn_lightbluetext,天蓝,0,普通,22544,CP（2）,pcn,,否
+15967,pcn_cyantext,青色,0,普通,22545,CP（2）,pcn,,否
+15968,pcn_tealtext,碧绿,0,普通,22546,CP（2）,pcn,,否
+15969,pcn_greentext,翠绿,0,普通,22547,CP（2）,pcn,,否
+15970,pcn_lightgreentext,柠绿,0,普通,22548,CP（2）,pcn,,否
+15971,pcn_limetext,柠黄,0,普通,22549,CP（2）,pcn,,否
+15972,pcn_yellowtext,亮黄,0,普通,22550,CP（2）,pcn,,否
+15973,pcn_ambertext,芥黄,0,普通,22551,CP（2）,pcn,,否
+15974,pcn_orangetext,甜橙,0,普通,22552,CP（2）,pcn,,否
+15975,pcn_deeporangetext,红橙,0,普通,22553,CP（2）,pcn,,否
+30061,pct_default,新兵,0,普通,233,,pct,,否
+10096,cam_skullscsg12ncm,面具迷彩,0,普通,10413,,wat,cam,否
+10259,cam_cherryak47t2,樱花,0,普通,10414,,wat,cam,否
+10300,cam_arcticmsr,寒区迷彩,0,普通,10488,,wat,cam,否
+10301,cam_bluearrowmsr,枫叶迷彩,0,普通,10489,,wat,cam,否
+10304,cam_desertmsr,海军丛林迷彩,0,普通,10495,,wat,cam,否
+10307,cam_junglewarfaremsr,丛林战争,0,普通,10503,,wat,cam,否
+10311,cam_maritimemsr,海洋迷彩,0,普通,10555,,wat,cam,否
+10313,cam_multicammsr,多地形迷彩,0,普通,10557,,wat,cam,否
+10314,cam_nebulamsr,南海卫士,0,普通,10558,,wat,cam,否
+10316,cam_operamsr,蟒蛇迷彩,0,普通,10560,,wat,cam,否
+10318,cam_pattern2msr,盗墓者,0,普通,10562,,wat,cam,否
+10319,cam_pattern3msr,血暮黑棘,0,普通,10563,,wat,cam,否
+10320,cam_patternmsr,金色瓷纹,0,普通,10564,,wat,cam,否
+10322,cam_phenixmsr,树皮迷彩,0,普通,10566,,wat,cam,否
+10323,cam_pumpkinmsr,南瓜迷彩,0,普通,10567,,wat,cam,否
+10325,cam_sogmsr,虎斑迷彩,0,普通,10571,,wat,cam,否
+10326,cam_tigermsr,蛛网迷彩,0,普通,10572,,wat,cam,否
+10327,cam_urbanmsr,海军沙漠迷彩,0,普通,10573,,wat,cam,否
+10840,cam_kingdomhero03m933kingdoms,司马懿,0,普通,19259,,wat,cam,否
+10906,cam_cute01ak104common,萌系迷彩,0,普通,11892,,wat,cam,否
+10907,cam_desertak104common,海军丛林迷彩,0,普通,11893,,wat,cam,否
+10916,cam_pumpkinak104common,南瓜迷彩,0,普通,11905,,wat,cam,否
+10918,cam_tigerak104common,蛛网迷彩,0,普通,11908,,wat,cam,否
+10919,cam_urbanak104common,海军沙漠迷彩,0,普通,11909,,wat,cam,否
+11024,cam_coral01l86coral,神秘海洋 章鱼,0,普通,19561,,wat,cam,否
+11062,cam_coral02wa2000coral,神秘海洋 珊瑚,0,普通,19719,,wat,cam,否
+11143,cam_coral03akbpcoral,神秘海洋 鱼群,0,普通,19862,,wat,cam,否
+11151,cam_insect01uspinsect,瓢虫,0,普通,19879,,wat,cam,否
+11281,cam_arcticas50common,寒区迷彩,0,普通,10971,,wat,cam,否
+11284,cam_desertas50common,海军丛林迷彩,0,普通,11022,,wat,cam,否
+11290,cam_maritimeas50common,海洋迷彩,0,普通,11206,,wat,cam,否
+11291,cam_multicamas50common,多地形迷彩,0,普通,11208,,wat,cam,否
+11292,cam_nebulaas50common,南海卫士,0,普通,11210,,wat,cam,否
+11295,cam_pattern2as50common,盗墓者,0,普通,11220,,wat,cam,否
+11296,cam_patternas50common,金色瓷纹,0,普通,11221,,wat,cam,否
+11307,cam_coral04type95coral,神秘海洋 大堡礁,0,普通,20108,,wat,cam,否
+11314,cam_sogas50common,虎斑迷彩,0,普通,11226,,wat,cam,否
+11315,cam_tigeras50common,蛛网迷彩,0,普通,11320,,wat,cam,否
+11317,cam_urbanas50common,海军沙漠迷彩,0,普通,11321,,wat,cam,否
+11428,cam_coral05miniuzicoral,神秘海洋 神仙鱼,0,普通,20295,,wat,cam,否
+11692,cam_insect02m240insect,毛毛虫,0,普通,20764,,wat,cam,否
+11745,cam_insect03m21ebrinsect,蜻蜓,0,普通,20846,,wat,cam,否
+11882,cam_kingdomhero04fa19113kingdoms,曹操,0,普通,21050,,wat,cam,否
+11928,cam_kingdomhero05csg123kingdoms,吕布,0,普通,21133,,wat,cam,否
+12348,cam_cherry,樱花,0,普通,,,wat,cam,否
+12349,cam_cherrygpas12,樱花,0,普通,21876,,wat,cam,否
+12612,cam_arctictype95tech,寒区迷彩,0,普通,14157,,wat,cam,否
+12615,cam_deserttype95tech,海军丛林迷彩,0,普通,14160,,wat,cam,否
+12618,cam_junglewarfaretype95tech,丛林战争,0,普通,14164,,wat,cam,否
+12622,cam_maritimetype95tech,海洋迷彩,0,普通,14170,,wat,cam,否
+12623,cam_multicamtype95tech,多地形迷彩,0,普通,14171,,wat,cam,否
+12624,cam_nebulatype95tech,南海卫士,0,普通,14175,,wat,cam,否
+12627,cam_operatype95tech,蟒蛇迷彩,0,普通,14182,,wat,cam,否
+12628,cam_painttype95tech,中国红,0,普通,14183,,wat,cam,否
+12630,cam_pattern2type95tech,盗墓者,0,普通,14185,,wat,cam,否
+12631,cam_patterntype95tech,金色瓷纹,0,普通,14186,,wat,cam,否
+12633,cam_pumpkintype95tech,南瓜迷彩,0,普通,14188,,wat,cam,否
+12635,cam_sogtype95tech,虎斑迷彩,0,普通,14193,,wat,cam,否
+12636,cam_tigertype95tech,蛛网迷彩,0,普通,14194,,wat,cam,否
+12637,cam_urbantype95tech,海军沙漠迷彩,0,普通,14195,,wat,cam,否
+12752,cam_arcticskorpion,寒区迷彩,0,普通,14494,,wat,cam,否
+12753,cam_bluearrowskorpion,枫叶迷彩,0,普通,14495,,wat,cam,否
+12756,cam_desertskorpion,海军丛林迷彩,0,普通,14498,,wat,cam,否
+12758,cam_goldskorpion,闪耀金,0,普通,14501,,wat,cam,否
+12761,cam_junglewarfareskorpion,丛林战争,0,普通,14503,,wat,cam,否
+12765,cam_maritimeskorpion,海洋迷彩,0,普通,14509,,wat,cam,否
+12766,cam_multicamskorpion,多地形迷彩,0,普通,14510,,wat,cam,否
+12767,cam_nebulaskorpion,南海卫士,0,普通,14511,,wat,cam,否
+12769,cam_operaskorpion,蟒蛇迷彩,0,普通,14513,,wat,cam,否
+12771,cam_pattern2skorpion,盗墓者,0,普通,14515,,wat,cam,否
+12772,cam_pattern3skorpion,血暮黑棘,0,普通,14516,,wat,cam,否
+12773,cam_patternskorpion,金色瓷纹,0,普通,14517,,wat,cam,否
+12776,cam_phenixskorpion,树皮迷彩,0,普通,14519,,wat,cam,否
+12777,cam_pumpkinskorpion,南瓜迷彩,0,普通,14520,,wat,cam,否
+12779,cam_sogskorpion,虎斑迷彩,0,普通,14523,,wat,cam,否
+12780,cam_tigerskorpion,蛛网迷彩,0,普通,14524,,wat,cam,否
+12781,cam_urbanskorpion,海军沙漠迷彩,0,普通,14525,,wat,cam,否
+14474,cam_arcticp06,寒区迷彩,0,普通,17887,,wat,cam,否
+14476,cam_bluearrowp06,枫叶迷彩,0,普通,17889,,wat,cam,否
+14480,cam_desertp06,海军丛林迷彩,0,普通,17893,,wat,cam,否
+14904,cam_junglewarfarep06,丛林战争,0,普通,17898,,wat,cam,否
+14908,cam_maritimep06,海洋迷彩,0,普通,18894,,wat,cam,否
+14909,cam_multicamp06,多地形迷彩,0,普通,18895,,wat,cam,否
+14910,cam_nebulap06,南海卫士,0,普通,18896,,wat,cam,否
+14912,cam_operap06,蟒蛇迷彩,0,普通,18898,,wat,cam,否
+14914,cam_pattern2p06,盗墓者,0,普通,18900,,wat,cam,否
+14915,cam_pattern3p06,血暮黑棘,0,普通,18901,,wat,cam,否
+14916,cam_patternp06,金色瓷纹,0,普通,18902,,wat,cam,否
+14918,cam_phenixp06,树皮迷彩,0,普通,18904,,wat,cam,否
+14919,cam_pumpkinp06,南瓜迷彩,0,普通,18905,,wat,cam,否
+14926,cam_sogp06,虎斑迷彩,0,普通,18913,,wat,cam,否
+14927,cam_tigerp06,蛛网迷彩,0,普通,18914,,wat,cam,否
+14928,cam_urbanp06,海军沙漠迷彩,0,普通,18915,,wat,cam,否
+15422,cam_pumpkinak47cell,南瓜迷彩,0,普通,19960,,wat,cam,否
+15790,cam_pumpkinarx51,南瓜迷彩,0,普通,20916,,wat,cam,否
+17078,cam_arcticfn2000tech,寒区迷彩,0,普通,24016,,wat,cam,否
+17080,cam_bluearrowfn2000tech,枫叶迷彩,0,普通,24018,,wat,cam,否
+17083,cam_desertfn2000tech,海军丛林迷彩,0,普通,24021,,wat,cam,否
+17087,cam_junglewarfarefn2000tech,丛林战争,0,普通,24026,,wat,cam,否
+17091,cam_maritimefn2000tech,海洋迷彩,0,普通,24032,,wat,cam,否
+17092,cam_multicamfn2000tech,多地形迷彩,0,普通,24033,,wat,cam,否
+17093,cam_nebulafn2000tech,南海卫士,0,普通,24034,,wat,cam,否
+17095,cam_operafn2000tech,蟒蛇迷彩,0,普通,24036,,wat,cam,否
+17097,cam_pattern2fn2000tech,盗墓者,0,普通,24038,,wat,cam,否
+17098,cam_pattern3fn2000tech,血暮黑棘,0,普通,24039,,wat,cam,否
+17099,cam_patternfn2000tech,金色瓷纹,0,普通,24040,,wat,cam,否
+17101,cam_phenixfn2000tech,树皮迷彩,0,普通,24042,,wat,cam,否
+17108,cam_sogfn2000tech,虎斑迷彩,0,普通,24050,,wat,cam,否
+17109,cam_tigerfn2000tech,蛛网迷彩,0,普通,24051,,wat,cam,否
+17110,cam_urbanfn2000tech,海军沙漠迷彩,0,普通,24052,,wat,cam,否
+17201,cam_arcticm1garand,寒区迷彩,0,普通,24220,,wat,cam,否
+17203,cam_bluearrowm1garand,枫叶迷彩,0,普通,24222,,wat,cam,否
+17207,cam_cute01m1garand,萌系迷彩,0,普通,24226,,wat,cam,否
+17208,cam_desertm1garand,海军丛林迷彩,0,普通,24227,,wat,cam,否
+17212,cam_junglewarfarem1garand,丛林战争,0,普通,24232,,wat,cam,否
+17216,cam_maritimem1garand,海洋迷彩,0,普通,24238,,wat,cam,否
+17217,cam_multicamm1garand,多地形迷彩,0,普通,24239,,wat,cam,否
+17218,cam_nebulam1garand,南海卫士,0,普通,24240,,wat,cam,否
+17220,cam_operam1garand,蟒蛇迷彩,0,普通,24242,,wat,cam,否
+17222,cam_pattern2m1garand,盗墓者,0,普通,24244,,wat,cam,否
+17223,cam_pattern3m1garand,血暮黑棘,0,普通,24245,,wat,cam,否
+17224,cam_patternm1garand,金色瓷纹,0,普通,24246,,wat,cam,否
+17226,cam_phenixm1garand,树皮迷彩,0,普通,24248,,wat,cam,否
+17227,cam_pumpkinm1garand,南瓜迷彩,0,普通,24249,,wat,cam,否
+17234,cam_sogm1garand,虎斑迷彩,0,普通,24257,,wat,cam,否
+17235,cam_tigerm1garand,蛛网迷彩,0,普通,24258,,wat,cam,否
+17236,cam_urbanm1garand,海军沙漠迷彩,0,普通,24259,,wat,cam,否
+17563,cam_pumpkinakbptech,南瓜迷彩,0,普通,24863,,wat,cam,否
+18641,cam_arcticl115,寒区迷彩,0,普通,26770,,wat,cam,否
+18643,cam_bluearrowl115,枫叶迷彩,0,普通,26772,,wat,cam,否
+18647,cam_desertl115,海军丛林迷彩,0,普通,26776,,wat,cam,否
+18651,cam_junglewarfarel115,丛林战争,0,普通,26781,,wat,cam,否
+18655,cam_maritimel115,海洋迷彩,0,普通,26787,,wat,cam,否
+18656,cam_multicaml115,多地形迷彩,0,普通,26788,,wat,cam,否
+18657,cam_nebulal115,南海卫士,0,普通,26789,,wat,cam,否
+18659,cam_operal115,蟒蛇迷彩,0,普通,26791,,wat,cam,否
+18661,cam_pattern2l115,盗墓者,0,普通,26793,,wat,cam,否
+18662,cam_pattern3l115,血暮黑棘,0,普通,26794,,wat,cam,否
+18663,cam_patternl115,金色瓷纹,0,普通,26795,,wat,cam,否
+18665,cam_phenixl115,树皮迷彩,0,普通,26797,,wat,cam,否
+18666,cam_pumpkinl115,南瓜迷彩,0,普通,26798,,wat,cam,否
+18673,cam_sogl115,虎斑迷彩,0,普通,26806,,wat,cam,否
+18674,cam_tigerl115,蛛网迷彩,0,普通,26807,,wat,cam,否
+18675,cam_urbanl115,海军沙漠迷彩,0,普通,26808,,wat,cam,否
+19432,cam_shardfn2000techshard,碎片迷彩,0,普通,,,wat,cam,否
+19433,cam_bcl1skorpionbcl,勇者游戏联赛迷彩1,0,普通,,,wat,cam,否
+19434,cam_bcl2type95techbcl,勇者游戏联赛迷彩2,0,普通,,,wat,cam,否
+20003,cam_acu,陆军通用迷彩,0,普通,966,,wat,cam,否
+20006,cam_woodland,沙色迷彩,0,普通,137,,wat,cam,否
+20007,cam_sog,虎斑迷彩,0,普通,967,,wat,cam,否
+20009,cam_multicam,多地形迷彩,0,普通,968,,wat,cam,否
+20010,cam_desert,海军丛林迷彩,0,普通,964,,wat,cam,否
+20013,cam_urban,海军沙漠迷彩,0,普通,889,,wat,cam,否
+20014,cam_arctic,寒区迷彩,0,普通,972,,wat,cam,否
+20016,cam_maritime,海洋迷彩,0,普通,973,,wat,cam,否
+20017,cam_hex,蜂巢迷彩,0,普通,980,,wat,cam,否
+20021,cam_dragon,蛇鳞迷彩,0,普通,1340,,wat,cam,否
+20022,cam_tiger,蛛网迷彩,0,普通,1341,,wat,cam,否
+20024,cam_phenix,树皮迷彩,0,普通,1342,,wat,cam,否
+20026,cam_opera,蟒蛇迷彩,0,普通,1343,,wat,cam,否
+20027,cam_bluearrow,枫叶迷彩,0,普通,1344,,wat,cam,否
+20028,cam_pattern,金色瓷纹,0,普通,1345,,wat,cam,否
+20035,cam_pattern2,盗墓者,0,普通,1346,,wat,cam,否
+20036,cam_nebula,南海卫士,0,普通,1347,,wat,cam,否
+20037,cam_pattern3,血暮黑棘,0,普通,1348,,wat,cam,否
+20038,cam_paiting,中国红,0,普通,1349,,wat,cam,否
+20042,cam_gold,闪耀金,0,普通,1369,,wat,cam,否
+20213,cam_cute01,萌系迷彩,0,普通,301,,wat,cam,否
+20247,cam_m4a1green,丛林迷彩,0,普通,864,,wat,cam,否
+20248,cam_m4a1yellow,黄色迷彩,0,普通,883,,wat,cam,否
+20332,cam_arcticr5rgp,寒区迷彩,0,普通,29314,,wat,cam,否
+20335,cam_bluearrowr5rgp,枫叶迷彩,0,普通,29317,,wat,cam,否
+20338,cam_desertr5rgp,海军丛林迷彩,0,普通,29320,,wat,cam,否
+20342,cam_junglewarfarer5rgp,丛林战争,0,普通,29325,,wat,cam,否
+20446,cam_maritimer5rgp,海洋迷彩,0,普通,29331,,wat,cam,否
+20447,cam_multicamr5rgp,多地形迷彩,0,普通,29332,,wat,cam,否
+20448,cam_nebular5rgp,南海卫士,0,普通,29333,,wat,cam,否
+20450,cam_operar5rgp,蟒蛇迷彩,0,普通,29335,,wat,cam,否
+20452,cam_pattern2r5rgp,盗墓者,0,普通,29337,,wat,cam,否
+20453,cam_pattern3r5rgp,血暮黑棘,0,普通,29338,,wat,cam,否
+20454,cam_patternr5rgp,金色瓷纹,0,普通,29339,,wat,cam,否
+20456,cam_phenixr5rgp,树皮迷彩,0,普通,29341,,wat,cam,否
+20457,cam_pumpkinr5rgp,南瓜迷彩,0,普通,29342,,wat,cam,否
+20464,cam_sogr5rgp,虎斑迷彩,0,普通,29349,,wat,cam,否
+20465,cam_tigerr5rgp,蛛网迷彩,0,普通,29350,,wat,cam,否
+20466,cam_urbanr5rgp,海军沙漠迷彩,0,普通,29351,,wat,cam,否
+20812,cam_arctictar21se,寒区迷彩,0,普通,10598,,wat,cam,否
+20813,cam_bluearrowtar21se,枫叶迷彩,0,普通,10599,,wat,cam,否
+20815,cam_deserttar21se,海军丛林迷彩,0,普通,10601,,wat,cam,否
+20837,cam_hextar21se,蜂巢迷彩,0,普通,10604,,wat,cam,否
+20838,cam_junglewarfaretar21se,丛林战争,0,普通,10605,,wat,cam,否
+20842,cam_maritimetar21se,海洋迷彩,0,普通,10609,,wat,cam,否
+20843,cam_multicamtar21se,多地形迷彩,0,普通,10610,,wat,cam,否
+20844,cam_nebulatar21se,南海卫士,0,普通,10611,,wat,cam,否
+20845,cam_operatar21se,蟒蛇迷彩,0,普通,10612,,wat,cam,否
+20846,cam_paitingtar21se,中国红,0,普通,10613,,wat,cam,否
+20847,cam_pattern2tar21se,盗墓者,0,普通,10614,,wat,cam,否
+20848,cam_pattern3tar21se,血暮黑棘,0,普通,10615,,wat,cam,否
+20849,cam_patterntar21se,金色瓷纹,0,普通,10616,,wat,cam,否
+20850,cam_phenixtar21se,树皮迷彩,0,普通,10617,,wat,cam,否
+20851,cam_sogtar21se,虎斑迷彩,0,普通,10618,,wat,cam,否
+20852,cam_tigertar21se,蛛网迷彩,0,普通,10619,,wat,cam,否
+20853,cam_urbantar21se,海军沙漠迷彩,0,普通,10620,,wat,cam,否
+21130,cam_acuan94hellwalker,陆军通用迷彩,0,普通,11816; 11817,,wat,cam,否
+21131,cam_colorfulan94hellwalker,炫彩,0,普通,11818,,wat,cam,否
+21132,cam_dragonan94hellwalker,蛇鳞迷彩,0,普通,11820; 11821,,wat,cam,否
+21357,cam_m4a1greenm4t2,丛林迷彩,0,普通,2805,,wat,cam,否
+21395,cam_m4a1yellowm4t2,黄色迷彩,0,普通,2843,,wat,cam,否
+21433,cam_woodlandm4t2,沙色迷彩,0,普通,2881,,wat,cam,否
+21435,cam_desertm4,海军丛林迷彩,0,普通,2883,,wat,cam,否
+21436,cam_desertspas12,海军丛林迷彩,0,普通,2884,,wat,cam,否
+21437,cam_desertfamas,海军丛林迷彩,0,普通,2885,,wat,cam,否
+21438,cam_desertusp,海军丛林迷彩,0,普通,2886,,wat,cam,否
+21439,cam_desertcheytac,海军丛林迷彩,0,普通,2887,,wat,cam,否
+21440,cam_desertl86,海军丛林迷彩,0,普通,2888,,wat,cam,否
+21442,cam_desertrpd,海军丛林迷彩,0,普通,2890,,wat,cam,否
+21443,cam_desertscar,海军丛林迷彩,0,普通,2891,,wat,cam,否
+21444,cam_desertmg4,海军丛林迷彩,0,普通,2892,,wat,cam,否
+21445,cam_desertm16,海军丛林迷彩,0,普通,2893,,wat,cam,否
+21446,cam_desertvector,海军丛林迷彩,0,普通,2894,,wat,cam,否
+21447,cam_desertaa12,海军丛林迷彩,0,普通,2895,,wat,cam,否
+21448,cam_deserttar21,海军丛林迷彩,0,普通,2896,,wat,cam,否
+21449,cam_desertp90,海军丛林迷彩,0,普通,2897,,wat,cam,否
+21450,cam_desertm1014,海军丛林迷彩,0,普通,2898,,wat,cam,否
+21451,cam_desertaug,海军丛林迷彩,0,普通,2899,,wat,cam,否
+21452,cam_desertstriker,海军丛林迷彩,0,普通,2900,,wat,cam,否
+21453,cam_desertwa2000,海军丛林迷彩,0,普通,2901,,wat,cam,否
+21454,cam_desertmp5k,海军丛林迷彩,0,普通,2902,,wat,cam,否
+21455,cam_desertminiuzi,海军丛林迷彩,0,普通,2903,,wat,cam,否
+21456,cam_desertacr,海军丛林迷彩,0,普通,2904,,wat,cam,否
+21457,cam_desertm240,海军丛林迷彩,0,普通,2905,,wat,cam,否
+21458,cam_desertm21ebr,海军丛林迷彩,0,普通,2906,,wat,cam,否
+21459,cam_desertfn2000,海军丛林迷彩,0,普通,2907,,wat,cam,否
+21461,cam_desertump45,海军丛林迷彩,0,普通,2909,,wat,cam,否
+21464,cam_desertscarsapr,海军丛林迷彩,0,普通,2912,,wat,cam,否
+21465,cam_desertm14ebr,海军丛林迷彩,0,普通,2913,,wat,cam,否
+21467,cam_deserttype95,海军丛林迷彩,0,普通,2915,,wat,cam,否
+21468,cam_desertff58,海军丛林迷彩,0,普通,2916,,wat,cam,否
+21469,cam_desertspbc,海军丛林迷彩,0,普通,2917,,wat,cam,否
+21470,cam_desertmp5sd,海军丛林迷彩,0,普通,2918,,wat,cam,否
+21471,cam_desertm4t2,海军丛林迷彩,0,普通,2919,,wat,cam,否
+21472,cam_desertm1014t2,海军丛林迷彩,0,普通,2920,,wat,cam,否
+21474,cam_urbanspas12,海军沙漠迷彩,0,普通,2922,,wat,cam,否
+21475,cam_urbanfamas,海军沙漠迷彩,0,普通,2923,,wat,cam,否
+21476,cam_urbanusp,海军沙漠迷彩,0,普通,2924,,wat,cam,否
+21477,cam_urbancheytac,海军沙漠迷彩,0,普通,2925,,wat,cam,否
+21478,cam_urbanl86,海军沙漠迷彩,0,普通,2926,,wat,cam,否
+21480,cam_urbanrpd,海军沙漠迷彩,0,普通,2928,,wat,cam,否
+21481,cam_urbanscar,海军沙漠迷彩,0,普通,2929,,wat,cam,否
+21482,cam_urbanmg4,海军沙漠迷彩,0,普通,2930,,wat,cam,否
+21483,cam_urbanm16,海军沙漠迷彩,0,普通,2931,,wat,cam,否
+21484,cam_urbanvector,海军沙漠迷彩,0,普通,2932,,wat,cam,否
+21485,cam_urbanaa12,海军沙漠迷彩,0,普通,2933,,wat,cam,否
+21486,cam_urbantar21,海军沙漠迷彩,0,普通,2934,,wat,cam,否
+21487,cam_urbanp90,海军沙漠迷彩,0,普通,2935,,wat,cam,否
+21488,cam_urbanm1014,海军沙漠迷彩,0,普通,2936,,wat,cam,否
+21489,cam_urbanaug,海军沙漠迷彩,0,普通,2937,,wat,cam,否
+21490,cam_urbanstriker,海军沙漠迷彩,0,普通,2938,,wat,cam,否
+21491,cam_urbanwa2000,海军沙漠迷彩,0,普通,2939,,wat,cam,否
+21492,cam_urbanmp5k,海军沙漠迷彩,0,普通,2940,,wat,cam,否
+21493,cam_urbanminiuzi,海军沙漠迷彩,0,普通,2941,,wat,cam,否
+21494,cam_urbanacr,海军沙漠迷彩,0,普通,2942,,wat,cam,否
+21495,cam_urbanm240,海军沙漠迷彩,0,普通,2943,,wat,cam,否
+21496,cam_urbanm21ebr,海军沙漠迷彩,0,普通,2944,,wat,cam,否
+21497,cam_urbanfn2000,海军沙漠迷彩,0,普通,2945,,wat,cam,否
+21499,cam_urbanump45,海军沙漠迷彩,0,普通,2947,,wat,cam,否
+21502,cam_urbanscarsapr,海军沙漠迷彩,0,普通,2950,,wat,cam,否
+21503,cam_urbanm14ebr,海军沙漠迷彩,0,普通,2951,,wat,cam,否
+21505,cam_urbantype95,海军沙漠迷彩,0,普通,2953,,wat,cam,否
+21506,cam_urbanff58,海军沙漠迷彩,0,普通,2954,,wat,cam,否
+21507,cam_urbanspbc,海军沙漠迷彩,0,普通,2955,,wat,cam,否
+21508,cam_urbanmp5sd,海军沙漠迷彩,0,普通,2956,,wat,cam,否
+21509,cam_urbanm4t2,海军沙漠迷彩,0,普通,2957,,wat,cam,否
+21510,cam_urbanm1014t2,海军沙漠迷彩,0,普通,2958,,wat,cam,否
+21547,cam_acum4t2,陆军通用迷彩,0,普通,2995,,wat,cam,否
+21549,cam_sogm4,虎斑迷彩,0,普通,2997,,wat,cam,否
+21550,cam_sogspas12,虎斑迷彩,0,普通,2998,,wat,cam,否
+21551,cam_sogfamas,虎斑迷彩,0,普通,2999,,wat,cam,否
+21552,cam_sogusp,虎斑迷彩,0,普通,3000,,wat,cam,否
+21553,cam_sogcheytac,虎斑迷彩,0,普通,3001,,wat,cam,否
+21554,cam_sogl86,虎斑迷彩,0,普通,3002,,wat,cam,否
+21556,cam_sogrpd,虎斑迷彩,0,普通,3004,,wat,cam,否
+21557,cam_sogscar,虎斑迷彩,0,普通,3005,,wat,cam,否
+21558,cam_sogmg4,虎斑迷彩,0,普通,3006,,wat,cam,否
+21559,cam_sogm16,虎斑迷彩,0,普通,3007,,wat,cam,否
+21560,cam_sogvector,虎斑迷彩,0,普通,3008,,wat,cam,否
+21561,cam_sogaa12,虎斑迷彩,0,普通,3009,,wat,cam,否
+21562,cam_sogtar21,虎斑迷彩,0,普通,3010,,wat,cam,否
+21563,cam_sogp90,虎斑迷彩,0,普通,3011,,wat,cam,否
+21564,cam_sogm1014,虎斑迷彩,0,普通,3012,,wat,cam,否
+21565,cam_sogaug,虎斑迷彩,0,普通,3013,,wat,cam,否
+21566,cam_sogstriker,虎斑迷彩,0,普通,3014,,wat,cam,否
+21567,cam_sogwa2000,虎斑迷彩,0,普通,3015,,wat,cam,否
+21568,cam_sogmp5k,虎斑迷彩,0,普通,3016,,wat,cam,否
+21569,cam_sogminiuzi,虎斑迷彩,0,普通,3017,,wat,cam,否
+21570,cam_sogacr,虎斑迷彩,0,普通,3018,,wat,cam,否
+21571,cam_sogm240,虎斑迷彩,0,普通,3019,,wat,cam,否
+21572,cam_sogm21ebr,虎斑迷彩,0,普通,3020,,wat,cam,否
+21573,cam_sogfn2000,虎斑迷彩,0,普通,3021,,wat,cam,否
+21575,cam_sogump45,虎斑迷彩,0,普通,3023,,wat,cam,否
+21578,cam_sogscarsapr,虎斑迷彩,0,普通,3026,,wat,cam,否
+21579,cam_sogm14ebr,虎斑迷彩,0,普通,3027,,wat,cam,否
+21581,cam_sogtype95,虎斑迷彩,0,普通,3029,,wat,cam,否
+21582,cam_sogff58,虎斑迷彩,0,普通,3030,,wat,cam,否
+21583,cam_sogspbc,虎斑迷彩,0,普通,3031,,wat,cam,否
+21584,cam_sogmp5sd,虎斑迷彩,0,普通,3032,,wat,cam,否
+21585,cam_sogm4t2,虎斑迷彩,0,普通,3033,,wat,cam,否
+21586,cam_sogm1014t2,虎斑迷彩,0,普通,3034,,wat,cam,否
+21587,cam_multicamm4,多地形迷彩,0,普通,3035,,wat,cam,否
+21588,cam_multicamspas12,多地形迷彩,0,普通,3036,,wat,cam,否
+21589,cam_multicamfamas,多地形迷彩,0,普通,3037,,wat,cam,否
+21590,cam_multicamusp,多地形迷彩,0,普通,3038,,wat,cam,否
+21591,cam_multicamcheytac,多地形迷彩,0,普通,3039,,wat,cam,否
+21592,cam_multicaml86,多地形迷彩,0,普通,3040,,wat,cam,否
+21594,cam_multicamrpd,多地形迷彩,0,普通,3042,,wat,cam,否
+21595,cam_multicamscar,多地形迷彩,0,普通,3043,,wat,cam,否
+21596,cam_multicammg4,多地形迷彩,0,普通,3044,,wat,cam,否
+21597,cam_multicamm16,多地形迷彩,0,普通,3045,,wat,cam,否
+21598,cam_multicamvector,多地形迷彩,0,普通,3046,,wat,cam,否
+21599,cam_multicamaa12,多地形迷彩,0,普通,3047,,wat,cam,否
+21600,cam_multicamtar21,多地形迷彩,0,普通,3048,,wat,cam,否
+21601,cam_multicamp90,多地形迷彩,0,普通,3049,,wat,cam,否
+21602,cam_multicamm1014,多地形迷彩,0,普通,3050,,wat,cam,否
+21603,cam_multicamaug,多地形迷彩,0,普通,3051,,wat,cam,否
+21604,cam_multicamstriker,多地形迷彩,0,普通,3052,,wat,cam,否
+21605,cam_multicamwa2000,多地形迷彩,0,普通,3053,,wat,cam,否
+21606,cam_multicammp5k,多地形迷彩,0,普通,3054,,wat,cam,否
+21607,cam_multicamminiuzi,多地形迷彩,0,普通,3055,,wat,cam,否
+21608,cam_multicamacr,多地形迷彩,0,普通,3056,,wat,cam,否
+21609,cam_multicamm240,多地形迷彩,0,普通,3057,,wat,cam,否
+21610,cam_multicamm21ebr,多地形迷彩,0,普通,3058,,wat,cam,否
+21611,cam_multicamfn2000,多地形迷彩,0,普通,3059,,wat,cam,否
+21613,cam_multicamump45,多地形迷彩,0,普通,3061,,wat,cam,否
+21616,cam_multicamscarsapr,多地形迷彩,0,普通,3064,,wat,cam,否
+21617,cam_multicamm14ebr,多地形迷彩,0,普通,3065,,wat,cam,否
+21619,cam_multicamtype95,多地形迷彩,0,普通,3067,,wat,cam,否
+21620,cam_multicamff58,多地形迷彩,0,普通,3068,,wat,cam,否
+21621,cam_multicamspbc,多地形迷彩,0,普通,3069,,wat,cam,否
+21622,cam_multicammp5sd,多地形迷彩,0,普通,3070,,wat,cam,否
+21623,cam_multicamm4t2,多地形迷彩,0,普通,3071,,wat,cam,否
+21624,cam_multicamm1014t2,多地形迷彩,0,普通,3072,,wat,cam,否
+21625,cam_arcticm4,寒区迷彩,0,普通,3073,,wat,cam,否
+21626,cam_arcticspas12,寒区迷彩,0,普通,3074,,wat,cam,否
+21627,cam_arcticfamas,寒区迷彩,0,普通,3075,,wat,cam,否
+21628,cam_arcticusp,寒区迷彩,0,普通,3076,,wat,cam,否
+21629,cam_arcticcheytac,寒区迷彩,0,普通,3077,,wat,cam,否
+21630,cam_arcticl86,寒区迷彩,0,普通,3078,,wat,cam,否
+21632,cam_arcticrpd,寒区迷彩,0,普通,3080,,wat,cam,否
+21633,cam_arcticscar,寒区迷彩,0,普通,3081,,wat,cam,否
+21634,cam_arcticmg4,寒区迷彩,0,普通,3082,,wat,cam,否
+21635,cam_arcticm16,寒区迷彩,0,普通,3083,,wat,cam,否
+21636,cam_arcticvector,寒区迷彩,0,普通,3084,,wat,cam,否
+21637,cam_arcticaa12,寒区迷彩,0,普通,3085,,wat,cam,否
+21638,cam_arctictar21,寒区迷彩,0,普通,3086,,wat,cam,否
+21639,cam_arcticp90,寒区迷彩,0,普通,3087,,wat,cam,否
+21640,cam_arcticm1014,寒区迷彩,0,普通,3088,,wat,cam,否
+21641,cam_arcticaug,寒区迷彩,0,普通,3089,,wat,cam,否
+21642,cam_arcticstriker,寒区迷彩,0,普通,3090,,wat,cam,否
+21643,cam_arcticwa2000,寒区迷彩,0,普通,3091,,wat,cam,否
+21644,cam_arcticmp5k,寒区迷彩,0,普通,3092,,wat,cam,否
+21645,cam_arcticminiuzi,寒区迷彩,0,普通,3093,,wat,cam,否
+21646,cam_arcticacr,寒区迷彩,0,普通,3094,,wat,cam,否
+21647,cam_arcticm240,寒区迷彩,0,普通,3095,,wat,cam,否
+21648,cam_arcticm21ebr,寒区迷彩,0,普通,3096,,wat,cam,否
+21649,cam_arcticfn2000,寒区迷彩,0,普通,3097,,wat,cam,否
+21651,cam_arcticump45,寒区迷彩,0,普通,3099,,wat,cam,否
+21654,cam_arcticscarsapr,寒区迷彩,0,普通,3102,,wat,cam,否
+21655,cam_arcticm14ebr,寒区迷彩,0,普通,3103,,wat,cam,否
+21657,cam_arctictype95,寒区迷彩,0,普通,3105,,wat,cam,否
+21658,cam_arcticff58,寒区迷彩,0,普通,3106,,wat,cam,否
+21659,cam_arcticspbc,寒区迷彩,0,普通,3107,,wat,cam,否
+21660,cam_arcticmp5sd,寒区迷彩,0,普通,3108,,wat,cam,否
+21661,cam_arcticm4t2,寒区迷彩,0,普通,3109,,wat,cam,否
+21662,cam_arcticm1014t2,寒区迷彩,0,普通,3110,,wat,cam,否
+21663,cam_maritimem4,海洋迷彩,0,普通,3111,,wat,cam,否
+21664,cam_maritimespas12,海洋迷彩,0,普通,3112,,wat,cam,否
+21665,cam_maritimefamas,海洋迷彩,0,普通,3113,,wat,cam,否
+21666,cam_maritimeusp,海洋迷彩,0,普通,3114,,wat,cam,否
+21667,cam_maritimecheytac,海洋迷彩,0,普通,3115,,wat,cam,否
+21668,cam_maritimel86,海洋迷彩,0,普通,3116,,wat,cam,否
+21670,cam_maritimerpd,海洋迷彩,0,普通,3118,,wat,cam,否
+21671,cam_maritimescar,海洋迷彩,0,普通,3119,,wat,cam,否
+21672,cam_maritimemg4,海洋迷彩,0,普通,3120,,wat,cam,否
+21673,cam_maritimem16,海洋迷彩,0,普通,3121,,wat,cam,否
+21674,cam_maritimevector,海洋迷彩,0,普通,3122,,wat,cam,否
+21675,cam_maritimeaa12,海洋迷彩,0,普通,3123,,wat,cam,否
+21676,cam_maritimetar21,海洋迷彩,0,普通,3124,,wat,cam,否
+21677,cam_maritimep90,海洋迷彩,0,普通,3125,,wat,cam,否
+21678,cam_maritimem1014,海洋迷彩,0,普通,3126,,wat,cam,否
+21679,cam_maritimeaug,海洋迷彩,0,普通,3127,,wat,cam,否
+21680,cam_maritimestriker,海洋迷彩,0,普通,3128,,wat,cam,否
+21681,cam_maritimewa2000,海洋迷彩,0,普通,3129,,wat,cam,否
+21682,cam_maritimemp5k,海洋迷彩,0,普通,3130,,wat,cam,否
+21683,cam_maritimeminiuzi,海洋迷彩,0,普通,3131,,wat,cam,否
+21684,cam_maritimeacr,海洋迷彩,0,普通,3132,,wat,cam,否
+21685,cam_maritimem240,海洋迷彩,0,普通,3133,,wat,cam,否
+21686,cam_maritimem21ebr,海洋迷彩,0,普通,3134,,wat,cam,否
+21687,cam_maritimefn2000,海洋迷彩,0,普通,3135,,wat,cam,否
+21689,cam_maritimeump45,海洋迷彩,0,普通,3137,,wat,cam,否
+21692,cam_maritimescarsapr,海洋迷彩,0,普通,3140,,wat,cam,否
+21693,cam_maritimem14ebr,海洋迷彩,0,普通,3141,,wat,cam,否
+21695,cam_maritimetype95,海洋迷彩,0,普通,3143,,wat,cam,否
+21696,cam_maritimeff58,海洋迷彩,0,普通,3144,,wat,cam,否
+21697,cam_maritimespbc,海洋迷彩,0,普通,3145,,wat,cam,否
+21698,cam_maritimemp5sd,海洋迷彩,0,普通,3146,,wat,cam,否
+21699,cam_maritimem4t2,海洋迷彩,0,普通,3147,,wat,cam,否
+21700,cam_maritimem1014t2,海洋迷彩,0,普通,3148,,wat,cam,否
+21704,cam_hexusp,蜂巢迷彩,0,普通,3152,,wat,cam,否
+21726,cam_pumpkinvepr,南瓜迷彩,0,普通,30156,,wat,cam,否
+21737,cam_hexm4t2,蜂巢迷彩,0,普通,3185,,wat,cam,否
+21738,cam_hexm1014t2,蜂巢迷彩,0,普通,3186,,wat,cam,否
+21775,cam_dragonm4t2,蛇鳞迷彩,0,普通,3223; 8039,,wat,cam,否
+21776,cam_dragonm1014t2,蛇鳞迷彩,0,普通,3224; 8040,,wat,cam,否
+21777,cam_tigerspas12,蛛网迷彩,0,普通,3225,,wat,cam,否
+21778,cam_tigerfamas,蛛网迷彩,0,普通,3226,,wat,cam,否
+21779,cam_tigerusp,蛛网迷彩,0,普通,3227,,wat,cam,否
+21780,cam_tigercheytac,蛛网迷彩,0,普通,3228,,wat,cam,否
+21781,cam_tigerl86,蛛网迷彩,0,普通,3229,,wat,cam,否
+21783,cam_tigerrpd,蛛网迷彩,0,普通,3231,,wat,cam,否
+21784,cam_tigerscar,蛛网迷彩,0,普通,3232,,wat,cam,否
+21785,cam_tigermg4,蛛网迷彩,0,普通,3233,,wat,cam,否
+21786,cam_tigerm16,蛛网迷彩,0,普通,3234,,wat,cam,否
+21787,cam_tigervector,蛛网迷彩,0,普通,3235,,wat,cam,否
+21788,cam_tigeraa12,蛛网迷彩,0,普通,3236,,wat,cam,否
+21789,cam_tigertar21,蛛网迷彩,0,普通,3237,,wat,cam,否
+21790,cam_tigerp90,蛛网迷彩,0,普通,3238,,wat,cam,否
+21791,cam_tigeraug,蛛网迷彩,0,普通,3239,,wat,cam,否
+21792,cam_tigerstriker,蛛网迷彩,0,普通,3240,,wat,cam,否
+21793,cam_tigerwa2000,蛛网迷彩,0,普通,3241,,wat,cam,否
+21794,cam_tigermp5k,蛛网迷彩,0,普通,3242,,wat,cam,否
+21795,cam_tigerminiuzi,蛛网迷彩,0,普通,3243,,wat,cam,否
+21796,cam_tigeracr,蛛网迷彩,0,普通,3244,,wat,cam,否
+21797,cam_tigerm240,蛛网迷彩,0,普通,3245,,wat,cam,否
+21798,cam_tigerm21ebr,蛛网迷彩,0,普通,3246,,wat,cam,否
+21799,cam_tigerfn2000,蛛网迷彩,0,普通,3247,,wat,cam,否
+21801,cam_tigerump45,蛛网迷彩,0,普通,3249,,wat,cam,否
+21804,cam_tigerscarsapr,蛛网迷彩,0,普通,3252,,wat,cam,否
+21805,cam_tigerm14ebr,蛛网迷彩,0,普通,3253,,wat,cam,否
+21807,cam_tigertype95,蛛网迷彩,0,普通,3255,,wat,cam,否
+21808,cam_tigerff58,蛛网迷彩,0,普通,3256,,wat,cam,否
+21809,cam_tigerspbc,蛛网迷彩,0,普通,3257,,wat,cam,否
+21810,cam_tigermp5sd,蛛网迷彩,0,普通,3258,,wat,cam,否
+21811,cam_tigerm4a1techevent,蛛网迷彩,0,普通,3259,,wat,cam,否
+21812,cam_tigerm4t2,蛛网迷彩,0,普通,3260,,wat,cam,否
+21813,cam_tigerm1014t2,蛛网迷彩,0,普通,3261,,wat,cam,否
+21814,cam_phenixspas12,树皮迷彩,0,普通,3262,,wat,cam,否
+21815,cam_phenixfamas,树皮迷彩,0,普通,3263,,wat,cam,否
+21816,cam_phenixusp,树皮迷彩,0,普通,3264,,wat,cam,否
+21817,cam_phenixcheytac,树皮迷彩,0,普通,3265,,wat,cam,否
+21818,cam_phenixl86,树皮迷彩,0,普通,3266,,wat,cam,否
+21820,cam_phenixrpd,树皮迷彩,0,普通,3268,,wat,cam,否
+21821,cam_phenixscar,树皮迷彩,0,普通,3269,,wat,cam,否
+21822,cam_phenixmg4,树皮迷彩,0,普通,3270,,wat,cam,否
+21823,cam_phenixm16,树皮迷彩,0,普通,3271,,wat,cam,否
+21824,cam_phenixvector,树皮迷彩,0,普通,3272,,wat,cam,否
+21825,cam_phenixaa12,树皮迷彩,0,普通,3273,,wat,cam,否
+21826,cam_phenixtar21,树皮迷彩,0,普通,3274,,wat,cam,否
+21827,cam_phenixp90,树皮迷彩,0,普通,3275,,wat,cam,否
+21828,cam_phenixaug,树皮迷彩,0,普通,3276,,wat,cam,否
+21829,cam_phenixstriker,树皮迷彩,0,普通,3277,,wat,cam,否
+21830,cam_phenixwa2000,树皮迷彩,0,普通,3278,,wat,cam,否
+21831,cam_phenixmp5k,树皮迷彩,0,普通,3279,,wat,cam,否
+21832,cam_phenixminiuzi,树皮迷彩,0,普通,3280,,wat,cam,否
+21833,cam_phenixacr,树皮迷彩,0,普通,3281,,wat,cam,否
+21834,cam_phenixm240,树皮迷彩,0,普通,3282,,wat,cam,否
+21835,cam_phenixm21ebr,树皮迷彩,0,普通,3283,,wat,cam,否
+21836,cam_phenixfn2000,树皮迷彩,0,普通,3284,,wat,cam,否
+21838,cam_phenixump45,树皮迷彩,0,普通,3286,,wat,cam,否
+21841,cam_phenixscarsapr,树皮迷彩,0,普通,3289,,wat,cam,否
+21842,cam_phenixm14ebr,树皮迷彩,0,普通,3290,,wat,cam,否
+21843,cam_phenixm4t2,树皮迷彩,0,普通,3291,,wat,cam,否
+21844,cam_phenixm1014t2,树皮迷彩,0,普通,3292,,wat,cam,否
+21845,cam_operaspas12,蟒蛇迷彩,0,普通,3293,,wat,cam,否
+21846,cam_operafamas,蟒蛇迷彩,0,普通,3294,,wat,cam,否
+21847,cam_operausp,蟒蛇迷彩,0,普通,3295,,wat,cam,否
+21848,cam_operacheytac,蟒蛇迷彩,0,普通,3296,,wat,cam,否
+21849,cam_operal86,蟒蛇迷彩,0,普通,3297,,wat,cam,否
+21851,cam_operarpd,蟒蛇迷彩,0,普通,3299,,wat,cam,否
+21852,cam_operascar,蟒蛇迷彩,0,普通,3300,,wat,cam,否
+21853,cam_operamg4,蟒蛇迷彩,0,普通,3301,,wat,cam,否
+21854,cam_operam16,蟒蛇迷彩,0,普通,3302,,wat,cam,否
+21855,cam_operavector,蟒蛇迷彩,0,普通,3303,,wat,cam,否
+21856,cam_operaaa12,蟒蛇迷彩,0,普通,3304,,wat,cam,否
+21857,cam_operatar21,蟒蛇迷彩,0,普通,3305,,wat,cam,否
+21858,cam_operap90,蟒蛇迷彩,0,普通,3306,,wat,cam,否
+21859,cam_operaaug,蟒蛇迷彩,0,普通,3307,,wat,cam,否
+21860,cam_operastriker,蟒蛇迷彩,0,普通,3308,,wat,cam,否
+21861,cam_operawa2000,蟒蛇迷彩,0,普通,3309,,wat,cam,否
+21862,cam_operamp5k,蟒蛇迷彩,0,普通,3310,,wat,cam,否
+21863,cam_operaminiuzi,蟒蛇迷彩,0,普通,3311,,wat,cam,否
+21864,cam_operaacr,蟒蛇迷彩,0,普通,3312,,wat,cam,否
+21865,cam_operam240,蟒蛇迷彩,0,普通,3313,,wat,cam,否
+21866,cam_operam21ebr,蟒蛇迷彩,0,普通,3314,,wat,cam,否
+21867,cam_operafn2000,蟒蛇迷彩,0,普通,3315,,wat,cam,否
+21869,cam_operaump45,蟒蛇迷彩,0,普通,3317,,wat,cam,否
+21872,cam_operascarsapr,蟒蛇迷彩,0,普通,3320,,wat,cam,否
+21873,cam_operam14ebr,蟒蛇迷彩,0,普通,3321,,wat,cam,否
+21874,cam_operam4t2,蟒蛇迷彩,0,普通,3322,,wat,cam,否
+21875,cam_operam1014t2,蟒蛇迷彩,0,普通,3323,,wat,cam,否
+21876,cam_bluearrowspas12,枫叶迷彩,0,普通,3324,,wat,cam,否
+21877,cam_bluearrowfamas,枫叶迷彩,0,普通,3325,,wat,cam,否
+21878,cam_bluearrowusp,枫叶迷彩,0,普通,3326,,wat,cam,否
+21879,cam_bluearrowcheytac,枫叶迷彩,0,普通,3327,,wat,cam,否
+21880,cam_bluearrowl86,枫叶迷彩,0,普通,3328,,wat,cam,否
+21882,cam_bluearrowrpd,枫叶迷彩,0,普通,3330,,wat,cam,否
+21883,cam_bluearrowscar,枫叶迷彩,0,普通,3331,,wat,cam,否
+21884,cam_bluearrowmg4,枫叶迷彩,0,普通,3332,,wat,cam,否
+21885,cam_bluearrowm16,枫叶迷彩,0,普通,3333,,wat,cam,否
+21886,cam_bluearrowvector,枫叶迷彩,0,普通,3334,,wat,cam,否
+21887,cam_bluearrowaa12,枫叶迷彩,0,普通,3335,,wat,cam,否
+21888,cam_bluearrowtar21,枫叶迷彩,0,普通,3336,,wat,cam,否
+21889,cam_bluearrowp90,枫叶迷彩,0,普通,3337,,wat,cam,否
+21890,cam_bluearrowaug,枫叶迷彩,0,普通,3338,,wat,cam,否
+21891,cam_bluearrowstriker,枫叶迷彩,0,普通,3339,,wat,cam,否
+21892,cam_bluearrowwa2000,枫叶迷彩,0,普通,3340,,wat,cam,否
+21893,cam_bluearrowmp5k,枫叶迷彩,0,普通,3341,,wat,cam,否
+21894,cam_bluearrowminiuzi,枫叶迷彩,0,普通,3342,,wat,cam,否
+21895,cam_bluearrowacr,枫叶迷彩,0,普通,3343,,wat,cam,否
+21896,cam_bluearrowm240,枫叶迷彩,0,普通,3344,,wat,cam,否
+21897,cam_bluearrowm21ebr,枫叶迷彩,0,普通,3345,,wat,cam,否
+21898,cam_bluearrowfn2000,枫叶迷彩,0,普通,3346,,wat,cam,否
+21900,cam_bluearrowump45,枫叶迷彩,0,普通,3348,,wat,cam,否
+21903,cam_bluearrowscarsapr,枫叶迷彩,0,普通,3351,,wat,cam,否
+21904,cam_bluearrowm14ebr,枫叶迷彩,0,普通,3352,,wat,cam,否
+21905,cam_bluearrowmcsevent,枫叶迷彩,0,普通,3353,,wat,cam,否
+21906,cam_bluearrowm4t2,枫叶迷彩,0,普通,3354,,wat,cam,否
+21907,cam_bluearrowm1014t2,枫叶迷彩,0,普通,3355,,wat,cam,否
+21908,cam_patternm4,金色瓷纹,0,普通,3356,,wat,cam,否
+21909,cam_patternspas12,金色瓷纹,0,普通,3357,,wat,cam,否
+21910,cam_patternfamas,金色瓷纹,0,普通,3358,,wat,cam,否
+21911,cam_patternusp,金色瓷纹,0,普通,3359,,wat,cam,否
+21912,cam_patterncheytac,金色瓷纹,0,普通,3360,,wat,cam,否
+21913,cam_patternl86,金色瓷纹,0,普通,3361,,wat,cam,否
+21915,cam_patternrpd,金色瓷纹,0,普通,3363,,wat,cam,否
+21916,cam_patternscar,金色瓷纹,0,普通,3364,,wat,cam,否
+21917,cam_patternmg4,金色瓷纹,0,普通,3365,,wat,cam,否
+21918,cam_patternm16,金色瓷纹,0,普通,3366,,wat,cam,否
+21919,cam_patternvector,金色瓷纹,0,普通,3367,,wat,cam,否
+21920,cam_patternaa12,金色瓷纹,0,普通,3368,,wat,cam,否
+21921,cam_patterntar21,金色瓷纹,0,普通,3369,,wat,cam,否
+21922,cam_patternp90,金色瓷纹,0,普通,3370,,wat,cam,否
+21923,cam_patternm1014,金色瓷纹,0,普通,3371,,wat,cam,否
+21924,cam_patternaug,金色瓷纹,0,普通,3372,,wat,cam,否
+21925,cam_patternstriker,金色瓷纹,0,普通,3373,,wat,cam,否
+21926,cam_patternwa2000,金色瓷纹,0,普通,3374,,wat,cam,否
+21927,cam_patternmp5k,金色瓷纹,0,普通,3375,,wat,cam,否
+21928,cam_patternminiuzi,金色瓷纹,0,普通,3376,,wat,cam,否
+21929,cam_patternacr,金色瓷纹,0,普通,3377,,wat,cam,否
+21930,cam_patternm240,金色瓷纹,0,普通,3378,,wat,cam,否
+21931,cam_patternm21ebr,金色瓷纹,0,普通,3379,,wat,cam,否
+21932,cam_patternfn2000,金色瓷纹,0,普通,3380,,wat,cam,否
+21934,cam_patternump45,金色瓷纹,0,普通,3382,,wat,cam,否
+21937,cam_patternscarsapr,金色瓷纹,0,普通,3385,,wat,cam,否
+21938,cam_patternm14ebr,金色瓷纹,0,普通,3386,,wat,cam,否
+21940,cam_patterntype95,金色瓷纹,0,普通,3388,,wat,cam,否
+21941,cam_patternff58,金色瓷纹,0,普通,3389,,wat,cam,否
+21942,cam_patternspbc,金色瓷纹,0,普通,3390,,wat,cam,否
+21943,cam_patternmp5sd,金色瓷纹,0,普通,3391,,wat,cam,否
+21945,cam_pattern2m4,盗墓者,0,普通,3393,,wat,cam,否
+21946,cam_pattern2spas12,盗墓者,0,普通,3394,,wat,cam,否
+21947,cam_pattern2famas,盗墓者,0,普通,3395,,wat,cam,否
+21948,cam_pattern2usp,盗墓者,0,普通,3396,,wat,cam,否
+21949,cam_pattern2cheytac,盗墓者,0,普通,3397,,wat,cam,否
+21950,cam_pattern2l86,盗墓者,0,普通,3398,,wat,cam,否
+21952,cam_pattern2rpd,盗墓者,0,普通,3400,,wat,cam,否
+21953,cam_pattern2scar,盗墓者,0,普通,3401,,wat,cam,否
+21954,cam_pattern2mg4,盗墓者,0,普通,3402,,wat,cam,否
+21955,cam_pattern2m16,盗墓者,0,普通,3403,,wat,cam,否
+21956,cam_pattern2vector,盗墓者,0,普通,3404,,wat,cam,否
+21957,cam_pattern2aa12,盗墓者,0,普通,3405,,wat,cam,否
+21958,cam_pattern2tar21,盗墓者,0,普通,3406,,wat,cam,否
+21959,cam_pattern2p90,盗墓者,0,普通,3407,,wat,cam,否
+21960,cam_pattern2m1014,盗墓者,0,普通,3408,,wat,cam,否
+21961,cam_pattern2aug,盗墓者,0,普通,3409,,wat,cam,否
+21962,cam_pattern2striker,盗墓者,0,普通,3410,,wat,cam,否
+21963,cam_pattern2wa2000,盗墓者,0,普通,3411,,wat,cam,否
+21964,cam_pattern2mp5k,盗墓者,0,普通,3412,,wat,cam,否
+21965,cam_pattern2miniuzi,盗墓者,0,普通,3413,,wat,cam,否
+21966,cam_pattern2acr,盗墓者,0,普通,3414,,wat,cam,否
+21967,cam_pattern2m240,盗墓者,0,普通,3415,,wat,cam,否
+21968,cam_pattern2m21ebr,盗墓者,0,普通,3416,,wat,cam,否
+21969,cam_pattern2fn2000,盗墓者,0,普通,3417,,wat,cam,否
+21971,cam_pattern2ump45,盗墓者,0,普通,3419,,wat,cam,否
+21974,cam_pattern2scarsapr,盗墓者,0,普通,3422,,wat,cam,否
+21975,cam_pattern2m14ebr,盗墓者,0,普通,3423,,wat,cam,否
+21977,cam_pattern2type95,盗墓者,0,普通,3425,,wat,cam,否
+21978,cam_pattern2ff58,盗墓者,0,普通,3426,,wat,cam,否
+21979,cam_pattern2spbc,盗墓者,0,普通,3427,,wat,cam,否
+21980,cam_pattern2mp5sd,盗墓者,0,普通,3428,,wat,cam,否
+21982,cam_nebulam4,南海卫士,0,普通,3430,,wat,cam,否
+21983,cam_nebulaspas12,南海卫士,0,普通,3431,,wat,cam,否
+21984,cam_nebulafamas,南海卫士,0,普通,3432,,wat,cam,否
+21985,cam_nebulausp,南海卫士,0,普通,3433,,wat,cam,否
+21986,cam_nebulacheytac,南海卫士,0,普通,3434,,wat,cam,否
+21987,cam_nebulal86,南海卫士,0,普通,3435,,wat,cam,否
+21989,cam_nebularpd,南海卫士,0,普通,3437,,wat,cam,否
+21990,cam_nebulascar,南海卫士,0,普通,3438,,wat,cam,否
+21991,cam_nebulamg4,南海卫士,0,普通,3439,,wat,cam,否
+21992,cam_nebulam16,南海卫士,0,普通,3440,,wat,cam,否
+21993,cam_nebulavector,南海卫士,0,普通,3441,,wat,cam,否
+21994,cam_nebulaaa12,南海卫士,0,普通,3442,,wat,cam,否
+21995,cam_nebulatar21,南海卫士,0,普通,3443,,wat,cam,否
+21996,cam_nebulap90,南海卫士,0,普通,3444,,wat,cam,否
+21997,cam_nebulam1014,南海卫士,0,普通,3445,,wat,cam,否
+21998,cam_nebulaaug,南海卫士,0,普通,3446,,wat,cam,否
+21999,cam_nebulastriker,南海卫士,0,普通,3447,,wat,cam,否
+22000,cam_nebulawa2000,南海卫士,0,普通,3448,,wat,cam,否
+22001,cam_nebulamp5k,南海卫士,0,普通,3449,,wat,cam,否
+22002,cam_nebulaminiuzi,南海卫士,0,普通,3450,,wat,cam,否
+22003,cam_nebulaacr,南海卫士,0,普通,3451,,wat,cam,否
+22004,cam_nebulam240,南海卫士,0,普通,3452,,wat,cam,否
+22005,cam_nebulam21ebr,南海卫士,0,普通,3453,,wat,cam,否
+22006,cam_nebulafn2000,南海卫士,0,普通,3454,,wat,cam,否
+22008,cam_nebulaump45,南海卫士,0,普通,3456,,wat,cam,否
+22011,cam_nebulascarsapr,南海卫士,0,普通,3459,,wat,cam,否
+22012,cam_nebulam14ebr,南海卫士,0,普通,3460,,wat,cam,否
+22014,cam_nebulatype95,南海卫士,0,普通,3462,,wat,cam,否
+22015,cam_nebulaff58,南海卫士,0,普通,3463,,wat,cam,否
+22016,cam_nebulaspbc,南海卫士,0,普通,3464,,wat,cam,否
+22017,cam_nebulamp5sd,南海卫士,0,普通,3465,,wat,cam,否
+22019,cam_pattern3m4,血暮黑棘,0,普通,3467,,wat,cam,否
+22020,cam_pattern3spas12,血暮黑棘,0,普通,3468,,wat,cam,否
+22021,cam_pattern3famas,血暮黑棘,0,普通,3469,,wat,cam,否
+22022,cam_pattern3usp,血暮黑棘,0,普通,3470,,wat,cam,否
+22023,cam_pattern3cheytac,血暮黑棘,0,普通,3471,,wat,cam,否
+22024,cam_pattern3l86,血暮黑棘,0,普通,3472,,wat,cam,否
+22026,cam_pattern3rpd,血暮黑棘,0,普通,3474,,wat,cam,否
+22027,cam_pattern3scar,血暮黑棘,0,普通,3475,,wat,cam,否
+22028,cam_pattern3mg4,血暮黑棘,0,普通,3476,,wat,cam,否
+22029,cam_pattern3m16,血暮黑棘,0,普通,3477,,wat,cam,否
+22030,cam_pattern3vector,血暮黑棘,0,普通,3478,,wat,cam,否
+22031,cam_pattern3aa12,血暮黑棘,0,普通,3479,,wat,cam,否
+22032,cam_pattern3tar21,血暮黑棘,0,普通,3480,,wat,cam,否
+22033,cam_pattern3p90,血暮黑棘,0,普通,3481,,wat,cam,否
+22034,cam_pattern3m1014,血暮黑棘,0,普通,3482,,wat,cam,否
+22035,cam_pattern3aug,血暮黑棘,0,普通,3483,,wat,cam,否
+22036,cam_pattern3striker,血暮黑棘,0,普通,3484,,wat,cam,否
+22037,cam_pattern3wa2000,血暮黑棘,0,普通,3485,,wat,cam,否
+22038,cam_pattern3mp5k,血暮黑棘,0,普通,3486,,wat,cam,否
+22039,cam_pattern3miniuzi,血暮黑棘,0,普通,3487,,wat,cam,否
+22040,cam_pattern3acr,血暮黑棘,0,普通,3488,,wat,cam,否
+22041,cam_pattern3m240,血暮黑棘,0,普通,3489,,wat,cam,否
+22042,cam_pattern3m21ebr,血暮黑棘,0,普通,3490,,wat,cam,否
+22043,cam_pattern3fn2000,血暮黑棘,0,普通,3491,,wat,cam,否
+22045,cam_pattern3model1887,血暮黑棘,0,普通,3493,,wat,cam,否
+22046,cam_pattern3ump45,血暮黑棘,0,普通,3494,,wat,cam,否
+22049,cam_pattern3scarsapr,血暮黑棘,0,普通,3497,,wat,cam,否
+22050,cam_pattern3m14ebr,血暮黑棘,0,普通,3498,,wat,cam,否
+22086,cam_goldminiuzi,闪耀金,0,普通,3534,,wat,cam,否
+22092,cam_cute01scarsapr,萌系迷彩,0,普通,3540,,wat,cam,否
+22093,cam_cute01m14ebr,萌系迷彩,0,普通,3541,,wat,cam,否
+22094,cam_cute01spbc,萌系迷彩,0,普通,3542,,wat,cam,否
+22095,cam_cute01mp5sd,萌系迷彩,0,普通,3543,,wat,cam,否
+22096,cam_cute01m4t2,萌系迷彩,0,普通,3544,,wat,cam,否
+22097,cam_cute01m1014t2,萌系迷彩,0,普通,3545,,wat,cam,否
+23396,cam_phenixcartevent,树皮迷彩,0,普通,5701,,wat,cam,否
+23411,cam_operatype95,蟒蛇迷彩,0,普通,5754,,wat,cam,否
+23415,cam_pattern2ump45eventyellow,盗墓者,0,普通,5786,,wat,cam,否
+23416,cam_pattern3ump45red,血暮黑棘,0,普通,5787,,wat,cam,否
+23417,cam_patternump45green,金色瓷纹,0,普通,5788,,wat,cam,否
+23420,cam_painttype95,中国红,0,普通,5805,,wat,cam,否
+23449,cam_pattern3type95event,血暮黑棘,0,普通,6056,,wat,cam,否
+23450,cam_nebulatype95event,南海卫士,0,普通,6057,,wat,cam,否
+23485,cam_graffiticheytacevent,涂鸦迷彩,0,普通,6101,,wat,cam,否
+23486,cam_skullsm4t2,面具迷彩,0,普通,6102,,wat,cam,否
+23488,cam_rockscarevent,岩石迷彩,0,普通,6104,,wat,cam,否
+23562,cam_yellowrsrt3,黄色迷彩,0,普通,6358,,wat,cam,否
+23566,cam_junglewarfareaa12,丛林战争,0,普通,6362,,wat,cam,否
+23567,cam_junglewarfareacr,丛林战争,0,普通,6363,,wat,cam,否
+23570,cam_junglewarfareaug,丛林战争,0,普通,6366,,wat,cam,否
+23571,cam_junglewarfarecheytac,丛林战争,0,普通,6367,,wat,cam,否
+23572,cam_junglewarfarefamas,丛林战争,0,普通,6368,,wat,cam,否
+23573,cam_junglewarfareff58,丛林战争,0,普通,6369,,wat,cam,否
+23574,cam_junglewarfarefn2000,丛林战争,0,普通,6370,,wat,cam,否
+23575,cam_junglewarfarel86,丛林战争,0,普通,6371,,wat,cam,否
+23576,cam_junglewarfarem1014,丛林战争,0,普通,6372,,wat,cam,否
+23577,cam_junglewarfarem1014t2,丛林战争,0,普通,6373,,wat,cam,否
+23578,cam_junglewarfarem14ebr,丛林战争,0,普通,6374,,wat,cam,否
+23579,cam_junglewarfarem16,丛林战争,0,普通,6375,,wat,cam,否
+23580,cam_junglewarfarem21ebr,丛林战争,0,普通,6376,,wat,cam,否
+23581,cam_junglewarfarem240,丛林战争,0,普通,6377,,wat,cam,否
+23582,cam_junglewarfarem4,丛林战争,0,普通,6378,,wat,cam,否
+23584,cam_junglewarfarem4t2,丛林战争,0,普通,6380,,wat,cam,否
+23585,cam_junglewarfaremg4,丛林战争,0,普通,6381,,wat,cam,否
+23586,cam_junglewarfareminiuzi,丛林战争,0,普通,6382,,wat,cam,否
+23587,cam_junglewarfaremp5k,丛林战争,0,普通,6383,,wat,cam,否
+23588,cam_junglewarfaremp5sd,丛林战争,0,普通,6384,,wat,cam,否
+23589,cam_junglewarfarep90,丛林战争,0,普通,6385,,wat,cam,否
+23590,cam_junglewarfarerpd,丛林战争,0,普通,6386,,wat,cam,否
+23591,cam_junglewarfarescar,丛林战争,0,普通,6387,,wat,cam,否
+23592,cam_junglewarfarescarsapr,丛林战争,0,普通,6388,,wat,cam,否
+23593,cam_junglewarfarespas12,丛林战争,0,普通,6389,,wat,cam,否
+23594,cam_junglewarfarespbc,丛林战争,0,普通,6390; 11479,,wat,cam,否
+23595,cam_junglewarfarestriker,丛林战争,0,普通,6391,,wat,cam,否
+23596,cam_junglewarfaretar21,丛林战争,0,普通,6392,,wat,cam,否
+23597,cam_junglewarfaretype95,丛林战争,0,普通,6393,,wat,cam,否
+23598,cam_junglewarfareump45,丛林战争,0,普通,6394,,wat,cam,否
+23599,cam_junglewarfareusp,丛林战争,0,普通,6395,,wat,cam,否
+23600,cam_junglewarfarevector,丛林战争,0,普通,6396,,wat,cam,否
+23601,cam_junglewarfarewa2000,丛林战争,0,普通,6397,,wat,cam,否
+23603,cam_arcticmp5sdevent,寒区迷彩,0,普通,6401,,wat,cam,否
+23817,cam_junglewarfareariar,丛林战争,0,普通,7992; 8138,,wat,cam,否
+23818,cam_junglewarfaretommygun,丛林战争,0,普通,7993; 8139,,wat,cam,否
+23819,cam_junglewarfarersrt3,丛林战争,0,普通,7994; 8140,,wat,cam,否
+24093,cam_blackwhiteskullsg36crr,骷髅猎手迷彩,0,普通,8617,,wat,cam,否
+24208,cam_hexariarse,蜂巢迷彩,0,普通,10180,,wat,cam,否
+24227,cam_pattern2ak47gld,盗墓者,0,普通,10203,,wat,cam,否
+24228,cam_patternak47gld,金色瓷纹,0,普通,10204,,wat,cam,否
+24229,cam_nebulaak47gld,南海卫士,0,普通,10205,,wat,cam,否
+24312,cam_tar21setar21se,树叶迷彩,0,普通,10568,,wat,cam,否
+24416,cam_arcticvectorse,寒区迷彩,0,普通,10890,,wat,cam,否
+24417,cam_bluearrowvectorse,枫叶迷彩,0,普通,10892,,wat,cam,否
+24419,cam_desertvectorse,海军丛林迷彩,0,普通,10896,,wat,cam,否
+24420,cam_dragonvectorse,蛇鳞迷彩,0,普通,10898; 10899,,wat,cam,否
+24421,cam_hexvectorse,蜂巢迷彩,0,普通,10900,,wat,cam,否
+24422,cam_junglewarfarevectorse,丛林战争,0,普通,10902,,wat,cam,否
+24426,cam_maritimevectorse,海洋迷彩,0,普通,10910,,wat,cam,否
+24427,cam_multicamvectorse,多地形迷彩,0,普通,10912,,wat,cam,否
+24428,cam_nebulavectorse,南海卫士,0,普通,10914,,wat,cam,否
+24429,cam_operavectorse,蟒蛇迷彩,0,普通,10916,,wat,cam,否
+24431,cam_pattern2vectorse,盗墓者,0,普通,10920,,wat,cam,否
+24432,cam_pattern3vectorse,血暮黑棘,0,普通,10922,,wat,cam,否
+24433,cam_patternvectorse,金色瓷纹,0,普通,10924,,wat,cam,否
+24435,cam_phenixvectorse,树皮迷彩,0,普通,10928,,wat,cam,否
+24436,cam_sogvectorse,虎斑迷彩,0,普通,10930,,wat,cam,否
+24437,cam_tigervectorse,蛛网迷彩,0,普通,10932,,wat,cam,否
+24438,cam_urbanvectorse,海军沙漠迷彩,0,普通,10934,,wat,cam,否
+24783,cam_l86christmas1l86christmasa,SA80-LSW 圣诞 默认迷彩,0,普通,33599,,wat,cam,否
+24784,cam_l86christmas2l86christmasb,SA80-LSW 圣诞 默认迷彩二号,0,普通,33600,,wat,cam,否
+24821,cam_hexan94hellwalker,蜂巢迷彩,0,普通,11822,,wat,cam,否
+24874,cam_kawaiian94hellwalker,卡哇伊迷彩,0,普通,11824,,wat,cam,否
+24875,cam_m4a1greenan94hellwalker,丛林迷彩,0,普通,11826; 11827,,wat,cam,否
+24876,cam_m4a1yellowan94hellwalker,黄色迷彩,0,普通,11828; 11829,,wat,cam,否
+24877,cam_paitingan94hellwalker,中国红,0,普通,11830,,wat,cam,否
+24878,cam_persianrugan94hellwalker,波斯地毯迷彩,0,普通,11832,,wat,cam,否
+24879,cam_woodlandan94hellwalker,沙色迷彩,0,普通,11834; 11835,,wat,cam,否
+24929,cam_animal03m4a1techanimal,鹿纹迷彩,0,普通,17696,,wat,cam,否
+24940,cam_newyear,新春,0,普通,,,wat,cam,否
+25077,cam_tgpmodel1887,TGP迷彩,0,普通,12213,,wat,cam,否
+25232,cam_rainbow01scarsaprrainbow,MR23 彩色斑马迷彩,0,普通,34296,,wat,cam,否
+25233,cam_rainbow02p90rainbow,PDW90 彩虹蜂巢迷彩,0,普通,34297,,wat,cam,否
+25234,cam_rainbow03ak47rainbow,AK-47 迷幻花窗迷彩,0,普通,34298,,wat,cam,否
+25236,cam_lunarnewyear01famasnya,Lunar New Year Camo 01,0,普通,34300,,wat,cam,否
+25237,cam_lunarnewyear02famasnyb,Lunar New Year Camo 02,0,普通,34301,,wat,cam,否
+25334,cam_acum16se,陆军通用迷彩,0,普通,12573; 12574,,wat,cam,否
+25335,cam_arcticm16se,寒区迷彩,0,普通,12575,,wat,cam,否
+25336,cam_bluearrowm16se,枫叶迷彩,0,普通,12576,,wat,cam,否
+25337,cam_colorfulm16se,炫彩,0,普通,12577,,wat,cam,否
+25338,cam_desertm16se,海军丛林迷彩,0,普通,12578,,wat,cam,否
+25339,cam_dragonm16se,蛇鳞迷彩,0,普通,12579; 12580,,wat,cam,否
+25340,cam_hexm16se,蜂巢迷彩,0,普通,12581,,wat,cam,否
+25341,cam_junglewarfarem16se,丛林战争,0,普通,12582,,wat,cam,否
+25342,cam_kawaiim16se,卡哇伊迷彩,0,普通,12583,,wat,cam,否
+25343,cam_m4a1greenm16se,丛林迷彩,0,普通,12584; 12585,,wat,cam,否
+25344,cam_m4a1yellowm16se,黄色迷彩,0,普通,12586; 12587,,wat,cam,否
+25345,cam_maritimem16se,海洋迷彩,0,普通,12588,,wat,cam,否
+25346,cam_multicamm16se,多地形迷彩,0,普通,12589,,wat,cam,否
+25347,cam_nebulam16se,南海卫士,0,普通,12590,,wat,cam,否
+25348,cam_operam16se,蟒蛇迷彩,0,普通,12591,,wat,cam,否
+25349,cam_paitingm16se,中国红,0,普通,12592,,wat,cam,否
+25350,cam_pattern2m16se,盗墓者,0,普通,12593,,wat,cam,否
+25351,cam_pattern3m16se,血暮黑棘,0,普通,12594,,wat,cam,否
+25352,cam_patternm16se,金色瓷纹,0,普通,12595,,wat,cam,否
+25353,cam_persianrugm16se,波斯地毯迷彩,0,普通,12596,,wat,cam,否
+25354,cam_phenixm16se,树皮迷彩,0,普通,12597,,wat,cam,否
+25355,cam_sogm16se,虎斑迷彩,0,普通,12598,,wat,cam,否
+25356,cam_tigerm16se,蛛网迷彩,0,普通,12599,,wat,cam,否
+25357,cam_urbanm16se,海军沙漠迷彩,0,普通,12600,,wat,cam,否
+25358,cam_woodlandm16se,沙色迷彩,0,普通,12601; 12602,,wat,cam,否
+25689,cam_arcticr870,寒区迷彩,0,普通,34848,,wat,cam,否
+25700,cam_desertr870,海军丛林迷彩,0,普通,34853,,wat,cam,否
+25705,cam_cowboym16se,荒野镖客迷彩,0,普通,13062,,wat,cam,否
+25707,cam_cowboy,荒野镖客迷彩,0,普通,13065,,wat,cam,否
+25708,cam_colorful,炫彩,0,普通,13064,,wat,cam,否
+25716,cam_junglewarfarer870,丛林战争,0,普通,34858,,wat,cam,否
+25755,cam_maritimer870,海洋迷彩,0,普通,34864,,wat,cam,否
+25756,cam_multicamr870,多地形迷彩,0,普通,34865,,wat,cam,否
+25757,cam_nebular870,南海卫士,0,普通,34866,,wat,cam,否
+25760,cam_pattern2r870,盗墓者,0,普通,34869,,wat,cam,否
+25761,cam_pattern3r870,血暮黑棘,0,普通,34870,,wat,cam,否
+25762,cam_patternr870,金色瓷纹,0,普通,34871,,wat,cam,否
+25764,cam_pumpkinr870,南瓜迷彩,0,普通,34873,,wat,cam,否
+25771,cam_sogr870,虎斑迷彩,0,普通,34881,,wat,cam,否
+25772,cam_urbanr870,海军沙漠迷彩,0,普通,34882,,wat,cam,否
+25866,cam_arcticsvu,寒区迷彩,0,普通,34990,,wat,cam,否
+25868,cam_bluearrowsvu,枫叶迷彩,0,普通,34992,,wat,cam,否
+25872,cam_desertsvu,海军丛林迷彩,0,普通,34996,,wat,cam,否
+25876,cam_junglewarfaresvu,丛林战争,0,普通,35001,,wat,cam,否
+25880,cam_maritimesvu,海洋迷彩,0,普通,35007,,wat,cam,否
+25881,cam_multicamsvu,多地形迷彩,0,普通,35008,,wat,cam,否
+25882,cam_nebulasvu,南海卫士,0,普通,35009,,wat,cam,否
+25884,cam_operasvu,蟒蛇迷彩,0,普通,35011,,wat,cam,否
+25886,cam_pattern2svu,盗墓者,0,普通,35013,,wat,cam,否
+25887,cam_pattern3svu,血暮黑棘,0,普通,35014,,wat,cam,否
+25888,cam_patternsvu,金色瓷纹,0,普通,35015,,wat,cam,否
+25890,cam_phenixsvu,树皮迷彩,0,普通,35017,,wat,cam,否
+25891,cam_pumpkinsvu,南瓜迷彩,0,普通,35018,,wat,cam,否
+25900,cam_sogsvu,虎斑迷彩,0,普通,35026,,wat,cam,否
+25901,cam_tigersvu,蛛网迷彩,0,普通,35027,,wat,cam,否
+25902,cam_urbansvu,海军沙漠迷彩,0,普通,35028,,wat,cam,否
+26255,cam_mwhero01ff58hero,幽灵迷彩,0,普通,14178,,wat,cam,否
+26256,cam_chinatext01p90scrawl,兵法,0,普通,14179,,wat,cam,否
+26275,cam_chinatext04,诫子书迷彩,0,普通,,,wat,cam,否
+26276,cam_chinatext03,孙子兵法,0,普通,,,wat,cam,否
+26277,cam_chinatext05,论语迷彩,0,普通,,,wat,cam,否
+26278,cam_chinatext02,出师表,0,普通,,,wat,cam,否
+26279,cam_chinatext01,兵法,0,普通,,,wat,cam,否
+26280,cam_mwhero05,肥皂,0,普通,,,wat,cam,否
+26281,cam_mwhero04,普莱斯,0,普通,,,wat,cam,否
+26282,cam_mwhero02,现代战争,0,普通,,,wat,cam,否
+26283,cam_mwhero01,幽灵迷彩,0,普通,,,wat,cam,否
+26284,cam_mwhero03,马卡洛夫,0,普通,,,wat,cam,否
+26317,cam_acuscarscrawl,陆军通用迷彩,0,普通,14293,,wat,cam,否
+26318,cam_arcticscarscrawl,寒区迷彩,0,普通,14295,,wat,cam,否
+26319,cam_bluearrowscarscrawl,枫叶迷彩,0,普通,14297,,wat,cam,否
+26320,cam_colorfulscarscrawl,炫彩,0,普通,14299,,wat,cam,否
+26321,cam_cowboyscarscrawl,荒野镖客迷彩,0,普通,14301,,wat,cam,否
+26322,cam_desertscarscrawl,海军丛林迷彩,0,普通,14303,,wat,cam,否
+26323,cam_dragonscarscrawl,蛇鳞迷彩,0,普通,14305,,wat,cam,否
+26324,cam_hexscarscrawl,蜂巢迷彩,0,普通,14307,,wat,cam,否
+26325,cam_junglewarfarescarscrawl,丛林战争,0,普通,14309,,wat,cam,否
+26326,cam_kawaiiscarscrawl,卡哇伊迷彩,0,普通,14311,,wat,cam,否
+26327,cam_m4a1greenscarscrawl,丛林迷彩,0,普通,14313,,wat,cam,否
+26328,cam_m4a1yellowscarscrawl,黄色迷彩,0,普通,14315,,wat,cam,否
+26329,cam_maritimescarscrawl,海洋迷彩,0,普通,14317,,wat,cam,否
+26330,cam_multicamscarscrawl,多地形迷彩,0,普通,14319,,wat,cam,否
+26331,cam_nebulascarscrawl,南海卫士,0,普通,14321,,wat,cam,否
+26332,cam_operascarscrawl,蟒蛇迷彩,0,普通,14323,,wat,cam,否
+26333,cam_paitingscarscrawl,中国红,0,普通,14325,,wat,cam,否
+26334,cam_pattern2scarscrawl,盗墓者,0,普通,14327,,wat,cam,否
+26335,cam_pattern3scarscrawl,血暮黑棘,0,普通,14329,,wat,cam,否
+26336,cam_patternscarscrawl,金色瓷纹,0,普通,14331,,wat,cam,否
+26337,cam_persianrugscarscrawl,波斯地毯迷彩,0,普通,14333,,wat,cam,否
+26338,cam_phenixscarscrawl,树皮迷彩,0,普通,14335,,wat,cam,否
+26339,cam_sogscarscrawl,虎斑迷彩,0,普通,14337,,wat,cam,否
+26340,cam_tigerscarscrawl,蛛网迷彩,0,普通,14339,,wat,cam,否
+26341,cam_urbanscarscrawl,海军沙漠迷彩,0,普通,14341,,wat,cam,否
+26342,cam_woodlandscarscrawl,沙色迷彩,0,普通,14343,,wat,cam,否
+26437,cam_acum21ebrhero,陆军通用迷彩,0,普通,14536,,wat,cam,否
+26438,cam_arcticm21ebrhero,寒区迷彩,0,普通,14538,,wat,cam,否
+26439,cam_bluearrowm21ebrhero,枫叶迷彩,0,普通,14540,,wat,cam,否
+26440,cam_colorfulm21ebrhero,炫彩,0,普通,14542,,wat,cam,否
+26441,cam_cowboym21ebrhero,荒野镖客迷彩,0,普通,14544,,wat,cam,否
+26442,cam_desertm21ebrhero,海军丛林迷彩,0,普通,14546,,wat,cam,否
+26443,cam_dragonm21ebrhero,蛇鳞迷彩,0,普通,14548,,wat,cam,否
+26444,cam_hexm21ebrhero,蜂巢迷彩,0,普通,14550,,wat,cam,否
+26445,cam_junglewarfarem21ebrhero,丛林战争,0,普通,14552,,wat,cam,否
+26446,cam_kawaiim21ebrhero,卡哇伊迷彩,0,普通,14554,,wat,cam,否
+26447,cam_m4a1greenm21ebrhero,丛林迷彩,0,普通,14556,,wat,cam,否
+26448,cam_m4a1yellowm21ebrhero,黄色迷彩,0,普通,14558,,wat,cam,否
+26449,cam_maritimem21ebrhero,海洋迷彩,0,普通,14560,,wat,cam,否
+26450,cam_multicamm21ebrhero,多地形迷彩,0,普通,14562,,wat,cam,否
+26451,cam_nebulam21ebrhero,南海卫士,0,普通,14564,,wat,cam,否
+26452,cam_operam21ebrhero,蟒蛇迷彩,0,普通,14566,,wat,cam,否
+26453,cam_paitingm21ebrhero,中国红,0,普通,14568,,wat,cam,否
+26454,cam_pattern2m21ebrhero,盗墓者,0,普通,14570,,wat,cam,否
+26455,cam_pattern3m21ebrhero,血暮黑棘,0,普通,14572,,wat,cam,否
+26456,cam_patternm21ebrhero,金色瓷纹,0,普通,14574,,wat,cam,否
+26457,cam_persianrugm21ebrhero,波斯地毯迷彩,0,普通,14576,,wat,cam,否
+26458,cam_phenixm21ebrhero,树皮迷彩,0,普通,14578,,wat,cam,否
+26459,cam_sogm21ebrhero,虎斑迷彩,0,普通,14580,,wat,cam,否
+26460,cam_tigerm21ebrhero,蛛网迷彩,0,普通,14582,,wat,cam,否
+26461,cam_urbanm21ebrhero,海军沙漠迷彩,0,普通,14584,,wat,cam,否
+26462,cam_woodlandm21ebrhero,沙色迷彩,0,普通,14586,,wat,cam,否
+26505,cam_hexgpas12,蜂巢迷彩,0,普通,14677,,wat,cam,否
+26537,cam_persianrug,波斯地毯迷彩,0,普通,,,wat,cam,否
+26539,cam_mwhero01m21ebrhero,幽灵迷彩,0,普通,14727,,wat,cam,否
+26544,cam_chinatext01scarscrawl,兵法,0,普通,14737,,wat,cam,否
+26577,cam_pumpkin,南瓜迷彩,0,普通,,,wat,cam,否
+26695,cam_arcticpecheneg,寒区迷彩,0,普通,35993,,wat,cam,否
+26697,cam_bluearrowpecheneg,枫叶迷彩,0,普通,35995,,wat,cam,否
+26701,cam_desertpecheneg,海军丛林迷彩,0,普通,35999,,wat,cam,否
+26705,cam_junglewarfarepecheneg,丛林战争,0,普通,36004,,wat,cam,否
+26709,cam_maritimepecheneg,海洋迷彩,0,普通,36010,,wat,cam,否
+26710,cam_multicampecheneg,多地形迷彩,0,普通,36011,,wat,cam,否
+26711,cam_nebulapecheneg,南海卫士,0,普通,36012,,wat,cam,否
+26713,cam_operapecheneg,蟒蛇迷彩,0,普通,36014,,wat,cam,否
+26715,cam_pattern2pecheneg,盗墓者,0,普通,36016,,wat,cam,否
+26716,cam_pattern3pecheneg,血暮黑棘,0,普通,36017,,wat,cam,否
+26717,cam_patternpecheneg,金色瓷纹,0,普通,36018,,wat,cam,否
+26719,cam_phenixpecheneg,树皮迷彩,0,普通,36020,,wat,cam,否
+26720,cam_pumpkinpecheneg,南瓜迷彩,0,普通,36021,,wat,cam,否
+26727,cam_sogpecheneg,虎斑迷彩,0,普通,36029,,wat,cam,否
+26728,cam_tigerpecheneg,蛛网迷彩,0,普通,36030,,wat,cam,否
+26729,cam_urbanpecheneg,海军沙漠迷彩,0,普通,36031,,wat,cam,否
+26850,cam_cowboyak47scrawl,荒野镖客迷彩,0,普通,15391,,wat,cam,否
+26852,cam_paitingak47scrawl,中国红,0,普通,15395,,wat,cam,否
+26907,cam_chinatext02ak47scrawl,出师表,0,普通,15505,,wat,cam,否
+26912,cam_pumpkinaa12,南瓜迷彩,0,普通,15515,,wat,cam,否
+26913,cam_pumpkinacr,南瓜迷彩,0,普通,15516,,wat,cam,否
+26915,cam_pumpkinak47,南瓜迷彩,0,普通,15518,,wat,cam,否
+26916,cam_pumpkinakbp,南瓜迷彩,0,普通,15519,,wat,cam,否
+26917,cam_pumpkinaks74u,南瓜迷彩,0,普通,15520,,wat,cam,否
+26918,cam_pumpkinan94,南瓜迷彩,0,普通,15521,,wat,cam,否
+26919,cam_pumpkinariar,南瓜迷彩,0,普通,15522,,wat,cam,否
+26920,cam_pumpkinariarse,南瓜迷彩,0,普通,15523,,wat,cam,否
+26922,cam_pumpkinaug,南瓜迷彩,0,普通,15525,,wat,cam,否
+26923,cam_pumpkincheytac,南瓜迷彩,0,普通,15526,,wat,cam,否
+26924,cam_pumpkinfamas,南瓜迷彩,0,普通,15527,,wat,cam,否
+26925,cam_pumpkinff58,南瓜迷彩,0,普通,15528,,wat,cam,否
+26926,cam_pumpking36c,南瓜迷彩,0,普通,15529,,wat,cam,否
+26927,cam_pumpkingpas12,南瓜迷彩,0,普通,15530,,wat,cam,否
+26928,cam_pumpkingpas12career,南瓜迷彩,0,普通,15531,,wat,cam,否
+26929,cam_pumpkinl86,南瓜迷彩,0,普通,15532,,wat,cam,否
+26930,cam_pumpkinm1014,南瓜迷彩,0,普通,15533,,wat,cam,否
+26931,cam_pumpkinm14ebr,南瓜迷彩,0,普通,15534,,wat,cam,否
+26932,cam_pumpkinm16,南瓜迷彩,0,普通,15535,,wat,cam,否
+26933,cam_pumpkinm16se,南瓜迷彩,0,普通,15536,,wat,cam,否
+26934,cam_pumpkinm21ebr,南瓜迷彩,0,普通,15537,,wat,cam,否
+26935,cam_pumpkinm240,南瓜迷彩,0,普通,15538,,wat,cam,否
+26936,cam_pumpkinm4,南瓜迷彩,0,普通,15539,,wat,cam,否
+26938,cam_pumpkinmg4,南瓜迷彩,0,普通,15541,,wat,cam,否
+26939,cam_pumpkinminiuzi,南瓜迷彩,0,普通,15542,,wat,cam,否
+26940,cam_pumpkinmodel1887,南瓜迷彩,0,普通,15543,,wat,cam,否
+26941,cam_pumpkinmp5k,南瓜迷彩,0,普通,15544,,wat,cam,否
+26942,cam_pumpkinmp5sd,南瓜迷彩,0,普通,15545,,wat,cam,否
+26943,cam_pumpkinp90,南瓜迷彩,0,普通,15546,,wat,cam,否
+26944,cam_pumpkinrpd,南瓜迷彩,0,普通,15547,,wat,cam,否
+26945,cam_pumpkinrsrt3,南瓜迷彩,0,普通,15548,,wat,cam,否
+26946,cam_pumpkinscarsapr,南瓜迷彩,0,普通,15549,,wat,cam,否
+26947,cam_pumpkinspas12,南瓜迷彩,0,普通,15550,,wat,cam,否
+26948,cam_pumpkinspbc,南瓜迷彩,0,普通,15551,,wat,cam,否
+26949,cam_pumpkinstriker,南瓜迷彩,0,普通,15552,,wat,cam,否
+26950,cam_pumpkintar21,南瓜迷彩,0,普通,15553,,wat,cam,否
+26951,cam_pumpkintar21se,南瓜迷彩,0,普通,15554,,wat,cam,否
+26952,cam_pumpkintommygun,南瓜迷彩,0,普通,15555,,wat,cam,否
+26953,cam_pumpkintommygunevent,南瓜迷彩,0,普通,15556,,wat,cam,否
+26954,cam_pumpkintype95,南瓜迷彩,0,普通,15557,,wat,cam,否
+26955,cam_pumpkinump45,南瓜迷彩,0,普通,15558,,wat,cam,否
+26956,cam_pumpkinvector,南瓜迷彩,0,普通,15559,,wat,cam,否
+26957,cam_pumpkinwa2000,南瓜迷彩,0,普通,15560,,wat,cam,否
+26958,cam_pumpkinscar,南瓜迷彩,0,普通,15564,,wat,cam,否
+26985,cam_kawaii,卡哇伊迷彩,0,普通,,,wat,cam,否
+27111,cam_mwhero01ak104hero,幽灵迷彩,0,普通,15861,,wat,cam,否
+27182,cam_kingdomhero01,诸葛亮,0,普通,,,wat,cam,否
+27183,cam_kingdomhero02,刘备,0,普通,,,wat,cam,否
+27184,cam_kingdomhero03,司马懿,0,普通,,,wat,cam,否
+27185,cam_kingdomhero04,曹操,0,普通,,,wat,cam,否
+27186,cam_kingdomhero01aks74u3kingdoms,诸葛亮,0,普通,18306,,wat,cam,否
+27250,cam_arcticmp7,寒区迷彩,0,普通,36676,,wat,cam,否
+27252,cam_bluearrowmp7,枫叶迷彩,0,普通,36678,,wat,cam,否
+27256,cam_desertmp7,海军丛林迷彩,0,普通,36682,,wat,cam,否
+27260,cam_junglewarfaremp7,丛林战争,0,普通,36687,,wat,cam,否
+27264,cam_maritimemp7,海洋迷彩,0,普通,36693,,wat,cam,否
+27265,cam_multicammp7,多地形迷彩,0,普通,36694,,wat,cam,否
+27266,cam_nebulamp7,南海卫士,0,普通,36695,,wat,cam,否
+27268,cam_operamp7,蟒蛇迷彩,0,普通,36697,,wat,cam,否
+27270,cam_pattern2mp7,盗墓者,0,普通,36699,,wat,cam,否
+27271,cam_pattern3mp7,血暮黑棘,0,普通,36700,,wat,cam,否
+27272,cam_patternmp7,金色瓷纹,0,普通,36701,,wat,cam,否
+27274,cam_phenixmp7,树皮迷彩,0,普通,36703,,wat,cam,否
+27275,cam_pumpkinmp7,南瓜迷彩,0,普通,36704,,wat,cam,否
+27282,cam_sogmp7,虎斑迷彩,0,普通,36712,,wat,cam,否
+27283,cam_tigermp7,蛛网迷彩,0,普通,36713,,wat,cam,否
+27284,cam_urbanmp7,海军沙漠迷彩,0,普通,36714,,wat,cam,否
+27288,cam_money,钻石迷彩,0,普通,,,wat,cam,否
+27292,cam_acum14ebrwargod,陆军通用迷彩,0,普通,16227,,wat,cam,否
+27293,cam_arcticm14ebrwargod,寒区迷彩,0,普通,16229,,wat,cam,否
+27294,cam_bluearrowm14ebrwargod,枫叶迷彩,0,普通,16231,,wat,cam,否
+27295,cam_colorfulm14ebrwargod,炫彩,0,普通,16233,,wat,cam,否
+27296,cam_cowboym14ebrwargod,荒野镖客迷彩,0,普通,16235,,wat,cam,否
+27297,cam_cute01m14ebrwargod,萌系迷彩,0,普通,16237,,wat,cam,否
+27298,cam_desertm14ebrwargod,海军丛林迷彩,0,普通,16239,,wat,cam,否
+27299,cam_dragonm14ebrwargod,蛇鳞迷彩,0,普通,16241,,wat,cam,否
+27300,cam_hexm14ebrwargod,蜂巢迷彩,0,普通,16243,,wat,cam,否
+27301,cam_junglewarfarem14ebrwargod,丛林战争,0,普通,16245,,wat,cam,否
+27302,cam_kawaiim14ebrwargod,卡哇伊迷彩,0,普通,16247,,wat,cam,否
+27303,cam_m4a1greenm14ebrwargod,丛林迷彩,0,普通,16249,,wat,cam,否
+27304,cam_m4a1yellowm14ebrwargod,黄色迷彩,0,普通,16251,,wat,cam,否
+27305,cam_maritimem14ebrwargod,海洋迷彩,0,普通,16253,,wat,cam,否
+27306,cam_multicamm14ebrwargod,多地形迷彩,0,普通,16255,,wat,cam,否
+27307,cam_nebulam14ebrwargod,南海卫士,0,普通,16257,,wat,cam,否
+27308,cam_operam14ebrwargod,蟒蛇迷彩,0,普通,16259,,wat,cam,否
+27309,cam_paitingm14ebrwargod,中国红,0,普通,16261,,wat,cam,否
+27310,cam_pattern2m14ebrwargod,盗墓者,0,普通,16263,,wat,cam,否
+27311,cam_pattern3m14ebrwargod,血暮黑棘,0,普通,16265,,wat,cam,否
+27312,cam_patternm14ebrwargod,金色瓷纹,0,普通,16267,,wat,cam,否
+27313,cam_persianrugm14ebrwargod,波斯地毯迷彩,0,普通,16269,,wat,cam,否
+27314,cam_phenixm14ebrwargod,树皮迷彩,0,普通,16271,,wat,cam,否
+27315,cam_pumpkinm14ebrwargod,南瓜迷彩,0,普通,16273,,wat,cam,否
+27316,cam_sogm14ebrwargod,虎斑迷彩,0,普通,16275,,wat,cam,否
+27317,cam_tigerm14ebrwargod,蛛网迷彩,0,普通,16277,,wat,cam,否
+27318,cam_urbanm14ebrwargod,海军沙漠迷彩,0,普通,16279,,wat,cam,否
+27319,cam_woodlandm14ebrwargod,沙色迷彩,0,普通,16281,,wat,cam,否
+27409,cam_wargod01,战神,0,普通,,,wat,cam,否
+27410,cam_wargod02,暗夜战神,0,普通,,,wat,cam,否
+27411,cam_wargod03,紫衫战神,0,普通,,,wat,cam,否
+27412,cam_wargod04,金甲战神,0,普通,,,wat,cam,否
+27413,cam_wargod05,至尊战神,0,普通,,,wat,cam,否
+27415,cam_animal01,豹纹迷彩,0,普通,,,wat,cam,否
+27416,cam_animal02,锦鳞迷彩,0,普通,,,wat,cam,否
+27417,cam_animal03,鹿纹迷彩,0,普通,,,wat,cam,否
+27418,cam_animal04,蟒纹迷彩,0,普通,,,wat,cam,否
+27419,cam_animal05,蛇纹迷彩,0,普通,,,wat,cam,否
+27420,cam_wargod01m14ebrwargod,战神,0,普通,16462,,wat,cam,否
+27492,cam_animal01g18animal,豹纹迷彩,0,普通,16608,,wat,cam,否
+27498,cam_acuminiuzibdiamond,陆军通用迷彩,0,普通,16622,,wat,cam,否
+27499,cam_arcticminiuzibdiamond,寒区迷彩,0,普通,16624,,wat,cam,否
+27500,cam_bluearrowminiuzibdiamond,枫叶迷彩,0,普通,16626,,wat,cam,否
+27501,cam_colorfulminiuzibdiamond,炫彩,0,普通,16628,,wat,cam,否
+27502,cam_cowboyminiuzibdiamond,荒野镖客迷彩,0,普通,16630,,wat,cam,否
+27503,cam_desertminiuzibdiamond,海军丛林迷彩,0,普通,16632,,wat,cam,否
+27504,cam_dragonminiuzibdiamond,蛇鳞迷彩,0,普通,16634,,wat,cam,否
+27506,cam_hexminiuzibdiamond,蜂巢迷彩,0,普通,16638,,wat,cam,否
+27507,cam_junglewarfareminiuzibdiamond,丛林战争,0,普通,16640,,wat,cam,否
+27508,cam_kawaiiminiuzibdiamond,卡哇伊迷彩,0,普通,16642,,wat,cam,否
+27509,cam_m4a1greenminiuzibdiamond,丛林迷彩,0,普通,16644,,wat,cam,否
+27510,cam_m4a1yellowminiuzibdiamond,黄色迷彩,0,普通,16646,,wat,cam,否
+27511,cam_maritimeminiuzibdiamond,海洋迷彩,0,普通,16648,,wat,cam,否
+27512,cam_multicamminiuzibdiamond,多地形迷彩,0,普通,16650,,wat,cam,否
+27513,cam_nebulaminiuzibdiamond,南海卫士,0,普通,16652,,wat,cam,否
+27514,cam_operaminiuzibdiamond,蟒蛇迷彩,0,普通,16654,,wat,cam,否
+27515,cam_paitingminiuzibdiamond,中国红,0,普通,16656,,wat,cam,否
+27516,cam_pattern2miniuzibdiamond,盗墓者,0,普通,16658,,wat,cam,否
+27517,cam_pattern3miniuzibdiamond,血暮黑棘,0,普通,16660,,wat,cam,否
+27518,cam_patternminiuzibdiamond,金色瓷纹,0,普通,16662,,wat,cam,否
+27519,cam_persianrugminiuzibdiamond,波斯地毯迷彩,0,普通,16664,,wat,cam,否
+27520,cam_phenixminiuzibdiamond,树皮迷彩,0,普通,16666,,wat,cam,否
+27521,cam_pumpkinminiuzibdiamond,南瓜迷彩,0,普通,16668,,wat,cam,否
+27522,cam_sogminiuzibdiamond,虎斑迷彩,0,普通,16670,,wat,cam,否
+27523,cam_tigerminiuzibdiamond,蛛网迷彩,0,普通,16672,,wat,cam,否
+27524,cam_urbanminiuzibdiamond,海军沙漠迷彩,0,普通,16674,,wat,cam,否
+27525,cam_woodlandminiuzibdiamond,沙色迷彩,0,普通,16676,,wat,cam,否
+27608,cam_cowboyak47animal,荒野镖客迷彩,0,普通,16844,,wat,cam,否
+27610,cam_paitingak47animal,中国红,0,普通,16848,,wat,cam,否
+27611,cam_pumpkinak47animal,南瓜迷彩,0,普通,16850,,wat,cam,否
+27669,cam_animal01ak47animal,豹纹迷彩,0,普通,16976,,wat,cam,否
+27749,cam_graffiticheytaceventm1014t2,涂鸦迷彩,0,普通,17153,,wat,cam,否
+27845,cam_animal02m1014animal,锦鳞迷彩,0,普通,17346,,wat,cam,否
+28092,cam_kingdomhero02famas3kingdoms,刘备,0,普通,18299,,wat,cam,否
+60171,cam_ninja01aa12ninja,黄忍,0,普通,17972,,wat,cam,否
+100,heg_scarfmask,沙漠网巾,0,普通,1; 6625,GP（1）; CP（2）,cat,heg,否
+104,han_hands,道吉狗,0,普通,34; 6626,GP（1）; CP（2）,cat,han,否
+105,han_fingerless,露指手套,0,普通,1720,GP（1）; CP（2）,cat,han,否
+114,han_tactical,特种部队,1,非普通,44,GP（1）,cat,han,否
+115,hea_socomb,洛奇,0,普通,45,GP（1）,cat,hea,否
+130,heg_bandana,渡鸦头巾(卡其色),0,普通,840; 7027,GP（1）; CP（2）,cat,heg,是
+134,han_typec,飞行员手套,0,普通,844,GP（1）,cat,han,否
+142,fja_standard,山地作战软壳衣,1,非普通,852,GP（1）; CP（2）,cat,fja,是
+150,han_typea,全功能电子表,1,非普通,1209,GP（1）,cat,han,否
+151,han_typeb,二战海军手表,0,普通,1210,GP（1）,cat,han,否
+153,heg_boonie,奔尼帽,1,非普通,1035; 7028,GP（1）; CP（2）,cat,heg,是
+16667,hea_blackwarriorbasic,Black Warrior Default Head,2,稀有,23387,GP（1）; CP（2）,cat,hea,是
+158,heg_concept,重型防弹钢盔,1,非普通,1727,GP（1）; CP（2）,cat,heg,是
+171,hea_zmcowboy,牛仔,0,普通,957,GP（1）; CP（2）,cat,hea,是
+185,hea_chao,超,0,普通,1067,GP（1）; CP（2）,cat,hea,是
+189,hea_hjelmaa,FROST,0,普通,1070,GP（1）; CP（2）,cat,hea,是
+196,hea_odom,奥多姆,0,普通,1084,GP（1）,cat,hea,是
+198,hea_veiga,Mike,0,普通,1086,GP（1）; CP（2）,cat,hea,是
+205,hea_hernandez,强盗,0,普通,1106,GP（1）,cat,hea,否
+209,hea_soap,Soap,0,普通,1142,GP（1）; CP（2）,cat,hea,是
+270,hea_chung,张,0,普通,913,GP（1）; CP（2）,cat,hea,是
+292,fpa_pro,灰蓝色渡鸦牛仔裤,0,普通,6134,GP（1）; CP（2）,cat,fpa,是
+304,eye_rayban,X-RAY太阳镜,0,普通,901,GP（1）,cat,eye,否
+310,heg_earhat,战术鸭舌帽（深灰色）,1,非普通,958,GP（1）; CP（2）,cat,heg,是
+16665,fja_blackwarriorbasic,Black Warrior Default Jacket,2,稀有,23385,GP（1）; CP（2）,cat,fja,是
+329,han_pilot,狙击手手套,0,普通,1721; 6723,GP（1）; CP（2）,cat,han,否
+335,han_fsb,潜水员,0,普通,1017,GP（1）,cat,han,否
+337,heg_chadg,查德奔尼帽,0,普通,1021; 6650,GP（1）; CP（2）,cat,heg,否
+338,heg_boris,滑雪帽,1,非普通,1022; 7029,GP（1）; CP（2）,cat,heg,是
+16666,fpa_blackwarriorbasic,Black Warrior Default Pants,2,稀有,23386,GP（1）; CP（2）,cat,fpa,是
+342,heg_composite,防水鸭舌帽,1,非普通,1100; 6651,GP（1）; CP（2）,cat,heg,是
+343,heg_usmc,陆战队奔尼帽,0,普通,1185; 7032,GP（1）; CP（2）,cat,heg,是
+354,heg_desert,沙漠之狐防弹头盔,0,普通,1311; 6655,GP（1）; CP（2）,cat,heg,否
+362,eye_accessories,沙漠防尘眼镜-透明,0,普通,1319,GP（1）,cat,eye,否
+18121,han_ccl,CCL S3 纪念手套,2,稀有,25817,GP（1）; CP（2）,cat,han,否
+365,hea_victor,维克多,0,普通,951,GP（1）,cat,hea,否
+388,hea_runfa,橡木,0,普通,1363,GP（1）,cat,hea,否
+397,fja_church,门徒作战T恤,1,非普通,1387,GP（1）; CP（2）,cat,fja,是
+398,fpa_board,褐色滑板裤,1,非普通,1389,GP（1）; CP（2）,cat,fpa,是
+414,elp_konglong,大力士,1,非普通,265,GP（1）; CP（2）,cat,elp,是
+17925,ves_cclesport,CCL S3赛季 纪念背包,3,史诗,25495,GP（1）; CP（2）,cat,ves,否
+2072,fja_raider,CORTEX动力机甲,3,史诗,14176,GP（1）; CP（2）,cat,fja,是
+2143,heg_hightechnotech,CORTEX集成头盔-白,2,稀有,17359,GP（1）; CP（2）,cat,heg,是
+418,elp_niao,啸鹰,1,非普通,269; 7056,GP（1）; CP（2）,cat,elp,是
+419,elp_tou,印第安大地,1,非普通,270,GP（1）; CP（2）,cat,elp,是
+420,elp_ying,毛利纹身,0,普通,271; 7036,GP（1）; CP（2）,cat,elp,是
+421,elp_zhongguo,盾,0,普通,272; 7057,GP（1）; CP（2）,cat,elp,是
+422,han_leather,终极行动,1,非普通,273,GP（1）,cat,han,否
+424,hea_eve,EVE,0,普通,290,GP（1）; CP（2）,cat,hea,是
+425,heg_eve,此物品已被禁用,0,普通,291,GP（1）; CP（2）,cat,heg,否
+426,fja_jeansuits,战斗夹克,1,非普通,296,GP（1）; CP（2）,cat,fja,是
+427,heg_tacticalclean,CQB轻型头盔,1,非普通,297; 12972,GP（1）; CP（2）,cat,heg,是
+436,hea_spetsnaz,古耶夫,0,普通,311,,cat,hea,否
+525,boo_infbasea,突击兵鞋子,0,普通,1412,GP（1）; CP（2）,cat,boo,是
+529,fja_infbasea,步兵战斗服,0,普通,1416,GP（1）; CP（2）,cat,fja,是
+530,fja_infprestigea,枯叶战斗服,0,普通,1417; 6658,GP（1）; CP（2）,cat,fja,否
+531,fja_infveterana,步兵白色无袖衫,0,普通,1418; 6659,GP（1）; CP（2）,cat,fja,是
+532,fpa_infbasea,步兵作战裤,1,非普通,1419,GP（1）; CP（2）,cat,fpa,是
+533,fpa_infprestigea,双护膝丛林作战裤,1,非普通,1420; 6660,GP（1）; CP（2）,cat,fpa,是
+534,fpa_infveterana,步兵丛林作战裤,0,普通,1421; 6661,GP（1）; CP（2）,cat,fpa,是
+536,han_infprestigea,短款战术手套,0,普通,1423; 6662,GP（1）; CP（2）,cat,han,否
+537,han_infveterana,步兵手套,0,普通,1424; 6663,GP（1）; CP（2）,cat,han,否
+539,heg_infveterana,防沙网巾,1,非普通,1426,GP（1）; CP（2）,cat,heg,是
+540,heg_infprestigea,防沙头巾,1,非普通,1427; 7023,GP（1）; CP（2）,cat,heg,是
+543,ves_infveterana,战术防弹衣,1,非普通,1430,GP（1）; CP（2）,cat,ves,是
+544,ves_infprestigea,重型战术防弹衣,1,非普通,1431,GP（1）; CP（2）,cat,ves,是
+552,fja_snibasea,狙击手轻便服,0,普通,1438; 6665,GP（1）; CP（2）,cat,fja,是
+553,fja_sniprestigea,狙击手伪装服B,0,普通,1439; 10012,GP（1）; CP（2）,cat,fja,否
+554,fja_sniveterana,树林伪装服,1,非普通,1440; 7008,GP（1）; CP（2）,cat,fja,是
+555,fpa_snibasea,狙击手绿色作战裤,0,普通,1441; 6666,GP（1）; CP（2）,cat,fpa,是
+556,fpa_sniprestigea,狙击手高级伪装裤C,1,非普通,1442; 10012,GP（1）; CP（2）,cat,fpa,否
+557,fpa_sniveterana,树林伪装裤,1,非普通,1443; 6996,GP（1）; CP（2）,cat,fpa,是
+559,han_sniprestigea,狙击手手套B,0,普通,1445,GP（1）; CP（2）,cat,han,否
+560,han_sniveterana,狙击手手套A,0,普通,1446,GP（1）; CP（2）,cat,han,否
+561,hea_snibasea,狙击手,0,普通,1447,GP（1）; CP（2）,cat,hea,是
+562,hea_sniprestigea,狙击手,0,普通,1448,GP（1）; CP（2）,cat,hea,否
+564,heg_snibasea,狙击手头部装备A,0,普通,1450; 6667,GP（1）; CP（2）,cat,heg,是
+565,heg_sniveterana,狙击手头部装备B,1,非普通,1451; 7033,GP（1）; CP（2）,cat,heg,是
+567,ves_sniprestigea,狙击手枯草伪装服,1,非普通,1453; 10012,GP（1）; CP（2）,cat,ves,否
+575,fja_acubasea,战术冲锋衣,0,普通,1461,GP（1）; CP（2）,cat,fja,是
+2142,heg_hightechnoguard,CORTEX集成头盔-金,2,稀有,17358,GP（1）; CP（2）,cat,heg,是
+577,fja_acuveterana,战斗护甲,0,普通,1463,GP（1）; CP（2）,cat,fja,是
+578,fpa_acubasea,战术冲锋裤,0,普通,1464,GP（1）; CP（2）,cat,fpa,否
+2141,heg_hightechnogrunt,CORTEX集成头盔-绿,3,史诗,17357,GP（1）; CP（2）,cat,heg,是
+580,fpa_acuveterana,灰色战术牛仔裤,0,普通,1466; 6670,GP（1）; CP（2）,cat,fpa,是
+582,han_acuprestigea,重型步兵作战手套,0,普通,1468; 6671,GP（1）; CP（2）,cat,han,否
+584,hea_acuprestigea,重装兵,0,普通,1470,GP（1）; CP（2）,cat,hea,是
+585,hea_acuveterana,重装兵,0,普通,1471,GP（1）; CP（2）,cat,hea,是
+586,heg_acubasea,滑雪帽,0,普通,1472,GP（1）; CP（2）,cat,heg,是
+587,heg_acuprestigea,战神面具,1,非普通,1473; 6673,GP（1）; CP（2）,cat,heg,是
+588,heg_acuveterana,战术护目镜,0,普通,1474,GP（1）; CP（2）,cat,heg,是
+2070,han_raider,CORTEX力量手套,3,史诗,14174,GP（1）; CP（2）,cat,han,是
+598,fja_grebasea,突击兵上衣,0,普通,1484,GP（1）; CP（2）,cat,fja,是
+599,fja_greprestigea,突击兵战术无袖衫,1,非普通,1485; 6675,GP（1）; CP（2）,cat,fja,是
+600,fja_greveterana,突击兵卡其色无袖衫,0,普通,1486,GP（1）; CP（2）,cat,fja,是
+601,fpa_grebasea,突击兵裤,0,普通,1487,GP（1）; CP（2）,cat,fpa,是
+602,fpa_greprestigea,重型战术裤,1,非普通,1488; 6677,GP（1）; CP（2）,cat,fpa,是
+603,fpa_greveterana,突击兵山地作战裤,1,非普通,1489; 6678,GP（1）; CP（2）,cat,fpa,否
+605,han_greprestigea,突击兵战术手套,0,普通,1491,GP（1）; CP（2）,cat,han,否
+607,heg_grebasea,突击兵帽,0,普通,1493,GP（1）; CP（2）,cat,heg,是
+2073,fpa_raider,CORTEX作战裤,2,稀有,14177,GP（1）; CP（2）,cat,fpa,是
+609,heg_greveterana,突击兵部队帽,0,普通,1495,GP（1）; CP（2）,cat,heg,是
+610,ves_greprestigea,重型战术护甲,0,普通,1496; 7052,GP（1）; CP（2）,cat,ves,是
+611,ves_greveterana,碳纤维轻型防弹衣,1,非普通,1497,GP（1）; CP（2）,cat,ves,是
+618,fja_spebasea,多地形作战服,0,普通,1523,GP（1）; CP（2）,cat,fja,是
+619,fja_speprestigea,高科技全地形作战服,0,普通,1524,GP（1）; CP（2）,cat,fja,是
+620,fja_speveterana,全地形作战服,0,普通,1525,GP（1）; CP（2）,cat,fja,是
+621,fpa_spebasea,多地形作战裤,0,普通,1526,GP（1）; CP（2）,cat,fpa,是
+622,fpa_speprestigea,高级全地形作战裤,1,非普通,1527,GP（1）; CP（2）,cat,fpa,是
+623,fpa_speveterana,全地形作战裤,0,普通,1528,GP（1）; CP（2）,cat,fpa,是
+627,hea_speprestigea,特种兵,0,普通,1532,GP（1）; CP（2）,cat,hea,是
+628,heg_spebasea,此物品已被禁用,0,普通,1533,GP（1）; CP（2）,cat,heg,是
+629,heg_speprestigea,猫头鹰轻型战术头盔,0,普通,1534,CP（2）,cat,heg,是
+630,heg_speveterana,轻型战术头盔,1,非普通,1535,GP（1）; CP（2）,cat,heg,是
+632,ves_speveterana,标准战术防弹衣,0,普通,1537,GP（1）; CP（2）,cat,ves,是
+633,ves_speprestigea,战术模块化防弹衣,0,普通,1538,CP（2）,cat,ves,否
+637,boo_sheveterana,此物品已被禁用,0,普通,1542,GP（1）; CP（2）,cat,boo,是
+638,fja_sheveterana,步兵战斗服,0,普通,1543,GP（1）; CP（2）,cat,fja,是
+639,fpa_sheveterana,步兵作战裤,0,普通,1544,GP（1）; CP（2）,cat,fpa,是
+643,boo_sheprestigea,此物品已被禁用,0,普通,1548; 10020,GP（1）; CP（2）,cat,boo,是
+644,fja_sheprestigea,精英级外套,0,普通,1549,GP（1）; CP（2）,cat,fja,是
+645,fpa_sheprestigea,精英级战术裤,0,普通,1550; 10020,GP（1）; CP（2）,cat,fpa,是
+651,fja_copbasea,白衬衫,0,普通,1556,GP（1）; CP（2）,cat,fja,是
+652,fpa_copbasea,西裤,0,普通,1557,GP（1）; CP（2）,cat,fpa,是
+655,fja_copprestigea,飞行员夹克,0,普通,1560,CP（2）,cat,fja,否
+656,fpa_copprestigea,战术牛仔裤,0,普通,1561,GP（1）; CP（2）,cat,fpa,否
+658,hea_copprestigea,警察,0,普通,1563,GP（1）; CP（2）,cat,hea,是
+659,heg_copprestigea,战警蓝牙耳机,0,普通,1564,CP（2）,cat,heg,否
+660,ves_copprestigea,此物品已被禁用,0,普通,1565,GP（1）; CP（2）,cat,ves,是
+663,fja_copveterana,休闲花衬衫,0,普通,1568,GP（1）; CP（2）,cat,fja,是
+664,fpa_copveterana,牛仔喇叭裤,0,普通,1569,GP（1）; CP（2）,cat,fpa,是
+668,ves_copveterana,此物品已被禁用,0,普通,1573,GP（1）; CP（2）,cat,ves,是
+1944,ves_mouprestigea,CQB战术背心,2,稀有,6458,GP（1）; CP（2）,cat,ves,是
+675,fja_cowprestigea,经典牛仔格子衫,1,非普通,1580,GP（1）; CP（2）,cat,fja,是
+676,fpa_cowprestigea,战斗牛仔裤,0,普通,1581,GP（1）; CP（2）,cat,fpa,是
+678,heg_cowprestigea,经典斗牛毡帽,0,普通,1583,GP（1）; CP（2）,cat,heg,是
+681,fja_cowveterana,复古牛仔衣,1,非普通,1586,GP（1）; CP（2）,cat,fja,是
+682,fpa_cowveterana,棕色西部牛仔裤,0,普通,1587,GP（1）; CP（2）,cat,fpa,是
+683,han_cowveterana,露指牛仔皮手套,1,非普通,1588,GP（1）; CP（2）,cat,han,否
+684,heg_cowveterana,军用窄边帽,1,非普通,1589,GP（1）; CP（2）,cat,heg,是
+2171,heg_soapred,HIGH发型-红色,2,稀有,18429,GP（1）; CP（2）,cat,heg,是
+689,heg_masquedevil,恶灵面具,1,非普通,1604,CP（2）,cat,heg,是
+2170,heg_soapyel,HIGH发型-金色,2,稀有,18428,GP（1）; CP（2）,cat,heg,是
+691,heg_masquezombie,活死人面具,1,非普通,1606; 6684,GP（1）; CP（2）,cat,heg,是
+692,heg_tacticalshield,重型特战头盔,1,非普通,1607; 7031,GP（1）; CP（2）,cat,heg,是
+693,heg_pilot,黑鹰飞行员头盔,0,普通,1608,CP（2）,cat,heg,是
+695,heg_scarfmaskghost,沙漠幽灵网巾,1,非普通,1610,GP（1）; CP（2）,cat,heg,是
+696,heg_hgcshield,高防御直升机机枪手头盔,1,非普通,1611,CP（2）,cat,heg,是
+697,heg_baseballblue,棒球帽-蓝,1,非普通,1612,GP（1）; CP（2）,cat,heg,是
+698,heg_baseballwht,棒球帽-白,0,普通,1613,GP（1）; CP（2）,cat,heg,是
+699,heg_baseballgreen,棒球帽-绿,1,非普通,1614; 6686,GP（1）; CP（2）,cat,heg,是
+700,heg_bandanared,渡鸦头巾-红,0,普通,1615; 6687,GP（1）; CP（2）,cat,heg,是
+702,fja_acuelitea,精英级重型外套,0,普通,1617,GP（1）; CP（2）,cat,fja,是
+703,fpa_acuelitea,精英级重型作战裤,0,普通,1618,GP（1）; CP（2）,cat,fpa,是
+705,hea_acuelitea,重装兵,0,普通,1620,GP（1）; CP（2）,cat,hea,是
+706,heg_acuelitea,超重型头盔,0,普通,1621,GP（1）; CP（2）,cat,heg,是
+707,ves_acuelitea,重型精英装甲,0,普通,1622,GP（1）; CP（2）,cat,ves,是
+713,eye_aviatorsblk,飞行员墨镜-炫黑,0,普通,1631; 6688,GP（1）; CP（2）,cat,eye,否
+714,eye_aviatorsred,飞行员墨镜-酒红,1,非普通,1632; 6689,GP（1）; CP（2）,cat,eye,否
+715,eye_aviatorsgreen,飞行员墨镜-墨绿,1,非普通,1633; 6690,GP（1）; CP（2）,cat,eye,否
+716,eye_aviatorswht,飞行员墨镜-镜面,1,非普通,1634; 6691,GP（1）; CP（2）,cat,eye,否
+717,eye_conceptblk,极限运动眼镜-经典黑,0,普通,1635; 6692,GP（1）; CP（2）,cat,eye,否
+718,eye_conceptblue,极限运动眼镜-深海蓝,1,非普通,1636; 6693,GP（1）; CP（2）,cat,eye,否
+11368,elp_tattoogirli,Logo I,2,稀有,11626,GP（1）; CP（2）,cat,elp,是
+720,eye_conceptwht,极限运动眼镜-透明,0,普通,1638; 6695,GP（1）; CP（2）,cat,eye,否
+721,eye_leipengblk,时尚太阳镜-黑,0,普通,1639; 6696,GP（1）; CP（2）,cat,eye,否
+722,eye_leipengyel,时尚太阳镜-黄,1,非普通,1640; 6697,GP（1）; CP（2）,cat,eye,否
+723,eye_leipengblue,时尚太阳镜-蓝,0,普通,1641; 6698,GP（1）; CP（2）,cat,eye,否
+724,eye_leipengred,时尚太阳镜-红,1,非普通,1642; 6699,GP（1）; CP（2）,cat,eye,否
+729,eye_sunglassesred,作战护目镜-玫瑰红,1,非普通,1647; 6704,GP（1）; CP（2）,cat,eye,否
+730,eye_sunglasseswht,作战护目镜-透明,0,普通,1648; 6705,GP（1）; CP（2）,cat,eye,否
+731,eye_pilotblk,蛤蟆镜-渐变黑,0,普通,1649; 6706,GP（1）; CP（2）,cat,eye,否
+732,eye_pilotred,蛤蟆镜-渐变红,1,非普通,1650; 6707,GP（1）; CP（2）,cat,eye,否
+733,eye_pilotyel,蛤蟆镜-渐变黄,1,非普通,1651; 6708,GP（1）; CP（2）,cat,eye,否
+734,eye_accessoriesblue,沙漠防尘眼镜-蓝,1,非普通,1652; 6709,GP（1）; CP（2）,cat,eye,否
+735,eye_accessoriesred,沙漠防尘眼镜-红,1,非普通,1653; 6710,GP（1）; CP（2）,cat,eye,否
+736,eye_goggles,轻型防风眼镜,0,普通,1654; 6711,GP（1）; CP（2）,cat,eye,否
+737,eye_usarmy,战地护目镜-透明,1,非普通,1655; 6712,GP（1）; CP（2）,cat,eye,否
+11369,elp_tattoogirlj,Logo J,2,稀有,11627,GP（1）; CP（2）,cat,elp,是
+739,eye_skiblk,极地滑雪镜-宝石蓝,0,普通,1657,GP（1）; CP（2）,cat,eye,否
+741,fja_infveteranb,步兵山地无袖衫,0,普通,1659; 6714,GP（1）; CP（2）,cat,fja,是
+742,fja_infveteranc,步兵沙漠无袖衫,0,普通,1660; 7002,GP（1）; CP（2）,cat,fja,是
+743,fja_infveterand,步兵雪地无袖衫,0,普通,1661,CP（2）,cat,fja,是
+744,fpa_infveteranb,步兵戈壁作战裤,0,普通,1662; 6634,GP（1）; CP（2）,cat,fpa,是
+745,fpa_infveteranc,步兵沙漠作战裤,0,普通,1663; 6647,GP（1）; CP（2）,cat,fpa,是
+746,fpa_infveterand,步兵雪地作战裤,0,普通,1664; 6715,GP（1）; CP（2）,cat,fpa,是
+747,fpa_infbaseb,步兵山地战术裤,0,普通,1665,GP（1）; CP（2）,cat,fpa,是
+748,fpa_infbasec,步兵战术牛仔裤,1,非普通,1666,GP（1）; CP（2）,cat,fpa,是
+749,fja_infprestigeb,荒漠战斗服,1,非普通,1667; 7001,GP（1）; CP（2）,cat,fja,是
+750,fpa_infprestigeb,双护膝沙漠作战裤,1,非普通,1668; 6995,GP（1）; CP（2）,cat,fpa,是
+751,fja_infbaseb,战斗背心,1,非普通,1669,GP（1）; CP（2）,cat,fja,是
+752,fja_infbasec,步兵灰色T恤,0,普通,1670,GP（1）; CP（2）,cat,fja,是
+2133,heg_predatorm5a,M5强袭防毒面具,3,史诗,16962,GP（1）; CP（2）,cat,heg,是
+754,fja_greprestigeb,突击兵荒漠无袖衫,1,非普通,1672; 7006,GP（1）; CP（2）,cat,fja,是
+755,fpa_greprestigeb,重型荒漠战术裤,0,普通,1673,CP（2）,cat,fpa,否
+756,fpa_greveteranb,突击兵戈壁作战裤,0,普通,1674,GP（1）; CP（2）,cat,fpa,是
+757,fpa_greveteranc,突击兵沙漠作战裤,1,非普通,1675,GP（1）; CP（2）,cat,fpa,是
+758,fpa_greveterand,突击兵雪地作战裤,1,非普通,1676; 6716,GP（1）; CP（2）,cat,fpa,是
+759,fja_greveteranb,突击兵山地无袖衫,1,非普通,1677,GP（1）; CP（2）,cat,fja,是
+760,fja_greveteranc,突击兵沙漠无袖衫,0,普通,1678,GP（1）; CP（2）,cat,fja,是
+761,fja_greveterand,突击兵雪地无袖衫,0,普通,1679; 6718,GP（1）; CP（2）,cat,fja,是
+762,fja_grebaseb,突击兵卡其色上衣,0,普通,1680; 7054,GP（1）; CP（2）,cat,fja,是
+763,fja_grebasec,突击兵白色上衣,0,普通,1681; 6719,GP（1）; CP（2）,cat,fja,是
+764,fpa_grebaseb,掷弹卡其战术裤,0,普通,1682,GP（1）; CP（2）,cat,fpa,是
+765,fpa_grebasec,掷弹雪地战术裤,0,普通,1683; 6720,GP（1）; CP（2）,cat,fpa,是
+766,fja_snibaseb,戈壁轻便服,1,非普通,1684; 7003,GP（1）; CP（2）,cat,fja,是
+767,fja_snibasec,沙漠轻便服,0,普通,1685; 7004,GP（1）; CP（2）,cat,fja,是
+768,fja_snibased,雪地轻便服,0,普通,1686,GP（1）; CP（2）,cat,fja,是
+769,fja_sniveteranb,戈壁伪装服,1,非普通,1687; 7009,GP（1）; CP（2）,cat,fja,是
+770,fja_sniveteranc,沙漠伪装服,0,普通,1688; 7010,GP（1）; CP（2）,cat,fja,是
+771,fja_sniveterand,雪地伪装服,1,非普通,1689; 7011,GP（1）; CP（2）,cat,fja,否
+772,fpa_snibaseb,戈壁作战裤,0,普通,1690; 6992,GP（1）; CP（2）,cat,fpa,是
+773,fpa_snibasec,沙漠作战裤,0,普通,1691; 6993,GP（1）; CP（2）,cat,fpa,是
+775,fpa_snibased,雪地作战裤,0,普通,1693,GP（1）; CP（2）,cat,fpa,是
+776,fpa_sniveteranb,戈壁伪装裤,0,普通,1694; 6997,GP（1）; CP（2）,cat,fpa,是
+777,fpa_sniveteranc,沙漠伪装裤,1,非普通,1695; 6998,GP（1）; CP（2）,cat,fpa,是
+778,fpa_sniveterand,雪地伪装裤,1,非普通,1696; 6999,GP（1）; CP（2）,cat,fpa,否
+779,ves_sniprestigeb,狙击手草原伪装服,1,非普通,1697; 10013,GP（1）; CP（2）,cat,ves,否
+780,ves_sniprestigec,狙击手枯叶伪装服,1,非普通,1698; 10014,GP（1）; CP（2）,cat,ves,否
+781,ves_sniprestiged,雪地伪装服,1,非普通,1699; 10015,GP（1）; CP（2）,cat,ves,否
+782,fja_acubaseb,山地战术冲锋衣,1,非普通,1700,GP（1）; CP（2）,cat,fja,是
+783,fja_acubasec,沙漠战术冲锋衣,1,非普通,1701,GP（1）; CP（2）,cat,fja,是
+784,fja_acubased,雪地战术冲锋衣,1,非普通,1702,GP（1）; CP（2）,cat,fja,是
+785,fpa_acubaseb,山地战术冲锋裤,1,非普通,1703; 6722,GP（1）; CP（2）,cat,fpa,是
+786,fpa_acubasec,沙漠战术冲锋裤,0,普通,1704,GP（1）; CP（2）,cat,fpa,是
+787,fpa_acubased,雪地战术冲锋裤,1,非普通,1705,GP（1）; CP（2）,cat,fpa,是
+796,fja_infbased,步兵白色作战服,0,普通,1714,GP（1）; CP（2）,cat,fja,是
+797,fja_infbasee,步兵灰色汗衫,0,普通,1715,GP（1）; CP（2）,cat,fja,否
+798,fpa_infbased,步兵丛林战术裤,0,普通,1716,GP（1）; CP（2）,cat,fpa,是
+799,fpa_infbasee,步兵沙漠战术裤,0,普通,1717,GP（1）; CP（2）,cat,fpa,是
+803,han_fingerlessyel,露指手套-卡其,0,普通,1725,GP（1）; CP（2）,cat,han,否
+805,han_usarmy,陆战队标准手套,0,普通,1728; 6725,GP（1）; CP（2）,cat,han,否
+811,boo_manveterana,此物品已被禁用,0,普通,1735,GP（1）; CP（2）,cat,boo,是
+14294,ves_qqbackpack,QQ背包,3,史诗,17481,GP（1）; CP（2）,cat,ves,否
+16655,ves_qqbackpackylw,QQ背包,3,史诗,23375,GP（1）; CP（2）,cat,ves,否
+815,hea_manveterana,此物品已被禁用,0,普通,1739,GP（1）; CP（2）,cat,hea,是
+11357,fja_tighttshirth,Tight Shirt H,2,稀有,11558,GP（1）; CP（2）,cat,fja,是
+819,han_tactical00,特种部队,0,普通,4710; 7018,GP（1）; CP（2）,cat,han,是
+820,han_tactical01,特种部队,0,普通,4711,CP（2）,cat,han,否
+824,han_tactical05,特种部队,0,普通,4715; 7013,GP（1）; CP（2）,cat,han,是
+825,han_tactical06,特种部队,0,普通,4716; 7014,GP（1）; CP（2）,cat,han,是
+826,han_tactical07,特种部队,0,普通,4717; 7019,GP（1）; CP（2）,cat,han,是
+829,han_fingerless00,露指手套,0,普通,4720; 6731,GP（1）; CP（2）,cat,han,否
+832,han_fingerless03,露指手套,0,普通,4723,GP（1）; CP（2）,cat,han,是
+846,han_fingerlessyel07,露指手套-卡其,0,普通,4737; 6746,GP（1）; CP（2）,cat,han,是
+854,han_fingerlessblk05,露指手套-黑,0,普通,4745; 6752,GP（1）; CP（2）,cat,han,否
+855,han_fingerlessblk06,露指手套-黑,0,普通,4746,GP（1）; CP（2）,cat,han,否
+859,han_hands00,道吉狗,0,普通,4750,CP（2）,cat,han,否
+860,han_hands01,道吉狗,0,普通,4751,CP（2）,cat,han,否
+864,han_hands05,道吉狗,0,普通,4755,GP（1）; CP（2）,cat,han,否
+865,han_hands06,道吉狗,0,普通,4756; 6756,GP（1）; CP（2）,cat,han,否
+866,han_hands07,道吉狗,0,普通,4757,GP（1）; CP（2）,cat,han,是
+869,han_typec00,飞行员手套,0,普通,4760,GP（1）; CP（2）,cat,han,是
+872,han_typec03,飞行员手套,0,普通,4763,GP（1）; CP（2）,cat,han,是
+874,han_typec05,飞行员手套,0,普通,4765,GP（1）; CP（2）,cat,han,是
+875,han_typec06,飞行员手套,0,普通,4766; 7015,GP（1）; CP（2）,cat,han,是
+876,han_typec07,飞行员手套,0,普通,4767,GP（1）; CP（2）,cat,han,是
+879,han_worn00,阿尔法五型,0,普通,4770; 6757,GP（1）; CP（2）,cat,han,否
+880,han_worn01,阿尔法五型,0,普通,4771,CP（2）,cat,han,否
+884,han_worn05,阿尔法五型,0,普通,4775; 6761,GP（1）; CP（2）,cat,han,否
+885,han_worn06,阿尔法五型,0,普通,4776; 6762,GP（1）; CP（2）,cat,han,否
+886,han_worn07,阿尔法五型,0,普通,4777; 6763,GP（1）; CP（2）,cat,han,否
+889,han_typea00,全功能电子表,0,普通,4780,CP（2）,cat,han,否
+890,han_typea01,全功能电子表,0,普通,4781,CP（2）,cat,han,否
+894,han_typea05,全功能电子表,0,普通,4785; 7082,GP（1）; CP（2）,cat,han,是
+895,han_typea06,全功能电子表,0,普通,4786,GP（1）,cat,han,否
+896,han_typea07,全功能电子表,0,普通,4787,GP（1）; CP（2）,cat,han,是
+899,han_typeb00,二战海军手表,0,普通,4790,GP（1）; CP（2）,cat,han,是
+900,han_typeb01,二战海军手表,0,普通,4791,GP（1）,cat,han,否
+904,han_typeb05,二战海军手表,0,普通,4795,GP（1）; CP（2）,cat,han,是
+905,han_typeb06,二战海军手表,0,普通,4796,GP（1）,cat,han,否
+906,han_typeb07,二战海军手表,0,普通,4797; 7055,GP（1）; CP（2）,cat,han,是
+909,han_basic00,肉手,0,普通,4800,GP（1）; CP（2）,cat,han,否
+929,han_usarmy00,陆战队标准手套,0,普通,4810,GP（1）; CP（2）,cat,han,是
+932,han_usarmy03,陆战队标准手套,0,普通,4813; 6767,GP（1）; CP（2）,cat,han,是
+934,han_usarmy05,陆战队标准手套,0,普通,4815; 6769,GP（1）; CP（2）,cat,han,否
+935,han_usarmy06,陆战队标准手套,0,普通,4816; 6770,GP（1）; CP（2）,cat,han,否
+936,han_usarmy07,陆战队标准手套,0,普通,4817; 6771,GP（1）; CP（2）,cat,han,是
+939,han_pilot00,狙击手手套,0,普通,4820,GP（1）; CP（2）,cat,han,是
+942,han_pilot03,狙击手手套,0,普通,4823; 6775,GP（1）; CP（2）,cat,han,是
+954,han_pilotblk05,狙击手手套-黑,0,普通,4835,GP（1）; CP（2）,cat,han,是
+966,han_pilotyel07,狙击手手套-卡其,0,普通,4847; 6779,GP（1）; CP（2）,cat,han,否
+979,han_fsb00,潜水员,0,普通,4850,CP（2）,cat,han,是
+980,han_fsb01,潜水员,0,普通,4851,CP（2）,cat,han,否
+984,han_fsb05,潜水员,0,普通,4855,GP（1）,cat,han,否
+985,han_fsb06,潜水员,0,普通,4856,GP（1）,cat,han,否
+986,han_fsb07,潜水员,0,普通,4857; 7083,GP（1）; CP（2）,cat,han,是
+989,han_leather00,终极行动,0,普通,4860,CP（2）,cat,han,否
+990,han_leather01,终极行动,0,普通,4861,CP（2）,cat,han,否
+994,han_leather05,终极行动,0,普通,4865,GP（1）; CP（2）,cat,han,是
+995,han_leather06,终极行动,0,普通,4866,GP（1）,cat,han,否
+996,han_leather07,终极行动,0,普通,4867; 7084,GP（1）; CP（2）,cat,han,是
+999,han_assaultscar00,激波者,0,普通,4870,GP（1）,cat,han,否
+1000,han_assaultscar01,激波者,0,普通,4871,CP（2）,cat,han,否
+1004,han_assaultscar05,激波者,0,普通,4875; 12975,GP（1）; CP（2）,cat,han,否
+1005,han_assaultscar06,激波者,0,普通,4876,GP（1）,cat,han,否
+1006,han_assaultscar07,激波者,0,普通,4877; 12974,GP（1）; CP（2）,cat,han,否
+1099,han_infbasea00,步兵肉手-白,0,普通,4960,GP（1）; CP（2）,cat,han,是
+1109,han_infbaseb00,步兵肉手-黄,0,普通,4970,GP（1）; CP（2）,cat,han,是
+1119,han_infveterana00,步兵手套,0,普通,4980,GP（1）; CP（2）,cat,han,是
+1129,han_infprestigea00,短款战术手套,0,普通,4990; 7017,GP（1）; CP（2）,cat,han,是
+1139,han_snibasea00,狙击手肉手,0,普通,5000,GP（1）; CP（2）,cat,han,是
+1149,han_sniprestigea00,狙击手手套B,0,普通,5010,GP（1）; CP（2）,cat,han,是
+1169,han_acubasea00,肉手,0,普通,5030,GP（1）; CP（2）,cat,han,是
+1179,han_acuveterana00,重型步兵战术手套,0,普通,5040,GP（1）; CP（2）,cat,han,否
+1186,han_acuveterana07,重型步兵战术手套,0,普通,5047; 6794,GP（1）; CP（2）,cat,han,否
+1189,han_acuprestigea00,重型步兵作战手套,0,普通,5050,GP（1）; CP（2）,cat,han,是
+1196,han_acuprestigea07,重型步兵作战手套,0,普通,5057,GP（1）; CP（2）,cat,han,是
+1199,han_acuelitea00,重型精英手套,0,普通,5060,GP（1）; CP（2）,cat,han,是
+1209,han_grebasea00,肉手,0,普通,5070,GP（1）; CP（2）,cat,han,是
+1219,han_greveterana00,突击兵战斗指南针,0,普通,5080,GP（1）; CP（2）,cat,han,否
+1229,han_greprestigea00,突击兵战术手套,0,普通,5090,GP（1）; CP（2）,cat,han,是
+1234,han_greprestigea05,突击兵战术手套,0,普通,5095; 6797,GP（1）; CP（2）,cat,han,是
+1239,han_spebasea00,肉手,0,普通,5100,GP（1）; CP（2）,cat,han,是
+1249,han_speveterana00,短款战术手套,0,普通,5110,GP（1）; CP（2）,cat,han,是
+1259,han_speprestigea00,高级短款战术手套,0,普通,5120,GP（1）; CP（2）,cat,han,否
+1260,han_speprestigea01,高级短款战术手套,0,普通,5121,CP（2）,cat,han,否
+1269,han_sheveterana00,此物品已被禁用,0,普通,5130,GP（1）; CP（2）,cat,han,是
+1279,han_sheprestigea00,此物品已被禁用,0,普通,5140,GP（1）; CP（2）,cat,han,是
+1289,han_copbasea00,肉手,0,普通,5150,GP（1）; CP（2）,cat,han,是
+1299,han_copveterana00,霹雳手套,0,普通,5160,GP（1）; CP（2）,cat,han,是
+1309,han_copprestigea00,杀手手套,0,普通,5170,GP（1）; CP（2）,cat,han,否
+1311,han_copprestigea02,杀手手套,0,普通,5172,CP（2）,cat,han,否
+1319,han_cowveterana00,露指牛仔皮手套,0,普通,5180,CP（2）,cat,han,是
+1329,han_cowprestigea00,驯马手套,0,普通,5190,GP（1）; CP（2）,cat,han,是
+11358,fja_tighttshirti,Tight Shirt I,2,稀有,11560,GP（1）; CP（2）,cat,fja,是
+1379,eye_aviatorsblk00,飞行员墨镜-炫黑,0,普通,5240,GP（1）; CP（2）,cat,eye,是
+1381,eye_aviatorsblk02,飞行员墨镜-炫黑,0,普通,5242,GP（1）; CP（2）,cat,eye,否
+1382,eye_aviatorsblk03,飞行员墨镜-炫黑,0,普通,5243,GP（1）; CP（2）,cat,eye,是
+1384,eye_aviatorsblk05,飞行员墨镜-炫黑,0,普通,5245,GP（1）; CP（2）,cat,eye,是
+1385,eye_aviatorsblk06,飞行员墨镜-炫黑,0,普通,5246; 6802,GP（1）; CP（2）,cat,eye,否
+1389,eye_aviatorsred00,飞行员墨镜-酒红,0,普通,5250,CP（2）,cat,eye,是
+1391,eye_aviatorsred02,飞行员墨镜-酒红,0,普通,5252,CP（2）,cat,eye,否
+1392,eye_aviatorsred03,飞行员墨镜-酒红,0,普通,5253; 6804,GP（1）; CP（2）,cat,eye,否
+1394,eye_aviatorsred05,飞行员墨镜-酒红,0,普通,5255,GP（1）; CP（2）,cat,eye,是
+1395,eye_aviatorsred06,飞行员墨镜-酒红,0,普通,5256; 6806,GP（1）; CP（2）,cat,eye,否
+1399,eye_aviatorsgreen00,飞行员墨镜-墨绿,0,普通,5260,GP（1）; CP（2）,cat,eye,是
+1401,eye_aviatorsgreen02,飞行员墨镜-墨绿,0,普通,5262,CP（2）,cat,eye,否
+1402,eye_aviatorsgreen03,飞行员墨镜-墨绿,0,普通,5263; 6808,GP（1）; CP（2）,cat,eye,是
+1404,eye_aviatorsgreen05,飞行员墨镜-墨绿,0,普通,5265; 6810,GP（1）; CP（2）,cat,eye,否
+1405,eye_aviatorsgreen06,飞行员墨镜-墨绿,0,普通,5266; 6811,GP（1）; CP（2）,cat,eye,否
+1409,eye_aviatorswht00,飞行员墨镜-镜面,0,普通,5270,GP（1）; CP（2）,cat,eye,是
+1411,eye_aviatorswht02,飞行员墨镜-镜面,0,普通,5272,CP（2）,cat,eye,否
+1412,eye_aviatorswht03,飞行员墨镜-镜面,0,普通,5273; 6813,GP（1）; CP（2）,cat,eye,否
+1414,eye_aviatorswht05,飞行员墨镜-镜面,0,普通,5275; 6815,GP（1）; CP（2）,cat,eye,否
+1415,eye_aviatorswht06,飞行员墨镜-镜面,0,普通,5276; 6816,GP（1）; CP（2）,cat,eye,否
+1419,eye_pilotblk00,蛤蟆镜-渐变黑,0,普通,5280; 6817,GP（1）; CP（2）,cat,eye,否
+1421,eye_pilotblk02,蛤蟆镜-渐变黑,0,普通,5282,CP（2）,cat,eye,否
+1422,eye_pilotblk03,蛤蟆镜-渐变黑,0,普通,5283; 6819,GP（1）; CP（2）,cat,eye,是
+1424,eye_pilotblk05,蛤蟆镜-渐变黑,0,普通,5285; 6821,GP（1）; CP（2）,cat,eye,否
+1425,eye_pilotblk06,蛤蟆镜-渐变黑,0,普通,5286; 6822,GP（1）; CP（2）,cat,eye,否
+1429,eye_pilotred00,蛤蟆镜-渐变红,0,普通,5290; 6823,GP（1）; CP（2）,cat,eye,否
+1431,eye_pilotred02,蛤蟆镜-渐变红,0,普通,5292,CP（2）,cat,eye,否
+1432,eye_pilotred03,蛤蟆镜-渐变红,0,普通,5293; 6825,GP（1）; CP（2）,cat,eye,否
+1434,eye_pilotred05,蛤蟆镜-渐变红,0,普通,5295; 6827,GP（1）; CP（2）,cat,eye,否
+1435,eye_pilotred06,蛤蟆镜-渐变红,0,普通,5296; 6828,GP（1）; CP（2）,cat,eye,否
+1439,eye_pilotyel00,蛤蟆镜-渐变黄,0,普通,5300; 6829,GP（1）; CP（2）,cat,eye,否
+1441,eye_pilotyel02,蛤蟆镜-渐变黄,0,普通,5302,CP（2）,cat,eye,否
+1442,eye_pilotyel03,蛤蟆镜-渐变黄,0,普通,5303; 6831,GP（1）; CP（2）,cat,eye,否
+1444,eye_pilotyel05,蛤蟆镜-渐变黄,0,普通,5305; 6833,GP（1）; CP（2）,cat,eye,否
+1445,eye_pilotyel06,蛤蟆镜-渐变黄,0,普通,5306; 6834,GP（1）; CP（2）,cat,eye,否
+1459,eye_goggles00,轻型防风眼镜,0,普通,5320; 6835,GP（1）; CP（2）,cat,eye,是
+1460,eye_goggles01,轻型防风眼镜,0,普通,5321,CP（2）,cat,eye,否
+1464,eye_goggles05,轻型防风眼镜,0,普通,5325; 6839,GP（1）; CP（2）,cat,eye,否
+1465,eye_goggles06,轻型防风眼镜,0,普通,5326; 6840,GP（1）; CP（2）,cat,eye,否
+1466,eye_goggles07,轻型防风眼镜,0,普通,5327,GP（1）; CP（2）,cat,eye,是
+1479,eye_sunglassesblk00,作战护目镜-石墨黑,0,普通,5340; 6841,GP（1）; CP（2）,cat,eye,是
+1481,eye_sunglassesblk02,作战护目镜-石墨黑,0,普通,5342,CP（2）,cat,eye,否
+1482,eye_sunglassesblk03,作战护目镜-石墨黑,0,普通,5343; 6843,GP（1）; CP（2）,cat,eye,否
+1484,eye_sunglassesblk05,作战护目镜-石墨黑,0,普通,5345; 6845,GP（1）; CP（2）,cat,eye,否
+1485,eye_sunglassesblk06,作战护目镜-石墨黑,0,普通,5346; 6846,GP（1）; CP（2）,cat,eye,否
+1489,eye_sunglassesgreen00,作战护目镜-极光绿,0,普通,5350; 6640,GP（1）; CP（2）,cat,eye,是
+1491,eye_sunglassesgreen02,作战护目镜-极光绿,0,普通,5352,GP（1）; CP（2）,cat,eye,否
+1492,eye_sunglassesgreen03,作战护目镜-极光绿,0,普通,5353; 6848,GP（1）; CP（2）,cat,eye,否
+1494,eye_sunglassesgreen05,作战护目镜-极光绿,0,普通,5355,GP（1）; CP（2）,cat,eye,否
+1495,eye_sunglassesgreen06,作战护目镜-极光绿,0,普通,5356; 6850,GP（1）; CP（2）,cat,eye,否
+1499,eye_sunglassesblue00,作战护目镜-电镀蓝,0,普通,5360; 6851,GP（1）; CP（2）,cat,eye,是
+1501,eye_sunglassesblue02,作战护目镜-电镀蓝,0,普通,5362,CP（2）,cat,eye,否
+1502,eye_sunglassesblue03,作战护目镜-电镀蓝,0,普通,5363; 6853,GP（1）; CP（2）,cat,eye,否
+1504,eye_sunglassesblue05,作战护目镜-电镀蓝,0,普通,5365; 6855,GP（1）; CP（2）,cat,eye,否
+1505,eye_sunglassesblue06,作战护目镜-电镀蓝,0,普通,5366; 6856,GP（1）; CP（2）,cat,eye,否
+1509,eye_sunglassesred00,作战护目镜-玫瑰红,0,普通,5370; 6637,GP（1）; CP（2）,cat,eye,是
+1511,eye_sunglassesred02,作战护目镜-玫瑰红,0,普通,5372,CP（2）,cat,eye,否
+1512,eye_sunglassesred03,作战护目镜-玫瑰红,0,普通,5373; 6858,GP（1）; CP（2）,cat,eye,否
+1514,eye_sunglassesred05,作战护目镜-玫瑰红,0,普通,5375; 6860,GP（1）; CP（2）,cat,eye,是
+1515,eye_sunglassesred06,作战护目镜-玫瑰红,0,普通,5376; 6861,GP（1）; CP（2）,cat,eye,否
+1519,eye_sunglasseswht00,作战护目镜-透明,0,普通,5380; 6862,GP（1）; CP（2）,cat,eye,是
+1521,eye_sunglasseswht02,作战护目镜-透明,0,普通,5382,CP（2）,cat,eye,否
+1522,eye_sunglasseswht03,作战护目镜-透明,0,普通,5383; 6864,GP（1）; CP（2）,cat,eye,否
+1524,eye_sunglasseswht05,作战护目镜-透明,0,普通,5385; 6866,GP（1）; CP（2）,cat,eye,否
+1525,eye_sunglasseswht06,作战护目镜-透明,0,普通,5386; 6867,GP（1）; CP（2）,cat,eye,否
+1529,eye_usarmy00,战地护目镜-透明,0,普通,5390; 6868,GP（1）; CP（2）,cat,eye,是
+1530,eye_usarmy01,战地护目镜-透明,0,普通,5391,CP（2）,cat,eye,否
+1534,eye_usarmy05,战地护目镜-透明,0,普通,5395; 6872,GP（1）; CP（2）,cat,eye,否
+1535,eye_usarmy06,战地护目镜-透明,0,普通,5396; 6873,GP（1）; CP（2）,cat,eye,否
+1539,eye_usarmyyel00,战地护目镜-澄黄,0,普通,5400; 7051,GP（1）; CP（2）,cat,eye,是
+1540,eye_usarmyyel01,战地护目镜-澄黄,0,普通,5401,CP（2）,cat,eye,否
+1544,eye_usarmyyel05,战地护目镜-澄黄,0,普通,5405; 6877,GP（1）; CP（2）,cat,eye,是
+1545,eye_usarmyyel06,战地护目镜-澄黄,0,普通,5406; 6878,GP（1）; CP（2）,cat,eye,否
+1559,eye_conceptblk00,极限运动眼镜-经典黑,0,普通,5420; 7047,GP（1）; CP（2）,cat,eye,是
+1561,eye_conceptblk02,极限运动眼镜-经典黑,0,普通,5422,CP（2）,cat,eye,否
+1562,eye_conceptblk03,极限运动眼镜-经典黑,0,普通,5423; 6880,GP（1）; CP（2）,cat,eye,否
+1564,eye_conceptblk05,极限运动眼镜-经典黑,0,普通,5425; 7040,GP（1）; CP（2）,cat,eye,是
+1565,eye_conceptblk06,极限运动眼镜-经典黑,0,普通,5426; 6882,GP（1）; CP（2）,cat,eye,否
+1569,eye_conceptblue00,极限运动眼镜-深海蓝,0,普通,5430,GP（1）; CP（2）,cat,eye,是
+1571,eye_conceptblue02,极限运动眼镜-深海蓝,0,普通,5432,CP（2）,cat,eye,否
+1572,eye_conceptblue03,极限运动眼镜-深海蓝,0,普通,5433; 6884,GP（1）; CP（2）,cat,eye,否
+1574,eye_conceptblue05,极限运动眼镜-深海蓝,0,普通,5435,GP（1）; CP（2）,cat,eye,否
+1575,eye_conceptblue06,极限运动眼镜-深海蓝,0,普通,5436; 6886,GP（1）; CP（2）,cat,eye,否
+1579,eye_conceptyel00,极限运动眼镜-琥珀黄,0,普通,5440,GP（1）; CP（2）,cat,eye,是
+1581,eye_conceptyel02,极限运动眼镜-琥珀黄,0,普通,5442,CP（2）,cat,eye,否
+1582,eye_conceptyel03,极限运动眼镜-琥珀黄,0,普通,5443,GP（1）; CP（2）,cat,eye,是
+1584,eye_conceptyel05,极限运动眼镜-琥珀黄,0,普通,5445,GP（1）; CP（2）,cat,eye,是
+1585,eye_conceptyel06,极限运动眼镜-琥珀黄,0,普通,5446; 6891,GP（1）; CP（2）,cat,eye,否
+1589,eye_conceptwht00,极限运动眼镜-透明,0,普通,5450,GP（1）; CP（2）,cat,eye,是
+1591,eye_conceptwht02,极限运动眼镜-透明,0,普通,5452,CP（2）,cat,eye,否
+1592,eye_conceptwht03,极限运动眼镜-透明,0,普通,5453; 6894,GP（1）; CP（2）,cat,eye,否
+1594,eye_conceptwht05,极限运动眼镜-透明,0,普通,5455; 6896,GP（1）; CP（2）,cat,eye,是
+1595,eye_conceptwht06,极限运动眼镜-透明,0,普通,5456; 6897,GP（1）; CP（2）,cat,eye,否
+1619,eye_rayban00,X-RAY太阳镜,0,普通,5470,GP（1）; CP（2）,cat,eye,是
+1629,eye_leipengblk00,时尚太阳镜-黑,0,普通,5480; 6644,GP（1）; CP（2）,cat,eye,是
+1631,eye_leipengblk02,时尚太阳镜-黑,0,普通,5482,CP（2）,cat,eye,否
+1632,eye_leipengblk03,时尚太阳镜-黑,0,普通,5483; 6899,GP（1）; CP（2）,cat,eye,否
+1634,eye_leipengblk05,时尚太阳镜-黑,0,普通,5485; 7041,GP（1）; CP（2）,cat,eye,是
+1635,eye_leipengblk06,时尚太阳镜-黑,0,普通,5486; 6901,GP（1）; CP（2）,cat,eye,否
+1639,eye_leipengyel00,时尚太阳镜-黄,0,普通,5490; 6902,GP（1）; CP（2）,cat,eye,是
+1641,eye_leipengyel02,时尚太阳镜-黄,0,普通,5492,CP（2）,cat,eye,否
+1642,eye_leipengyel03,时尚太阳镜-黄,0,普通,5493; 6904,GP（1）; CP（2）,cat,eye,是
+1644,eye_leipengyel05,时尚太阳镜-黄,0,普通,5495; 6906,GP（1）; CP（2）,cat,eye,否
+1645,eye_leipengyel06,时尚太阳镜-黄,0,普通,5496; 6907,GP（1）; CP（2）,cat,eye,否
+1649,eye_leipengblue00,时尚太阳镜-蓝,0,普通,5500; 6908,GP（1）; CP（2）,cat,eye,是
+1651,eye_leipengblue02,时尚太阳镜-蓝,0,普通,5502,CP（2）,cat,eye,否
+1652,eye_leipengblue03,时尚太阳镜-蓝,0,普通,5503; 6910,GP（1）; CP（2）,cat,eye,否
+1654,eye_leipengblue05,时尚太阳镜-蓝,0,普通,5505; 6912,GP（1）; CP（2）,cat,eye,是
+1655,eye_leipengblue06,时尚太阳镜-蓝,0,普通,5506; 6913,GP（1）; CP（2）,cat,eye,否
+1659,eye_leipengred00,时尚太阳镜-红,0,普通,5510; 6914,GP（1）; CP（2）,cat,eye,是
+1661,eye_leipengred02,时尚太阳镜-红,0,普通,5512,CP（2）,cat,eye,否
+1662,eye_leipengred03,时尚太阳镜-红,0,普通,5513; 6916,GP（1）; CP（2）,cat,eye,是
+1664,eye_leipengred05,时尚太阳镜-红,0,普通,5515; 6918,GP（1）; CP（2）,cat,eye,是
+1665,eye_leipengred06,时尚太阳镜-红,0,普通,5516; 6919,GP（1）; CP（2）,cat,eye,否
+1669,eye_leipengwht00,时尚太阳镜-电镀,0,普通,5520; 7049,GP（1）; CP（2）,cat,eye,是
+1671,eye_leipengwht02,时尚太阳镜-电镀,0,普通,5522,CP（2）,cat,eye,否
+1672,eye_leipengwht03,时尚太阳镜-电镀,0,普通,5523; 6921,GP（1）; CP（2）,cat,eye,否
+1674,eye_leipengwht05,时尚太阳镜-电镀,0,普通,5525; 6923,GP（1）; CP（2）,cat,eye,否
+1675,eye_leipengwht06,时尚太阳镜-电镀,0,普通,5526; 6924,GP（1）; CP（2）,cat,eye,否
+1679,eye_meta00,火狐半面罩,0,普通,5530,GP（1）; CP（2）,cat,eye,是
+1709,eye_accessories00,沙漠防尘眼镜-透明,0,普通,5560; 7042,GP（1）; CP（2）,cat,eye,是
+1710,eye_accessories01,沙漠防尘眼镜-透明,0,普通,5561,CP（2）,cat,eye,否
+1714,eye_accessories05,沙漠防尘眼镜-透明,0,普通,5565; 7043,GP（1）; CP（2）,cat,eye,是
+1715,eye_accessories06,沙漠防尘眼镜-透明,0,普通,5566,GP（1）,cat,eye,否
+1716,eye_accessories07,沙漠防尘眼镜-透明,0,普通,5567,GP（1）; CP（2）,cat,eye,是
+1719,eye_accessoriesblue00,沙漠防尘眼镜-蓝,0,普通,5570; 6925,GP（1）; CP（2）,cat,eye,是
+1720,eye_accessoriesblue01,沙漠防尘眼镜-蓝,0,普通,5571,CP（2）,cat,eye,否
+1724,eye_accessoriesblue05,沙漠防尘眼镜-蓝,0,普通,5575; 6929,GP（1）; CP（2）,cat,eye,否
+1725,eye_accessoriesblue06,沙漠防尘眼镜-蓝,0,普通,5576; 6930,GP（1）; CP（2）,cat,eye,否
+1726,eye_accessoriesblue07,沙漠防尘眼镜-蓝,0,普通,5577; 6931,GP（1）; CP（2）,cat,eye,是
+1729,eye_accessoriesred00,沙漠防尘眼镜-红,0,普通,5580,GP（1）; CP（2）,cat,eye,否
+1730,eye_accessoriesred01,沙漠防尘眼镜-红,0,普通,5581,CP（2）,cat,eye,否
+1734,eye_accessoriesred05,沙漠防尘眼镜-红,0,普通,5585; 6935,GP（1）; CP（2）,cat,eye,否
+1735,eye_accessoriesred06,沙漠防尘眼镜-红,0,普通,5586; 6936,GP（1）; CP（2）,cat,eye,否
+1736,eye_accessoriesred07,沙漠防尘眼镜-红,0,普通,5587,GP（1）; CP（2）,cat,eye,是
+1746,eye_merc07,高级防弹护目镜,0,普通,5597,GP（1）; CP（2）,cat,eye,是
+1775,eye_skiyel06,极地滑雪镜-玛瑙黄,0,普通,5626; 7050,GP（1）; CP（2）,cat,eye,是
+1789,eye_copprestigea00,警察L3眼镜,0,普通,5640,GP（1）; CP（2）,cat,eye,是
+1802,eye_cowprestigea03,经典机车眼镜,0,普通,5653,GP（1）; CP（2）,cat,eye,是
+1809,elp_konglong01,大力士,0,普通,5661,GP（1）; CP（2）,cat,elp,是
+1810,elp_lianpu01,武士脸谱,0,普通,5662; 6940,GP（1）; CP（2）,cat,elp,否
+1811,elp_liyu01,锦鲤,0,普通,5663,GP（1）; CP（2）,cat,elp,是
+1812,elp_long01,升龙,0,普通,5664,GP（1）; CP（2）,cat,elp,是
+1813,elp_niao01,啸鹰,0,普通,5665; 6941,GP（1）; CP（2）,cat,elp,是
+1814,elp_tou01,印第安大地,0,普通,5666,GP（1）; CP（2）,cat,elp,是
+1815,elp_ying01,毛利纹身,0,普通,5667; 7039,GP（1）; CP（2）,cat,elp,是
+1816,elp_zhongguo01,盾,0,普通,5668; 6942,GP（1）; CP（2）,cat,elp,是
+1817,heg_sase,海豹突击帽,0,普通,5669; 6943,GP（1）; CP（2）,cat,heg,否
+1818,fpa_sheveteranb,步兵山地战术裤,0,普通,5707; 10017,GP（1）; CP（2）,cat,fpa,是
+1819,fpa_sheveteranc,步兵漠作战裤,0,普通,5708; 10018,GP（1）; CP（2）,cat,fpa,是
+1820,fpa_sheveterand,步兵雪地作战裤,0,普通,5709; 10019,CP（2）,cat,fpa,是
+1824,han_braceletd,玛瑙佛珠,0,普通,5728,GP（1）; CP（2）,cat,han,是
+1828,fja_suits,侦探西装,0,普通,5732,GP（1）; CP（2）,cat,fja,否
+1829,heg_baseballcops,警队棒球帽,0,普通,5733,CP（2）,cat,heg,否
+1831,ves_techno,动力辅助防弹衣,0,普通,5738,CP（2）,cat,ves,否
+1832,ves_tactical,战斧防弹衣,0,普通,5739,GP（1）,cat,ves,否
+1833,heg_duckbill,贝尔鸭嘴帽,0,普通,5749,GP（1）; CP（2）,cat,heg,是
+10514,ves_guanyuancient,Vest of the Green Dragon,3,史诗,11199,GP（1）; CP（2）,cat,ves,是
+1835,fpa_sheprestigeb,精英级作战裤,0,普通,5808; 10021,GP（1）; CP（2）,cat,fpa,是
+1840,fja_safefile,卡其色紧身夹克,0,普通,5818,GP（1）; CP（2）,cat,fja,是
+1842,fja_fengyi,开拓者夹克,0,普通,5824,GP（1）; CP（2）,cat,fja,是
+1843,heg_headband,66号机车头巾,1,非普通,5825,GP（1）; CP（2）,cat,heg,是
+1844,fja_sniprestigec,狙击手伪装服B,0,普通,5944; 10014,GP（1）; CP（2）,cat,fja,否
+1845,fja_sniprestiged,狙击手伪装服B,1,非普通,5945; 10015,GP（1）; CP（2）,cat,fja,否
+1846,fpa_sniprestigeb,狙击手高级伪装裤C,1,非普通,5946; 10013,GP（1）; CP（2）,cat,fpa,否
+1847,fpa_sniprestigec,狙击手高级伪装裤C,1,非普通,5947; 10014,GP（1）; CP（2）,cat,fpa,否
+1848,fpa_sniprestiged,狙击手高级伪装裤C,1,非普通,5948; 10015,GP（1）; CP（2）,cat,fpa,否
+1849,fja_sniprestigeb,狙击手伪装服B,0,普通,5949; 10013,GP（1）; CP（2）,cat,fja,否
+1855,boo_sheveteranb,此物品已被禁用,0,普通,5973; 10017,GP（1）; CP（2）,cat,boo,否
+1856,boo_sheveteranc,此物品已被禁用,0,普通,5974; 10018,GP（1）; CP（2）,cat,boo,否
+1857,boo_sheveterand,此物品已被禁用,0,普通,5975; 10019,GP（1）; CP（2）,cat,boo,否
+1858,boo_sheprestigeb,此物品已被禁用,0,普通,5976; 10021,GP（1）; CP（2）,cat,boo,否
+1859,heg_stetson,格子保暖帽,0,普通,5981,GP（1）; CP（2）,cat,heg,是
+1869,eye_canes,沙漠之狐防沙镜,0,普通,6021,GP（1）; CP（2）,cat,eye,是
+28702,fja_elenaad,艾莲娜 高级上装,2,稀有,38754; 38869; 38874,GP（1）; CP（2）,cat,fja,是
+1875,fja_srtprestigea,此物品已被禁用,0,普通,6042,GP（1）; CP（2）,cat,fja,是
+1876,fja_srtveterana,此物品已被禁用,0,普通,6043,GP（1）; CP（2）,cat,fja,是
+1877,fpa_srtprestigea,此物品已被禁用,0,普通,6044,GP（1）; CP（2）,cat,fpa,是
+1878,fpa_srtveterana,此物品已被禁用,0,普通,6045,GP（1）; CP（2）,cat,fpa,是
+1879,han_srtprestigea,此物品已被禁用,0,普通,6046,GP（1）; CP（2）,cat,han,是
+1880,han_srtveterana,此物品已被禁用,0,普通,6047,GP（1）; CP（2）,cat,han,是
+1881,heg_srtprestigea,此物品已被禁用,0,普通,6048,GP（1）; CP（2）,cat,heg,是
+1882,heg_srtveterana,此物品已被禁用,0,普通,6049,GP（1）; CP（2）,cat,heg,是
+1883,hea_srtveterana,此物品已被禁用,0,普通,6050,GP（1）; CP（2）,cat,hea,是
+28704,han_elenaad,艾莲娜 高级手套,2,稀有,38754; 38869; 38872,GP（1）; CP（2）,cat,han,是
+12940,heg_infiltrator_f_hardman,暗夜骑士头盔,3,史诗,14889,GP（1）; CP（2）,cat,heg,是
+12938,ves_infiltrator_female_swords,暗之双刃,2,稀有,14887,GP（1）; CP（2）,cat,ves,是
+1887,fja_gongfu,功夫衫,1,非普通,6062,CP（2）,cat,fja,是
+1891,heg_commandos,敢死队贝雷帽,1,非普通,6106,GP（1）; CP（2）,cat,heg,是
+1892,heg_headset,战术步话机,0,普通,6107,CP（2）,cat,heg,是
+2004,heg_acuweld,白鬼重防头盔,3,史诗,11689,GP（1）; CP（2）,cat,heg,是
+1903,ves_feather,渡鸦轻便防弹衣,0,普通,6118,CP（2）,cat,ves,否
+1905,heg_topee,CQB迷彩奔尼帽,0,普通,6127,GP（1）; CP（2）,cat,heg,否
+1909,ves_kaifula,凯萨多功能作战背心,1,非普通,6132,GP（1）; CP（2）,cat,ves,是
+1910,fja_camouflage,魅影迷彩战斗衣,0,普通,6133,GP（1）; CP（2）,cat,fja,否
+1915,fja_halloween,南瓜战术衣,0,普通,6183,CP（2）,cat,fja,否
+1916,heg_halloween,南瓜战术头盔,0,普通,6184,CP（2）,cat,heg,否
+1917,fpa_halloween,南瓜战术裤,0,普通,6185,CP（2）,cat,fpa,否
+1918,fja_pioneer,酋长夹克,0,普通,6188,CP（2）,cat,fja,否
+1919,heg_tacticalswat,沙漠之狐头部套装,1,非普通,6233,CP（2）,cat,heg,是
+1922,fja_soneventa,逆袭战斗服,0,普通,6236,GP（1）; CP（2）,cat,fja,否
+1923,fja_soneventb,秩序战斗服,0,普通,6237,GP（1）; CP（2）,cat,fja,否
+1924,fja_soneventc,希望战斗服,0,普通,6238,GP（1）; CP（2）,cat,fja,否
+1925,fja_soneventd,爱之战斗服,0,普通,6239,GP（1）; CP（2）,cat,fja,否
+1926,fja_sonevente,正义战斗服,0,普通,6240,GP（1）; CP（2）,cat,fja,否
+1927,fja_goose,圣诞作战外套,0,普通,6241,CP（2）,cat,fja,否
+1928,fpa_goose,圣诞山地防寒裤,0,普通,6242,CP（2）,cat,fpa,否
+1929,fja_kgb,野马小队作战衣,1,非普通,6243; 10022,CP（2）,cat,fja,是
+1930,fpa_kgb,野马小队作战裤,1,非普通,6244; 10022,GP（1）; CP（2）,cat,fpa,是
+1931,ves_kgb,野马轻型作战背心,1,非普通,6245; 10022,CP（2）,cat,ves,是
+1932,han_kgb,野马战术手套,1,非普通,6246; 10022,GP（1）; CP（2）,cat,han,是
+1933,heg_christmas,圣诞老人战术帽,0,普通,6248,CP（2）,cat,heg,否
+1934,ves_hiking,圣诞老人山地背包,0,普通,6249,CP（2）,cat,ves,否
+1935,fja_netcafe,腾讯战术衣,0,普通,6328,GP（1）,cat,fja,否
+1938,fja_mouprestigea,BDU体恤衫,0,普通,6452,GP（1）; CP（2）,cat,fja,是
+1939,fja_mouveterana,BDU无袖汗衫,0,普通,6453,GP（1）; CP（2）,cat,fja,否
+1940,fpa_mouveterana,CQB训练裤-沙漠迷彩,0,普通,6454,GP（1）; CP（2）,cat,fpa,否
+1941,han_mouveterana,CQB战术手套,0,普通,6455,GP（1）; CP（2）,cat,han,否
+1943,ves_mouveterana,VIP防弹背心,0,普通,6457,GP（1）; CP（2）,cat,ves,是
+2003,han_acuacu,白鬼作战手套,3,史诗,11688,CP（2）,cat,han,是
+1949,heg_qt,QQ Talk 顶级战术耳机,0,普通,6507,GP（1）,cat,heg,否
+1950,hea_mountain,山地人,0,普通,6522,GP（1）; CP（2）,cat,hea,否
+1951,heg_mountain,山地人,0,普通,6523,GP（1）; CP（2）,cat,heg,否
+2001,fja_acuacuheavy,白炙星重型装甲,3,史诗,11686,GP（1）; CP（2）,cat,fja,是
+1954,heg_baseballbear,鸭舌帽头部装备,1,非普通,6565,GP（1）; CP（2）,cat,heg,是
+1957,han_mouprestigea,CQB作战手套,0,普通,6593,GP（1）; CP（2）,cat,han,是
+1958,fpa_mouprestigea,BDU荒漠作战裤,1,非普通,6594,GP（1）; CP（2）,cat,fpa,是
+2002,fpa_acuacuheavy,白炙星作战护腿,3,史诗,11687,GP（1）; CP（2）,cat,fpa,是
+2035,eye_darkevil,百鬼之王面具,2,稀有,12450,GP（1）; CP（2）,cat,eye,是
+1961,heg_bandanachinese,好运头巾（红色）,1,非普通,7960,GP（1）; CP（2）,cat,heg,是
+1962,fpa_boardjeans,蓝色船长牛仔裤,0,普通,7961,GP（1）; CP（2）,cat,fpa,是
+12937,ves_infiltrator_female_riot,薄翼护甲,2,稀有,14886,GP（1）; CP（2）,cat,ves,是
+11815,ves_squid,保罗背包,4,传奇,13444,GP（1）; CP（2）,cat,ves,是
+15682,ves_chameleon,变色龙战甲 护具,3,史诗,20655; 20656,GP（1）; CP（2）,cat,ves,否
+1966,hea_denny,此物品已被禁用,0,普通,8837,GP（1）; CP（2）,cat,hea,否
+1967,heg_denny,此物品已被禁用,0,普通,8838,GP（1）; CP（2）,cat,heg,否
+15867,ves_chameleon_02,变色龙战甲 护具,3,史诗,21101; 21106,GP（1）; CP（2）,cat,ves,否
+1969,fja_cfveterana,连帽皮衣,0,普通,8852,GP（1）; CP（2）,cat,fja,是
+1970,fpa_cfprestigea,迷彩滑板裤,1,非普通,8853,GP（1）; CP（2）,cat,fpa,是
+1971,fpa_cfveterana,做旧滑板裤,0,普通,8854,GP（1）; CP（2）,cat,fpa,是
+1972,han_cfprestigea,单手无指皮手套,0,普通,8855,CP（2）,cat,han,是
+1973,han_cfveterana,手,0,普通,8856,GP（1）; CP（2）,cat,han,是
+1974,heg_cfprestigea,此物品已被禁用,0,普通,8857,CP（2）,cat,heg,是
+1975,heg_cfveterana,查尔斯遮阳帽,0,普通,8858,GP（1）; CP（2）,cat,heg,是
+1976,ves_cfprestigea,多功能挂件背心,1,非普通,8859,GP（1）; CP（2）,cat,ves,是
+1977,ves_cfveterana,轻便枪带,0,普通,8860,CP（2）,cat,ves,是
+16175,ves_chameleonfe,变色龙战甲 护具,3,史诗,22558; 22747,GP（1）; CP（2）,cat,ves,否
+16279,ves_chameleonfe02,变色龙战甲 护具,3,史诗,22746; 22748,GP（1）; CP（2）,cat,ves,否
+1981,fpa_boarderthin,时尚卡其帆布裤,1,非普通,10826,GP（1）; CP（2）,cat,fpa,是
+1982,eye_mirrorthin,蛤蟆护目镜,0,普通,10827,GP（1）; CP（2）,cat,eye,是
+1983,fja_slumthin,格子衬衫,0,普通,10828,CP（2）,cat,fja,是
+1984,ves_civilvestthin,高级软质避弹衣,1,非普通,10829,CP（2）,cat,ves,是
+15681,han_chameleon,变色龙战甲 护手,3,史诗,20654; 20656,GP（1）; CP（2）,cat,han,否
+15678,fja_chameleon,变色龙战甲 上衣,3,史诗,20651; 20656,GP（1）; CP（2）,cat,fja,否
+1987,heg_bandanathin,褐色花纹方巾,1,非普通,10832,GP（1）; CP（2）,cat,heg,是
+1988,heg_duckbillthin,潮男帆布鸭嘴帽,1,非普通,10833,GP（1）; CP（2）,cat,heg,是
+1989,ves_holsterthin,守护神手枪背带,0,普通,10834,CP（2）,cat,ves,是
+15865,fja_chameleon_02,变色龙战甲 上衣,3,史诗,21099; 21106,GP（1）; CP（2）,cat,fja,否
+1991,heg_headbandthin,爱国者头带,1,非普通,10836,CP（2）,cat,heg,是
+16130,fja_chameleonfe,变色龙战甲 上衣,3,史诗,22016; 22747,GP（1）; CP（2）,cat,fja,否
+16276,fja_chameleonfe02,变色龙战甲 上衣,3,史诗,22559; 22748,GP（1）; CP（2）,cat,fja,否
+1994,fpa_cowjeans,神枪手牛仔裤,1,非普通,11310,GP（1）; CP（2）,cat,fpa,是
+1995,han_cowleather,马术皮手套,1,非普通,11311,CP（2）,cat,han,是
+15869,han_chameleon_02,变色龙战甲 手套,3,史诗,21105; 21106,GP（1）; CP（2）,cat,han,否
+15680,heg_chameleon,变色龙战甲 头盔,3,史诗,20653; 20656,GP（1）; CP（2）,cat,heg,否
+15868,heg_chameleon_02,变色龙战甲 头盔,3,史诗,21102; 21106,GP（1）; CP（2）,cat,heg,否
+16174,heg_chameleonfe,变色龙战甲 头盔,3,史诗,22030; 22747,GP（1）; CP（2）,cat,heg,否
+16278,heg_chameleonfe02,变色龙战甲 头盔,3,史诗,22745; 22748,GP（1）; CP（2）,cat,heg,否
+15679,fpa_chameleon,变色龙战甲 下装,3,史诗,20652; 20656,GP（1）; CP（2）,cat,fpa,否
+15866,fpa_chameleon_02,变色龙战甲 下装,3,史诗,21100; 21106,GP（1）; CP（2）,cat,fpa,否
+16131,fpa_chameleonfe,变色龙战甲 下装,3,史诗,22026; 22747,GP（1）; CP（2）,cat,fpa,否
+16277,fpa_chameleonfe02,变色龙战甲 下装,3,史诗,22560; 22748,GP（1）; CP（2）,cat,fpa,否
+10343,ves_pomeranian,博美宠物背包,3,史诗,10474,GP（1）; CP（2）,cat,ves,是
+1985,heg_manicthin,捕食者面部盔甲,3,史诗,10830,GP（1）; CP（2）,cat,heg,是
+2087,heg_hardman,苍穹作战头盔,3,史诗,14810,GP（1）; CP（2）,cat,heg,是
+11381,ves_safetyholster,柴犬宠物背包,4,传奇,12278,GP（1）; CP（2）,cat,ves,否
+15683,heg_scubagirld,冲锋帽,3,史诗,20657,GP（1）; CP（2）,cat,heg,否
+11362,elp_tattoogirlc,宠物女孩纹身,2,稀有,11568,GP（1）; CP（2）,cat,elp,是
+16150,heg_wffighter_hata,船帽,2,稀有,22218,GP（1）; CP（2）,cat,heg,是
+2078,fja_athena,刺客斗篷,3,史诗,14212; 14530,GP（1）; CP（2）,cat,fja,是
+2013,eye_fbiheadgear,特工对讲机,0,普通,12411,GP（1）; CP（2）,cat,eye,否
+2014,fja_fbishirt,国际刑警衬衣,0,普通,12412,GP（1）; CP（2）,cat,fja,否
+2015,fpa_fbipants,战术西裤,0,普通,12413,GP（1）; CP（2）,cat,fpa,否
+2016,ves_fbispec,ADU警用防弹背心,0,普通,12414,GP（1）; CP（2）,cat,ves,否
+2017,fja_sasnavy,雷霆作战上衣,1,非普通,12415,GP（1）; CP（2）,cat,fja,是
+2082,ves_athena,刺客上衣,3,史诗,14216; 14530,GP（1）; CP（2）,cat,ves,是
+2080,han_athena,刺客手套,3,史诗,14214; 14530,GP（1）; CP（2）,cat,han,是
+2020,hea_barbara,此物品已被禁用,0,普通,12435,GP（1）; CP（2）,cat,hea,是
+2022,heg_barbara,此物品已被禁用,0,普通,12437,GP（1）; CP（2）,cat,heg,是
+2023,heg_barbarasm,美杜莎杀手彩妆,0,普通,12438,GP（1）; CP（2）,cat,heg,是
+2024,heg_barbarablue,杀手朋克发型,1,非普通,12439,GP（1）; CP（2）,cat,heg,是
+2025,fja_viper,蛇蝎紧身衣,0,普通,12440,GP（1）; CP（2）,cat,fja,是
+2026,fja_redsnake,魔蛇作战紧身衣,1,非普通,12441,GP（1）; CP（2）,cat,fja,是
+2081,heg_athena,刺客头巾,3,史诗,14215; 14530,GP（1）; CP（2）,cat,heg,是
+2028,fpa_viper,蛇蝎紧身皮裤,0,普通,12443,GP（1）; CP（2）,cat,fpa,是
+2029,fpa_redsnake,魔蛇紧身皮裤,1,非普通,12444,GP（1）; CP（2）,cat,fpa,是
+2032,han_rope,剑术软甲护手,0,普通,12447,GP（1）; CP（2）,cat,han,是
+12582,eye_faceclothc,丹鹤,3,史诗,22368,GP（1）; CP（2）,cat,eye,是
+2135,heg_capcash,单身贵族棒球帽,2,稀有,17044,GP（1）; CP（2）,cat,heg,是
+2037,eye_leather,潜伏者涂装,1,非普通,12452,GP（1）; CP（2）,cat,eye,是
+2137,ves_teddvbearcash,单身贵族泰迪背包,3,史诗,17046,GP（1）; CP（2）,cat,ves,是
+2039,eye_tape,剃刀杀手面具,1,非普通,12454,GP（1）; CP（2）,cat,eye,是
+2136,heg_tacticalshieldcash,单身贵族头盔,2,稀有,17045,GP（1）; CP（2）,cat,heg,是
+2041,ves_bulletbelt,恶魔之子双枪腰带,1,非普通,12456,GP（1）; CP（2）,cat,ves,是
+2043,ves_handgunbelt,杀手手枪腰带,0,普通,12458,GP（1）; CP（2）,cat,ves,是
+12942,heg_infiltrator_f_oneeye,单眼巨人头盔,2,稀有,14891,GP（1）; CP（2）,cat,heg,是
+2046,fja_mark,逆火作战外套,0,普通,12746,GP（1）; CP（2）,cat,fja,否
+11185,ves_monkey,捣蛋猴-棕色,2,稀有,19933,GP（1）; CP（2）,cat,ves,是
+2048,ves_motocycle,黑金刚动能软甲,0,普通,12748,GP（1）; CP（2）,cat,ves,否
+2049,hea_cowgirl,此物品已被禁用,0,普通,13054,GP（1）; CP（2）,cat,hea,否
+2050,heg_cowgirl,此物品已被禁用,0,普通,13055,GP（1）; CP（2）,cat,heg,否
+2051,fja_sleeves,坏女孩T恤,0,普通,13056,GP（1）; CP（2）,cat,fja,否
+17144,ves_monkeybackpack,咚咚锵背包,3,史诗,24116,GP（1）; CP（2）,cat,ves,否
+2053,fpa_pingoles,西部紧身牛仔裤,0,普通,13058,GP（1）; CP（2）,cat,fpa,否
+2090,heg_oneeye,独眼巨人全息头盔,2,稀有,14813,GP（1）; CP（2）,cat,heg,是
+28885,ves_mr19qqbackpack,鹅是普莱斯,3,史诗,39005,GP（1）; CP（2）,cat,ves,否
+2057,fja_leatherjacket,猎手牛仔上衣,1,非普通,13162,GP（1）; CP（2）,cat,fja,是
+2058,fja_denimjacket,白色休闲衬衫,1,非普通,13163,GP（1）; CP（2）,cat,fja,是
+2059,ves_machete,快枪手斜跨手枪带,0,普通,13164,GP（1）; CP（2）,cat,ves,是
+2060,ves_cowgirlholster,鬣狗双左轮腰带,0,普通,13165,GP（1）; CP（2）,cat,ves,是
+2061,heg_steta,经典牛仔白色毡帽,0,普通,13166,GP（1）; CP（2）,cat,heg,是
+2062,heg_stetb,PINK牛仔毡帽,1,非普通,13167,GP（1）; CP（2）,cat,heg,是
+2063,heg_stetc,骑士毡帽,1,非普通,13168,GP（1）; CP（2）,cat,heg,是
+2064,heg_stetd,魅惑牛仔毡帽,1,非普通,13169,GP（1）; CP（2）,cat,heg,是
+2065,heg_stete,镂空牛仔草帽,1,非普通,13170,GP（1）; CP（2）,cat,heg,是
+2066,fpa_chaps,斗牛士卡其色皮套裤,1,非普通,13237,GP（1）; CP（2）,cat,fpa,是
+2067,ves_cowgirlbelt,斗牛士腰带,0,普通,13900,GP（1）; CP（2）,cat,ves,否
+28703,fpa_elenaad,方舟精英战术裤,2,稀有,38752; 38869,GP（1）; CP（2）,cat,fpa,是
+26258,ves_hkpoliceadvance,防护背心,3,史诗,35525,GP（1）; CP（2）,cat,ves,是
+26253,fja_hkpoliceadvance,防护夹克,3,史诗,35523,GP（1）; CP（2）,cat,fja,是
+26174,eye_hkpolice,防护镜,3,史诗,35453,GP（1）; CP（2）,cat,eye,是
+26254,fpa_hkpoliceadvance,防护裤,3,史诗,35524,GP（1）; CP（2）,cat,fpa,是
+26260,han_hkpoliceadvance,防护手套,3,史诗,35527,GP（1）; CP（2）,cat,han,是
+11184,ves_bunny,粉红比奇兔,3,史诗,19932,GP（1）; CP（2）,cat,ves,是
+11366,elp_tattoogirlg,粉红世界纹身,2,稀有,11578,GP（1）; CP（2）,cat,elp,是
+19736,fja_police_advanced,复合纤维防弹衣,3,史诗,27083,GP（1）; CP（2）,cat,fja,是
+19747,han_police_advanced,复合纤维防割手套,3,史诗,28659,GP（1）; CP（2）,cat,han,是
+15357,heg_advanced_police,复合纤维头盔,3,史诗,19777,GP（1）; CP（2）,cat,heg,是
+15404,fpa_advanced_police,复合纤维长裤,3,史诗,19813,GP（1）; CP（2）,cat,fpa,是
+2012,heg_lighttechno,蝮蛇近卫头盔,2,稀有,12160,GP（1）; CP（2）,cat,heg,是
+2009,fja_lighttechno,蝮蛇铠甲,2,稀有,12157,GP（1）; CP（2）,cat,fja,是
+2083,heg_shredder,忍者面具-暗忍,0,普通,14806,GP（1）; CP（2）,cat,heg,是
+2084,heg_shreddera,忍者面具-刀锋,0,普通,14807,GP（1）; CP（2）,cat,heg,是
+2010,fpa_lighttechno,蝮蛇作战裤,2,稀有,12158,GP（1）; CP（2）,cat,fpa,是
+18122,heg_assassinhood,盖尔的兜帽,2,稀有,25818,GP（1）; CP（2）,cat,heg,是
+18123,heg_assassinhat,盖尔的头盔,2,稀有,25819,GP（1）; CP（2）,cat,heg,是
+2088,heg_monkey,狼蛛作战头盔,1,非普通,14811,GP（1）; CP（2）,cat,heg,是
+2089,heg_steam,猛犸象头盔,1,非普通,14812,GP（1）; CP（2）,cat,heg,是
+18124,ves_assassincloak,盖尔的耀目披风,2,稀有,25820,GP（1）; CP（2）,cat,ves,是
+2091,han_rub,护具手套-暗忍,0,普通,14814,GP（1）; CP（2）,cat,han,是
+2092,han_ruba,护具手套-刀锋,1,非普通,14815,GP（1）; CP（2）,cat,han,是
+363,eye_merc,高级防弹护目镜,2,稀有,1320,GP（1）,cat,eye,否
+26259,ves_hkpoliceadvance1,高级防护背心,3,史诗,35526,GP（1）; CP（2）,cat,ves,是
+25253,fpa_polaris_ad,高级机械裤装,3,史诗,34318; 34427,GP（1）; CP（2）,cat,fpa,是
+2096,fja_blkninja,忍者护甲-暗忍,0,普通,14819,GP（1）; CP（2）,cat,fja,是
+2097,fja_blkninjaa,忍者护甲-刀锋,1,非普通,14820,GP（1）; CP（2）,cat,fja,是
+25250,fja_polaris_ad,高级机械上装,3,史诗,34315; 34427,GP（1）; CP（2）,cat,fja,是
+25254,heg_polaris_ad,高级机械头盔,3,史诗,34319; 34427,GP（1）; CP（2）,cat,heg,是
+2100,fpa_blkninja,忍者护腿-暗忍,0,普通,14823,GP（1）; CP（2）,cat,fpa,是
+2101,fpa_blkninjaa,忍者护腿-刀锋,1,非普通,14824,GP（1）; CP（2）,cat,fpa,是
+26370,heg_hkpolicehelmet1,高级战术头盔,3,史诗,35553,GP（1）; CP（2）,cat,heg,是
+2103,fpa_ironmana,雷神腿甲-巨蟒,0,普通,14826,GP（1）; CP（2）,cat,fpa,是
+2104,ves_riot,强袭护盾,1,非普通,14827,GP（1）; CP（2）,cat,ves,是
+2106,hea_empty,此物品已被禁用,0,普通,14829,GP（1）; CP（2）,cat,hea,是
+2079,fpa_athena,个性小短裤,3,史诗,14213; 14530,GP（1）; CP（2）,cat,fpa,是
+1965,heg_miner,工兵安全帽,2,稀有,8803; 10821,CP（2）,cat,heg,否
+1980,fpa_overall,工人先锋裤,2,稀有,8870; 10821,GP（1）; CP（2）,cat,fpa,否
+1979,fja_jumper,工人先锋外套,2,稀有,8869; 10821,GP（1）; CP（2）,cat,fja,否
+2112,heg_hazmat,收割者重型头盔标准版,1,非普通,15371,GP（1）; CP（2）,cat,heg,是
+2113,heg_hazmaturb,收割者重型头盔URB迷彩,1,非普通,15372,GP（1）; CP（2）,cat,heg,是
+2114,heg_hazmatcamo,收割者重型头盔野战迷彩,1,非普通,15373,GP（1）; CP（2）,cat,heg,是
+2115,fja_hazmat,重型防化服-标准版,0,普通,15374,GP（1）; CP（2）,cat,fja,是
+2116,fja_hazmaturb,重型防化服-URB迷彩,1,非普通,15375,GP（1）; CP（2）,cat,fja,是
+2117,fja_hazmatcamo,重型防化服-野战迷彩,1,非普通,15376,GP（1）; CP（2）,cat,fja,是
+2118,ves_hazmat,守护神生化装置-橙色,0,普通,15377,GP（1）; CP（2）,cat,ves,是
+25435,ves_polaris_sword,光学单刃背包,3,史诗,34418; 34427,CP（2）,cat,ves,是
+22961,fja_hally,哈利夹克,3,史诗,31596; 31600,GP（1）; CP（2）,cat,fja,否
+2121,han_hazmat,增厚防化手套-标准版,0,普通,15380,GP（1）; CP（2）,cat,han,是
+2122,han_hazmaturb,增厚防化手套-URB迷彩,1,非普通,15381,GP（1）; CP（2）,cat,han,是
+2123,han_hazmatcamo,增厚防化手套-野战迷彩,1,非普通,15382,GP（1）; CP（2）,cat,han,是
+2124,fpa_hazmat,重型防化裤-标准版,0,普通,15383,GP（1）; CP（2）,cat,fpa,是
+2125,fpa_hazmaturb,重型防化裤-URB迷彩,1,非普通,15384,GP（1）; CP（2）,cat,fpa,是
+2126,fpa_hazmatcamo,重型防化裤-野战迷彩,1,非普通,15385,GP（1）; CP（2）,cat,fpa,是
+22962,han_hally,哈利手套,3,史诗,31597; 31600,GP（1）; CP（2）,cat,han,否
+22963,fpa_hally,哈利长裤,3,史诗,31598; 31600,GP（1）; CP（2）,cat,fpa,否
+10345,ves_wolfdog,黑背宠物背包,3,史诗,10477,GP（1）; CP（2）,cat,ves,否
+2131,heg_tube,轻质通信头盔,0,普通,16960,GP（1）; CP（2）,cat,heg,是
+2069,heg_cowgirlbrunette,黑发,2,稀有,14173,GP（1）; CP（2）,cat,heg,是
+25231,heg_polarisb,黑色马尾长辫,3,史诗,34295; 34427,GP（1）; CP（2）,cat,heg,是
+2134,hea_hazmat,此物品已被禁用,0,普通,17043,GP（1）; CP（2）,cat,hea,是
+2040,ves_katana,黑丸武士刀,2,稀有,12455,GP（1）; CP（2）,cat,ves,是
+1964,han_lion,红豆沙战术手套,2,稀有,8277,GP（1）; CP（2）,cat,han,是
+688,heg_masqueface,红脸面具,2,稀有,1603; 7024,GP（1）; CP（2）,cat,heg,是
+2138,heg_evea,帅气短发,1,非普通,17354,GP（1）; CP（2）,cat,heg,是
+2139,heg_auxiliary,智能意识感应头盔,1,非普通,17355,GP（1）; CP（2）,cat,heg,是
+1963,fja_lion,红色祥云夹克,3,史诗,8276,GP（1）; CP（2）,cat,fja,是
+2075,fja_skater,滑板夹克,2,稀有,14209; 14529,GP（1）; CP（2）,cat,fja,是
+2076,heg_skater,滑板帽,2,稀有,14210; 14529,GP（1）; CP（2）,cat,heg,是
+579,fpa_acuprestigea,灰色作战牛仔裤,2,稀有,1465; 7085,GP（1）; CP（2）,cat,fpa,是
+10574,ves_ghostlmgwht,毁灭者战术套装-白,2,稀有,18716,GP（1）; CP（2）,cat,ves,是
+2147,han_evetech,月神机械手臂-白,0,普通,17363,GP（1）; CP（2）,cat,han,是
+10575,ves_ghostlmgblue,毁灭者战术套装-灰,2,稀有,18718,GP（1）; CP（2）,cat,ves,是
+10576,ves_ghostlmggreen,毁灭者战术套装-绿,2,稀有,18720,GP（1）; CP（2）,cat,ves,是
+324,eye_meta,火狐半面罩,3,史诗,997,GP（1）; CP（2）,cat,eye,否
+25251,fja_polaris_cloak,机械斗篷,3,史诗,34316; 34427,GP（1）; CP（2）,cat,fja,是
+28147,han_cybergirlad2,机械金属朋克护手,2,稀有,37746; 37966,GP（1）; CP（2）,cat,han,是
+2155,fja_evetech,人造人生物躯体-白,0,普通,17371,GP（1）; CP（2）,cat,fja,是
+28144,fja_cybergirlad2,机械金属朋克夹克,2,稀有,37743; 37966,GP（1）; CP（2）,cat,fja,是
+816,heg_manveterana,极地防寒帽-白色,3,史诗,1740,GP（1）; CP（2）,cat,heg,否
+2159,fpa_evetech,人造人机械躯体-白,0,普通,17375,GP（1）; CP（2）,cat,fpa,是
+11363,elp_tattoogirld,极速黑猫纹身,2,稀有,11570,GP（1）; CP（2）,cat,elp,是
+719,eye_conceptyel,极限运动眼镜-琥珀黄,2,稀有,1637; 6694,GP（1）; CP（2）,cat,eye,否
+2163,fja_santashelper,圣诞节,0,普通,17962,GP（1）; CP（2）,cat,fja,是
+2164,fpa_santashelper,圣诞节,0,普通,17963,GP（1）; CP（2）,cat,fpa,是
+2165,han_santashelper,圣诞节,0,普通,17964,GP（1）; CP（2）,cat,han,是
+2166,heg_santashelper,圣诞节,0,普通,17965,GP（1）; CP（2）,cat,heg,是
+2168,heg_militarya,战场制式头盔,0,普通,18426,GP（1）; CP（2）,cat,heg,是
+2169,heg_militaryb,战场制式头盔-黄,1,非普通,18427,GP（1）; CP（2）,cat,heg,是
+11367,elp_tattoogirlh,急速狸猫纹身,2,稀有,11580,GP（1）; CP（2）,cat,elp,是
+24709,ves_cnknot,己亥限定编织包,2,稀有,33506,CP（2）,cat,ves,否
+2172,fja_soapa,非洲战场作战服,0,普通,18430,GP（1）; CP（2）,cat,fja,是
+2173,fja_soapb,非洲绿荫作战服,0,普通,18431,GP（1）; CP（2）,cat,fja,是
+2174,fja_militarya,极地雪原作战服,0,普通,18432,GP（1）; CP（2）,cat,fja,是
+2175,fja_militaryb,极地草原作战服,1,非普通,18433,GP（1）; CP（2）,cat,fja,是
+2176,ves_soapa,简易作战挂带-黄,0,普通,18434,GP（1）; CP（2）,cat,ves,是
+2177,ves_soapb,简易作战挂带-绿,0,普通,18435,GP（1）; CP（2）,cat,ves,是
+2178,ves_militarya,通用性作战挂带,0,普通,18436,GP（1）; CP（2）,cat,ves,是
+2179,ves_militaryb,野战作战挂带,1,非普通,18437,GP（1）; CP（2）,cat,ves,是
+2180,han_soapa,野外战术手套-黑,0,普通,18438,GP（1）; CP（2）,cat,han,是
+2181,han_soapb,野外战术手套-黄,0,普通,18439,GP（1）; CP（2）,cat,han,是
+2182,han_militarya,标准军用手套-灰,0,普通,18440,GP（1）; CP（2）,cat,han,是
+2183,han_militaryb,标准军用手套-黄,1,非普通,18441,GP（1）; CP（2）,cat,han,是
+2184,fpa_soapa,丛林作战裤,0,普通,18442,GP（1）; CP（2）,cat,fpa,是
+2185,fpa_soapb,沙漠作战裤,0,普通,18443,GP（1）; CP（2）,cat,fpa,是
+2186,fpa_militarya,极地雪原作战裤,0,普通,18444,GP（1）; CP（2）,cat,fpa,是
+2187,fpa_militaryb,极地草原作战裤,1,非普通,18445,GP（1）; CP（2）,cat,fpa,是
+2188,heg_phonegear,入耳式对讲机,0,普通,18449,GP（1）; CP（2）,cat,heg,是
+2068,heg_cowgirlblonde,金发,2,稀有,14172,GP（1）; CP（2）,cat,heg,是
+10262,han_bountyhunter,金扣猫爪,3,史诗,10417,GP（1）; CP（2）,cat,han,是
+2161,ves_teddybeargold,金色单身贵族泰迪背包,2,稀有,17750,GP（1）; CP（2）,cat,ves,是
+10216,eye_roundsunglasses,复古护目镜,1,非普通,10327,GP（1）; CP（2）,cat,eye,是
+10264,fpa_bountyhunter,金色紧身机车手裤装,3,史诗,10419,GP（1）; CP（2）,cat,fpa,是
+10261,heg_bountyhunter,金色猫耳,3,史诗,10416,GP（1）; CP（2）,cat,heg,是
+28143,fja_cybergirlad1,金属朋克夹克,2,稀有,37742,GP（1）; CP（2）,cat,fja,是
+2044,fpa_leather,紧身皮裤,3,史诗,12459,GP（1）; CP（2）,cat,fpa,是
+416,elp_liyu,锦鲤,2,稀有,267,GP（1）; CP（2）,cat,elp,否
+16154,fja_wffighter_jacket,经典短款皮衣,2,稀有,22242,GP（1）; CP（2）,cat,fja,是
+16172,eye_wffighter_goggles,经典防风镜,2,稀有,22555,GP（1）; CP（2）,cat,eye,是
+674,eye_cowprestigea,经典机车眼镜,2,稀有,1579,GP（1）; CP（2）,cat,eye,否
+10364,eye_guardwhite,通灵眼,0,普通,10504,GP（1）; CP（2）,cat,eye,是
+10365,eye_guardblack,恶灵眼,0,普通,10510,GP（1）; CP（2）,cat,eye,是
+10379,ves_whitesword,审判之双刃,0,普通,10594,GP（1）; CP（2）,cat,ves,是
+10425,ves_zombiehunter,Apocalyptic Backpack,0,普通,10628,GP（1）; CP（2）,cat,ves,是
+1996,heg_cowstetsona,警探牛仔帽,2,稀有,11312,CP（2）,cat,heg,是
+10449,han_zombiehunter,Zombie Hunter Gloves,0,普通,10637,GP（1）; CP（2）,cat,han,是
+2055,fja_watteau,玖红玫瑰短袖衬衫,2,稀有,13060,GP（1）; CP（2）,cat,fja,是
+10451,heg_pilothat,Pilot Headgear,0,普通,10639,GP（1）; CP（2）,cat,heg,是
+2095,han_giant,巨力手套,3,史诗,14818,GP（1）; CP（2）,cat,han,是
+10497,heg_guanyuancient,头冠-绿,0,普通,11195,GP（1）; CP（2）,cat,heg,是
+10498,han_guanyuancient,麒麟手套-黑,0,普通,11197,GP（1）; CP（2）,cat,han,是
+11498,fpa_stockingb,绝对领域-短袜,2,稀有,20433,GP（1）; CP（2）,cat,fpa,是
+16159,fpa_wffighter_officer,军官制服 裤子,2,稀有,22255; 22265,GP（1）; CP（2）,cat,fpa,是
+16155,fja_wffighter_officer,军官制服 上衣,2,稀有,22243; 22255,GP（1）; CP（2）,cat,fja,否
+16153,heg_wffighter_hairc,军官制服 头部装备,2,稀有,22221; 22255,GP（1）; CP（2）,cat,heg,否
+27245,eye_mr18zhloot,卡俄斯之瞳,4,传奇,36667,GP（1）; CP（2）,cat,eye,否
+18219,heg_assassinhoodfe,凯特妮丝的兜帽,2,稀有,25976,GP（1）; CP（2）,cat,heg,是
+18220,ves_assassincloakfe,凯特妮丝的耀目披风,2,稀有,25977,GP（1）; CP（2）,cat,ves,是
+10522,han_armshield,棕色手套,0,普通,10652,GP（1）; CP（2）,cat,han,是
+10524,eye_ghostwht,战术镭射眼镜-红色,0,普通,18680,GP（1）; CP（2）,cat,eye,是
+2074,fpa_skater,宽口短裤,2,稀有,14208; 14529,GP（1）; CP（2）,cat,fpa,是
+10535,fpa_rubberguard,游骑兵战斗裤装,0,普通,10661,GP（1）; CP（2）,cat,fpa,是
+2129,heg_werewolf,狼人面具,2,稀有,15562,GP（1）; CP（2）,cat,heg,否
+10552,elp_zombieranger,游骑兵铁丝护腕,1,非普通,10665,GP（1）; CP（2）,cat,elp,是
+2047,heg_gsg9,狼蛛夜间作战头盔,2,稀有,12747,GP（1）; CP（2）,cat,heg,是
+10558,eye_ghostgreen,战术镭射眼镜-黄色,1,非普通,18684,GP（1）; CP（2）,cat,eye,是
+10559,fja_ghostjacketwht,战术冲锋衣-珠白,0,普通,18686,GP（1）; CP（2）,cat,fja,是
+10560,fja_ghostjacketblue,战术冲锋衣-普蓝,1,非普通,18688,GP（1）; CP（2）,cat,fja,是
+10561,fja_ghostjacketgreen,战术冲锋衣-墨绿,1,非普通,18690,GP（1）; CP（2）,cat,fja,是
+10562,fpa_ghostpantswht,战术冲锋裤-迷彩,0,普通,18692,GP（1）; CP（2）,cat,fpa,是
+10563,fpa_ghostpantsblue,战术冲锋裤-普蓝,1,非普通,18694,GP（1）; CP（2）,cat,fpa,是
+10564,fpa_ghostpantsgreen,战术冲锋裤-墨绿,1,非普通,18696,GP（1）; CP（2）,cat,fpa,是
+10565,han_ghosttacticalwht,战术防刺手套-珠白,0,普通,18698,GP（1）; CP（2）,cat,han,是
+10566,han_ghosttacticalblue,战术防刺手套-普蓝,1,非普通,18700,GP（1）; CP（2）,cat,han,是
+10567,han_ghosttacticalgreen,战术防刺手套-墨绿,1,非普通,18702,GP（1）; CP（2）,cat,han,是
+10568,ves_ghostassaultwht,突袭者战术套装-白,1,非普通,18704,GP（1）; CP（2）,cat,ves,是
+10569,ves_ghostassaultblue,突袭者战术套装-灰,1,非普通,18706,GP（1）; CP（2）,cat,ves,是
+10570,ves_ghostassaultgreen,突袭者战术套装-绿,1,非普通,18708,GP（1）; CP（2）,cat,ves,是
+10571,ves_ghostcleanwht,战术防弹衣-蛟,0,普通,18710,GP（1）; CP（2）,cat,ves,是
+10572,ves_ghostcleanblue,战术防弹衣-炫,1,非普通,18712,GP（1）; CP（2）,cat,ves,是
+10573,ves_ghostcleangreen,战术防弹衣-玄,1,非普通,18714,GP（1）; CP（2）,cat,ves,是
+2094,han_ironmana,雷神利爪-巨蟒,2,稀有,14817,GP（1）; CP（2）,cat,han,是
+2093,han_ironman,雷神利爪-闪电,2,稀有,14816,GP（1）; CP（2）,cat,han,是
+2086,heg_ironmana,雷神头盔-巨蟒,2,稀有,14809,GP（1）; CP（2）,cat,heg,是
+10581,eye_ghostmasque,幽灵战术面具,0,普通,18730,GP（1）; CP（2）,cat,eye,是
+2085,heg_ironman,雷神头盔-闪电,2,稀有,14808,GP（1）; CP（2）,cat,heg,是
+10744,hea_guard,Lucien Head,0,普通,11592,GP（1）; CP（2）,cat,hea,是
+10746,fja_hoodie,剑士卫衣,0,普通,11594,GP（1）; CP（2）,cat,fja,是
+10747,fja_swardsman,圣灵战袍,0,普通,11595,GP（1）; CP（2）,cat,fja,是
+10748,fja_tough,天蚕轻型防弹衣,0,普通,11596,GP（1）; CP（2）,cat,fja,是
+10752,eye_monster,白泽面具,0,普通,11600,GP（1）; CP（2）,cat,eye,是
+10753,han_crawler,金刚鹰爪,0,普通,11601,GP（1）; CP（2）,cat,han,是
+10835,heg_ghostfacedebris,恐怖稻草人面罩,1,非普通,19249,GP（1）; CP（2）,cat,heg,是
+10836,heg_ghostfacestrip,骷髅面罩,1,非普通,19251,GP（1）; CP（2）,cat,heg,是
+2102,fpa_ironman,雷神腿甲-闪电,3,史诗,14825,GP（1）; CP（2）,cat,fpa,是
+2099,fja_ironmana,雷神战铠-巨蟒,3,史诗,14822,GP（1）; CP（2）,cat,fja,是
+10936,ves_zombieholster,死亡天使枪套,1,非普通,10713,GP（1）; CP（2）,cat,ves,是
+2098,fja_ironman,雷神战铠-闪电,2,稀有,14821,GP（1）; CP（2）,cat,fja,是
+11183,ves_backholster,天使之泪,1,非普通,19931,GP（1）; CP（2）,cat,ves,是
+2011,han_lighttechno,利爪作战手套,2,稀有,12159,GP（1）; CP（2）,cat,han,是
+20615,heg_zhuntlootbosshlmt,炼狱之颅,3,史诗,29492,GP（1）; CP（2）,cat,heg,否
+11186,ves_schoolbag,校园作战包-棕,1,非普通,19934,GP（1）; CP（2）,cat,ves,是
+11189,han_sweater,狙击手棉手套,1,非普通,19937,GP（1）; CP（2）,cat,han,是
+20616,ves_zhuntbossbkpk,炼狱之女,4,传奇,29493,CP（2）,cat,ves,否
+21073,ves_zhunterbossbpkm,炼狱之子,3,史诗,29909,CP（2）,cat,ves,否
+11561,fpa_sniperlaborday,猎鹰军裤,2,稀有,20512,GP（1）; CP（2）,cat,fpa,是
+11465,heg_nikolay,猎鹰面具,3,史诗,20367,GP（1）; CP（2）,cat,heg,是
+11578,han_sniperlaborday,猎鹰手套,2,稀有,20561,GP（1）; CP（2）,cat,han,是
+11579,heg_sniperlaborday,猎鹰幽灵面具,2,稀有,20562,GP（1）; CP（2）,cat,heg,是
+11536,fja_sniperlaborday,猎鹰战衣,2,稀有,20511,GP（1）; CP（2）,cat,fja,是
+22964,heg_hally,流放者游骑兵面具,3,史诗,31599,GP（1）; CP（2）,cat,heg,否
+10837,heg_ghostfacesnake,掠食者面罩,3,史诗,19253,GP（1）; CP（2）,cat,heg,是
+15773,heg_scubagirlb,马尾,3,史诗,20892,GP（1）; CP（2）,cat,heg,否
+2109,fja_mamba,曼巴蛇短披风,3,史诗,15355,GP（1）; CP（2）,cat,fja,是
+2111,ves_mamba,曼巴蛇快手冲锋衣,2,稀有,15357,GP（1）; CP（2）,cat,ves,是
+2110,fpa_mamba,曼巴蛇战术长裤,2,稀有,15356,GP（1）; CP（2）,cat,fpa,是
+28745,heg_manson,曼森装束,4,传奇,38821,GP（1）; CP（2）,cat,heg,否
+11360,elp_tattoogirla,冒险卡通纹身,2,稀有,11564,GP（1）; CP（2）,cat,elp,是
+2162,ves_teddybearrose,玫瑰金单身贵族泰迪背包,2,稀有,17751,GP（1）; CP（2）,cat,ves,是
+10507,fja_monkeyking,美猴王：孙悟空,3,史诗,18579; 18589,GP（1）; CP（2）,cat,fja,否
+10508,fpa_monkeyking,美猴王：孙悟空,3,史诗,18581; 18589,GP（1）; CP（2）,cat,fpa,否
+10509,han_monkeyking,美猴王：孙悟空,3,史诗,18583; 18589,GP（1）; CP（2）,cat,han,否
+10613,heg_mkinghead,美猴王面具,3,史诗,18797,CP（2）,cat,heg,否
+11377,heg_zombiehunterblk,黑色短发,1,非普通,12218,GP（1）; CP（2）,cat,heg,是
+11378,heg_zombiehunterblue,蓝色短发,1,非普通,12219,GP（1）; CP（2）,cat,heg,是
+11379,heg_zombiehunterred,红色短发,1,非普通,12220,GP（1）; CP（2）,cat,heg,是
+11380,fpa_tightjeansa,丧尸紧身裤装,1,非普通,12263,GP（1）; CP（2）,cat,fpa,是
+2191,heg_crown,美猴王羽冠,2,稀有,18796,CP（2）,cat,heg,否
+12974,heg_infiltrator_f_ironman_a,迷彩死神头盔,3,史诗,14923,GP（1）; CP（2）,cat,heg,是
+1870,heg_predatorm5,冥王特战头盔,2,稀有,6022,GP（1）; CP（2）,cat,heg,是
+14660,ves_wanderer,末日者背包,2,稀有,18346,GP（1）; CP（2）,cat,ves,是
+14661,heg_dystopic,末日者帽子,2,稀有,18347,GP（1）; CP（2）,cat,heg,是
+18481,heg_dystopic_mask,末日者面具,3,史诗,26403,GP（1）; CP（2）,cat,heg,是
+13767,fja_wanderer,末日者套装 夹克,3,史诗,16454; 16455,GP（1）; CP（2）,cat,fja,是
+13768,fpa_wanderer,末日者套装 裤子,3,史诗,16454; 16456,GP（1）; CP（2）,cat,fpa,是
+11641,han_combat,战术格斗手套-白,0,普通,13189,GP（1）; CP（2）,cat,han,是
+11647,ves_swordholster,审判之剑,0,普通,13190,GP（1）; CP（2）,cat,ves,是
+11767,fpa_dragonsoldierarmor,龙战士腿部护甲-青,0,普通,13381,GP（1）; CP（2）,cat,fpa,是
+11769,han_dragonsoldierarmor,龙战士手套-青,0,普通,13382,GP（1）; CP（2）,cat,han,是
+11770,heg_dragonsoldierarmor,龙战士头盔-青,0,普通,13383,GP（1）; CP（2）,cat,heg,是
+11772,ves_dragonsoldierarmor,龙战士胸甲-青,0,普通,13384,GP（1）; CP（2）,cat,ves,是
+11810,fpa_scientist,纳米荧光战斗裤装,0,普通,13439,GP（1）; CP（2）,cat,fpa,是
+11812,ves_scientist,纳米战斗上装,0,普通,13441,GP（1）; CP（2）,cat,ves,是
+11814,han_scientist,纳米荧光手套,0,普通,13443,GP（1）; CP（2）,cat,han,是
+13770,heg_wanderer,末日者套装 帽子,3,史诗,16454; 16458,GP（1）; CP（2）,cat,heg,是
+13769,han_wanderer,末日者套装 手套,3,史诗,16454; 16457,GP（1）; CP（2）,cat,han,是
+12581,eye_faceclothb,莫兰,2,稀有,22367,GP（1）; CP（2）,cat,eye,是
+25252,fja_polaris_jacket,墨蓝机能夹克,3,史诗,34317; 34427,GP（1）; CP（2）,cat,fja,是
+2128,heg_pumpkin,南瓜杰克面具,2,稀有,15561,GP（1）; CP（2）,cat,heg,否
+11832,eye_scientist_visor,纳米技术护目镜,0,普通,13468,GP（1）; CP（2）,cat,eye,是
+11833,fpa_scientist_boots,纳米荧光战斗裤装,0,普通,13469,GP（1）; CP（2）,cat,fpa,是
+11834,han_scientist_gloves,纳米荧光手套,0,普通,13470,GP（1）; CP（2）,cat,han,是
+11835,eye_scientist,纳米技术护目镜,0,普通,13471,GP（1）; CP（2）,cat,eye,是
+11836,fja_dragonsoldier_b,龙战士作战服,0,普通,13472,GP（1）; CP（2）,cat,fja,是
+11837,fpa_dragonsoldier_b,龙战士作战裤,0,普通,13473,GP（1）; CP（2）,cat,fpa,是
+11838,ves_dragonsoldierarmor_b,龙战士胸甲-蓝,0,普通,13474,GP（1）; CP（2）,cat,ves,是
+11839,han_dragonsoldierarmor_b,龙战士手套-蓝,0,普通,13475,GP（1）; CP（2）,cat,han,是
+11840,fpa_dragonsoldierarmor_b,龙战士腿部护甲-蓝,0,普通,13476,GP（1）; CP（2）,cat,fpa,是
+11841,heg_dragonsoldierarmor_b,龙战士头盔-蓝,0,普通,13477,GP（1）; CP（2）,cat,heg,是
+25436,fja_polaris_lemon,柠黄机能夹克,3,史诗,34419; 34427,CP（2）,cat,fja,是
+15484,heg_recluse,怒火头盔,3,史诗,20123,GP（1）; CP（2）,cat,heg,否
+2027,fja_sexyjacket,女妖战斗夹克,3,史诗,12442,GP（1）; CP（2）,cat,fja,是
+12574,han_guanyuheavy,青龙重装铠甲EXO手套,1,非普通,22360,GP（1）; CP（2）,cat,han,是
+2052,fpa_leggings,朋克个性牛仔裤,2,稀有,13057,GP（1）; CP（2）,cat,fpa,是
+10506,heg_monkeyking,齐天大圣面具,3,史诗,18577,CP（2）,cat,heg,否
+12577,fja_sailorb,美式学生装,1,非普通,22363,GP（1）; CP（2）,cat,fja,是
+12580,eye_faceclotha,金琥,1,非普通,22366,GP（1）; CP（2）,cat,eye,是
+10516,fpa_guanyuancient,麒麟白银腿甲,3,史诗,11203; 12221,GP（1）; CP（2）,cat,fpa,是
+10515,fja_guanyuancient,麒麟白银战铠,3,史诗,11201; 12221,GP（1）; CP（2）,cat,fja,是
+12589,fpa_kingpina,钢甲护膝一号,0,普通,14144,GP（1）; CP（2）,cat,fpa,是
+12593,fpa_kingpinb,战士护膝一号,0,普通,14145,GP（1）; CP（2）,cat,fpa,是
+12598,fpa_kingpinc,战士护膝二号,0,普通,14146,GP（1）; CP（2）,cat,fpa,是
+12602,fja_kingpinb,护面装甲,0,普通,14148,GP（1）; CP（2）,cat,fja,是
+12603,fja_kingpinc,护身战甲,0,普通,14149,GP（1）; CP（2）,cat,fja,是
+12607,han_kingpinb,战士铁拳一号,0,普通,14151,GP（1）; CP（2）,cat,han,是
+12608,han_kingpinc,战士铁拳二号,0,普通,14152,GP（1）; CP（2）,cat,han,是
+12831,heg_guanyuacient,美髯公发型,1,非普通,22355,GP（1）; CP（2）,cat,heg,是
+15772,fpa_scubagirl_b,潜水服套装 裤子,3,史诗,20891; 22709,GP（1）; CP（2）,cat,fpa,否
+12833,fja_guanyu,青龙轻装铠甲,1,非普通,22357,GP（1）; CP（2）,cat,fja,是
+15771,fja_scubagirl_b,潜水服套装 上衣,3,史诗,20890; 22709,GP（1）; CP（2）,cat,fja,否
+16275,heg_scubagirlc,潜水呼吸管,3,史诗,22744,GP（1）; CP（2）,cat,heg,否
+12928,fja_spysuit,独狼西装,0,普通,14877,GP（1）; CP（2）,cat,fja,否
+12929,fpa_spysuit,独狼西裤,0,普通,14878,GP（1）; CP（2）,cat,fpa,否
+12930,han_spyglove,独狼皮手套,0,普通,14879,GP（1）; CP（2）,cat,han,是
+12931,eye_spysunglasses,独狼护目镜,0,普通,14880,GP（1）; CP（2）,cat,eye,是
+16255,heg_scubagirla,潜水呼吸器,3,史诗,22708,GP（1）; CP（2）,cat,heg,否
+1834,heg_nvg,潜行者头盔,2,稀有,5750,GP（1）; CP（2）,cat,heg,是
+1993,fja_cowfurcoat,枪神翻毛夹克,2,稀有,11309,CP（2）,cat,fja,是
+24708,heg_oldjonny,强尼装束,4,传奇,33505,CP（2）,cat,heg,否
+2132,heg_invadera,侵略者防毒面具,2,稀有,16961,GP（1）; CP（2）,cat,heg,是
+12573,han_guanyu,青龙铠甲EXO手套,3,史诗,22359,GP（1）; CP（2）,cat,han,是
+10163,heg_guanyulightfur,青龙铠甲轻装头盔套装,3,史诗,10091,GP（1）; CP（2）,cat,heg,是
+12575,fpa_guanyu,青龙轻装铠甲裤装,3,史诗,22361,GP（1）; CP（2）,cat,fpa,是
+12834,heg_guanyulight,青龙轻装铠甲头盔,3,史诗,11238,GP（1）; CP（2）,cat,heg,是
+12572,fja_guanyuheavy,青龙重装铠甲,3,史诗,22358,GP（1）; CP（2）,cat,fja,是
+12576,fpa_guanyuheavy,青龙重装铠甲裤装,3,史诗,22362,GP（1）; CP（2）,cat,fpa,是
+12832,heg_guanyuhelmet,青龙重装铠甲头盔,3,史诗,22356,GP（1）; CP（2）,cat,heg,是
+10164,heg_guanyuhelmetfur,青龙重装铠甲头盔套装,3,史诗,10092,GP（1）; CP（2）,cat,heg,是
+1986,heg_gasmaskthin,全息防毒面具,2,稀有,10831,GP（1）; CP（2）,cat,heg,是
+2054,fpa_hotpants,热辣超短牛仔裤,3,史诗,13059,GP（1）; CP（2）,cat,fpa,是
+2158,fpa_eveguard,人造人机械躯体-金,2,稀有,17374,GP（1）; CP（2）,cat,fpa,是
+2157,fpa_evegrunt,人造人机械躯体-绿,3,史诗,17373,GP（1）; CP（2）,cat,fpa,是
+2154,fja_eveguard,人造人生物躯体-金,2,稀有,17370,GP（1）; CP（2）,cat,fja,是
+2153,fja_evegrunt,人造人生物躯体-绿,3,史诗,17369,GP（1）; CP（2）,cat,fja,是
+12991,fja_spyadvanced,独狼战斗服,0,普通,14941,GP（1）; CP（2）,cat,fja,否
+12992,fpa_spyadvanced,独狼休闲裤,0,普通,14942,GP（1）; CP（2）,cat,fpa,否
+12993,han_spyadvanced,独狼手套,0,普通,14943,GP（1）; CP（2）,cat,han,是
+12994,heg_spyheadgear,特工头套,0,普通,14944,GP（1）; CP（2）,cat,heg,是
+11364,elp_tattoogirle,锐戈比女郎纹身,2,稀有,11572,GP（1）; CP（2）,cat,elp,是
+2130,heg_triclops,三眼巨人面具,2,稀有,15563,GP（1）; CP（2）,cat,heg,否
+156,heg_tactical,伞兵头盔,2,稀有,144,GP（1）,cat,heg,是
+13010,fja_spyveterana,独狼战甲,0,普通,14959,GP（1）; CP（2）,cat,fja,否
+13022,heg_technohat,韩寒赛博格头盔,0,普通,12185,GP（1）; CP（2）,cat,heg,否
+11352,fja_tighttshirtd,丧尸横切背心,2,稀有,10515,GP（1）; CP（2）,cat,fja,是
+11354,fja_tighttshirtf,丧尸红头背心,2,稀有,11554,GP（1）; CP（2）,cat,fja,是
+10247,fja_tighttshirta,丧尸美食背心,2,稀有,10328,GP（1）; CP（2）,cat,fja,是
+13684,fja_cfjacket,咖啡色短皮衣,0,普通,16332,GP（1）; CP（2）,cat,fja,是
+13685,fpa_cfleather,浅色牛仔裤,0,普通,16333,GP（1）; CP（2）,cat,fpa,是
+10533,heg_zombieranger,丧尸面甲,3,史诗,10657,GP（1）; CP（2）,cat,heg,是
+11856,heg_zombiemask,丧尸面具,2,稀有,13507,GP（1）; CP（2）,cat,heg,否
+11350,fja_tighttshirtb,丧尸喵咪背心,2,稀有,10391,GP（1）; CP（2）,cat,fja,是
+11351,fja_tighttshirtc,丧尸情侣背心,2,稀有,10392,GP（1）; CP（2）,cat,fja,是
+11353,fja_tighttshirte,丧尸甜品背心,2,稀有,11098,GP（1）; CP（2）,cat,fja,是
+11355,fja_tighttshirtg,丧尸问号背心,2,稀有,11556,GP（1）; CP（2）,cat,fja,是
+13712,han_mtxcfglove,真皮手套-军绿色,0,普通,16375,GP（1）; CP（2）,cat,han,是
+11359,fja_tighttshirtj,丧尸植物背心,2,稀有,11562,GP（1）; CP（2）,cat,fja,是
+753,heg_afuhan,沙漠英雄头部装备,2,稀有,1671; 7026,GP（1）; CP（2）,cat,heg,是
+13717,han_basic,肉手,0,普通,16382; 22709,GP（1）; CP（2）,cat,han,否
+13718,heg_femalemask,轻便反恐面罩-灰色,0,普通,16383,GP（1）; CP（2）,cat,heg,是
+13722,ves_cqbbackpack,精巧型战术背包,0,普通,16469,GP（1）; CP（2）,cat,ves,是
+13723,ves_leebackpack,深色帆布背包,0,普通,16471,GP（1）; CP（2）,cat,ves,是
+13736,eye_spyfemalesunglasses,红框防护眼镜,0,普通,16403,GP（1）; CP（2）,cat,eye,是
+13737,heg_cffemale_longhair,褐色马尾辫,0,普通,16404,GP（1）; CP（2）,cat,heg,是
+13748,han_spyglovea,轻便射击手套-灰色,0,普通,16421,GP（1）; CP（2）,cat,han,是
+13765,han_spygloveb,自由搏击手套-浅色,0,普通,16452,GP（1）; CP（2）,cat,han,是
+13766,heg_femalespybun,盘发,0,普通,16453,GP（1）; CP（2）,cat,heg,是
+1968,fja_cfprestigea,山地冲锋外套,2,稀有,8851,CP（2）,cat,fja,是
+28701,heg_elenaad,神经链路战盔,2,稀有,38750; 38869,GP（1）; CP（2）,cat,heg,是
+417,elp_long,升龙,2,稀有,268,GP（1）; CP（2）,cat,elp,否
+12939,heg_infiltrator_f_steam,生化防护头盔,2,稀有,14888,GP（1）; CP（2）,cat,heg,是
+1959,elp_mouveterana,狮虎纹身,2,稀有,6595,GP（1）; CP（2）,cat,elp,是
+2107,ves_ninja,十字双刀,2,稀有,15350,GP（1）; CP（2）,cat,ves,是
+16149,heg_wffighter_hairb,时尚发带,2,稀有,22213,GP（1）; CP（2）,cat,heg,是
+25246,heg_hallychp2,拾荒者猎人面具,3,史诗,34310,GP（1）; CP（2）,cat,heg,否
+2120,ves_hazmatcamo,守护神生化装置-青色,2,稀有,15379,GP（1）; CP（2）,cat,ves,是
+2119,ves_hazmaturb,守护神生化装置-银色,2,稀有,15378,GP（1）; CP（2）,cat,ves,是
+14295,ves_swordcffemale,双刃青钢剑,2,稀有,17482,GP（1）; CP（2）,cat,ves,是
+11365,elp_tattoogirlf,水手服少女纹身,2,稀有,11574,GP（1）; CP（2）,cat,elp,是
+13715,fja_fulldress,丝质晚礼服套装,2,稀有,16380; 16386,GP（1）; CP（2）,cat,fja,否
+15309,fja_rampart_mtx,轻便作战衣,0,普通,19664,GP（1）; CP（2）,cat,fja,是
+15310,fpa_rampart_mtx,轻便作战裤,0,普通,19665,GP（1）; CP（2）,cat,fpa,是
+15311,heg_rampart_mtx,骷髅头巾,0,普通,19666,GP（1）; CP（2）,cat,heg,是
+15312,heg_rampart_gasmask,防毒面具,0,普通,19667,GP（1）; CP（2）,cat,heg,是
+15313,eye_steampunkfemale,防爆护目镜,0,普通,19668,GP（1）; CP（2）,cat,eye,是
+15314,eye_tape_female,防爆面具,0,普通,19669,GP（1）; CP（2）,cat,eye,是
+15315,fja_tank_dempseysexy,性感胸衣,0,普通,19670,GP（1）; CP（2）,cat,fja,是
+15316,fpa_tank_dempseysexy,过膝长靴,0,普通,19671,GP（1）; CP（2）,cat,fpa,是
+15324,eye_richtofenglasses,高科技护目镜,0,普通,19679,GP（1）; CP（2）,cat,eye,是
+15325,eye_richtofenmask,防风头巾,0,普通,19680,GP（1）; CP（2）,cat,eye,是
+15326,fja_richtofenmtx,红色衬衫,0,普通,19681,GP（1）; CP（2）,cat,fja,是
+15327,fpa_richtofenjeans,牛仔作战裤,0,普通,19688,GP（1）; CP（2）,cat,fpa,是
+15328,eye_musha_mtx,刀客面具,0,普通,19689,GP（1）; CP（2）,cat,eye,是
+15329,fja_musha_mtx,刀客风衣,0,普通,19690,GP（1）; CP（2）,cat,fja,是
+15330,fpa_musha_mtx,作战裤,0,普通,19691,GP（1）; CP（2）,cat,fpa,是
+15332,heg_musha_mtx,防风围巾,0,普通,19693,GP（1）; CP（2）,cat,heg,是
+15333,heg_musha_up,防风斗篷,0,普通,19522,GP（1）; CP（2）,cat,heg,是
+15355,hea_police,警察默认头部,0,普通,19775,GP（1）; CP（2）,cat,hea,是
+15356,heg_police,警察默认头部装备,0,普通,19776,GP（1）; CP（2）,cat,heg,是
+13716,fpa_fulldress,丝质晚礼服套装,2,稀有,16381; 16386,GP（1）; CP（2）,cat,fpa,否
+15358,fja_police,警察默认夹克,0,普通,19778,GP（1）; CP（2）,cat,fja,是
+15359,fpa_police,警察默认长裤,0,普通,19779,GP（1）; CP（2）,cat,fpa,是
+15360,han_police,警察默认手臂,0,普通,19780,GP（1）; CP（2）,cat,han,是
+13775,han_basicclean,丝质晚礼服套装,2,稀有,16386; 16467,GP（1）; CP（2）,cat,han,否
+12943,heg_infiltrator_f_a,死亡骷髅头盔,2,稀有,14892,GP（1）; CP（2）,cat,heg,是
+10445,ves_jeansbackpack,死亡天使战术背包,2,稀有,10634,GP（1）; CP（2）,cat,ves,是
+11020,ves_holsterset,死亡天使战术套装,3,史诗,10714,GP（1）; CP（2）,cat,ves,是
+2033,eye_deathbreathe,死亡之息,3,史诗,12448,GP（1）; CP（2）,cat,eye,是
+10450,heg_tankgirl,坦克女郎头盔,2,稀有,10638,GP（1）; CP（2）,cat,heg,是
+22500,heg_amerianhero,汤姆头套,3,史诗,30766,CP（2）,cat,heg,否
+2018,heg_sasberet,特种兵贝雷帽,2,稀有,12416,GP（1）; CP（2）,cat,heg,是
+15766,fja_scubagirl_a,潜水服套装 上衣,0,普通,20881,GP（1）; CP（2）,cat,fja,是
+15767,fpa_scubagirl_a,潜水服套装 裤子,0,普通,20884,GP（1）; CP（2）,cat,fpa,是
+2019,fpa_sasnavy,特种兵作战裤,2,稀有,12417,GP（1）; CP（2）,cat,fpa,是
+17449,ves_qqbackpackblue,腾讯视频VIP 背包,3,史诗,24659,GP（1）; CP（2）,cat,ves,否
+1960,fja_leathersuits,天龙战衣,2,稀有,7955,GP（1）; CP（2）,cat,fja,是
+26779,heg_mr18battlepass,通行证精英套装-头部,3,史诗,36121; 36812,GP（1）; CP（2）,cat,heg,否
+608,heg_greprestigea,突击兵作战帽,2,稀有,1494; 7030,GP（1）; CP（2）,cat,heg,是
+2038,eye_skeleton,亡灵铁面,2,稀有,12453,GP（1）; CP（2）,cat,eye,是
+26991,heg_mr18zhloot,乌拉尔战斗防护服 面具,3,史诗,36373; 36400,GP（1）; CP（2）,cat,heg,否
+26753,ves_mr18hardshell,乌瑞亚之甲,4,传奇,36073,GP（1）; CP（2）,cat,ves,否
+12945,fpa_infiltrator_f_a,无形青云甲裤装,2,稀有,14894,GP（1）; CP（2）,cat,fpa,是
+16092,fja_wffighter_vest,WWII Female Fighter Default Jacket,0,普通,21849,GP（1）; CP（2）,cat,fja,是
+16093,fpa_wffighter_denim,WWII Female Fighter Default Pants,0,普通,21856,GP（1）; CP（2）,cat,fpa,是
+12944,fja_infiltrator_f_a,无形青云甲上装,2,稀有,14893,GP（1）; CP（2）,cat,fja,是
+12946,han_infiltrator_f_a,无形青云手套,2,稀有,14895,GP（1）; CP（2）,cat,han,是
+16148,heg_wffighter_haira,WWII Female Fighter Default Headgear,0,普通,22205,GP（1）; CP（2）,cat,heg,是
+12949,fpa_infiltrator_f_ironman,无形玄铁甲裤装,2,稀有,14898,GP（1）; CP（2）,cat,fpa,是
+12948,fja_infiltrator_f_ironman,无形玄铁甲上装,2,稀有,14897,GP（1）; CP（2）,cat,fja,是
+12950,han_infiltrator_f_ironman,无形玄铁手套,2,稀有,14899,GP（1）; CP（2）,cat,han,是
+12975,fpa_infiltrator_f_ironman_a,无形野战甲裤装,3,史诗,14924,GP（1）; CP（2）,cat,fpa,是
+12973,fja_infiltrator_f_ironman_a,无形野战甲上装,3,史诗,14922,GP（1）; CP（2）,cat,fja,是
+12976,han_infiltrator_f_ironman_a,无形野战手套,3,史诗,14925,GP（1）; CP（2）,cat,han,是
+12980,han_infiltrator_f_giant,无形重装护臂,3,史诗,14929,GP（1）; CP（2）,cat,han,是
+415,elp_lianpu,武士脸谱,2,稀有,266; 6638,GP（1）; CP（2）,cat,elp,是
+16157,fpa_wffighter_mskirt,军官制服 短裙,0,普通,22245,GP（1）; CP（2）,cat,fpa,是
+1886,fpa_warrior,武士战斗裤,2,稀有,6061,CP（2）,cat,fpa,是
+1990,fpa_leethin,限量版牛仔裤,2,稀有,10835,CP（2）,cat,fpa,是
+19730,fja_joker,小丑套装-带帽夹克,3,史诗,28632; 28954,GP（1）; CP（2）,cat,fja,否
+19731,han_joker,小丑套装-手套,3,史诗,28633; 28954,GP（1）; CP（2）,cat,han,否
+12924,ves_husky,小马达背包,3,史诗,14873,GP（1）; CP（2）,cat,ves,否
+25248,fja_hallychp2,新款哈利夹克,3,史诗,34312; 34314,GP（1）; CP（2）,cat,fja,否
+25249,fpa_hallychp2,新款哈利裤子,3,史诗,34313; 34314,GP（1）; CP（2）,cat,fpa,否
+25247,han_hallychp2,新款哈利手套,3,史诗,34311; 34314,GP（1）; CP（2）,cat,han,否
+1952,heg_mouprestigea,眼镜蛇防风镜,2,稀有,6538,GP（1）; CP（2）,cat,heg,是
+15774,ves_rebreather_backpack,氧气背包,3,史诗,20893,GP（1）; CP（2）,cat,ves,否
+2077,ves_skater,摇滚T恤,2,稀有,14211; 14529,GP（1）; CP（2）,cat,ves,是
+11361,elp_tattoogirlb,摇滚玫瑰纹身,2,稀有,11566,GP（1）; CP（2）,cat,elp,是
+16651,fpa_blackwarrior,曜石战袍裤子,2,稀有,23371; 23389,GP（1）; CP（2）,cat,fpa,是
+16652,han_blackwarrior,Black Warrior Default Gloves,0,普通,23372,GP（1）; CP（2）,cat,han,是
+16668,ves_blackwarrior,曜石战袍披风,2,稀有,23388; 23389,GP（1）; CP（2）,cat,ves,是
+16650,fja_blackwarrior,曜石战袍上衣,2,稀有,23370; 23389,GP（1）; CP（2）,cat,fja,是
+16653,hea_blackwarrior,曜石战袍头盔,2,稀有,23373,GP（1）; CP（2）,cat,hea,否
+1885,heg_gladiator,野马战术头盔,3,史诗,6060; 10022,CP（2）,cat,heg,是
+16151,heg_wffighter_hatb,野战帽,2,稀有,22219,GP（1）; CP（2）,cat,heg,是
+29058,ves_mr19iwreskin,夜幕突袭套装 防弹衣,2,稀有,39333; 39339,GP（1）; CP（2）,cat,ves,否
+29062,fpa_mr19iwreskin,夜幕突袭套装 裤子,2,稀有,39337; 39339,GP（1）; CP（2）,cat,fpa,否
+29059,fja_mr19iwreskin,夜幕突袭套装 上衣,2,稀有,39334; 39339,GP（1）; CP（2）,cat,fja,否
+29057,han_mr19iwreskin,夜幕突袭套装 手,2,稀有,39332; 39339,GP（1）; CP（2）,cat,han,否
+29063,hea_mr19iwreskin,夜幕突袭套装 头,2,稀有,39338; 39339,GP（1）; CP（2）,cat,hea,否
+29060,heg_mr19iwreskin,夜幕突袭套装 头盔,2,稀有,39335; 39339,GP（1）; CP（2）,cat,heg,否
+29061,boo_mr19iwreskin,夜幕突袭套装 鞋子,2,稀有,39336; 39339,GP（1）; CP（2）,cat,boo,否
+29480,fpa_mr19iwreskin2,夜幕突袭套装2 裤子,2,稀有,40106; 40108,GP（1）; CP（2）,cat,fpa,否
+29479,fja_mr19iwreskin2,夜幕突袭套装2 上衣,2,稀有,40105; 40108,GP（1）; CP（2）,cat,fja,否
+29481,han_mr19iwreskin2,夜幕突袭套装2 手,2,稀有,40107; 40108,GP（1）; CP（2）,cat,han,否
+29478,heg_mr19iwreskin2,夜幕突袭套装2 头,2,稀有,40104; 40108,GP（1）; CP（2）,cat,heg,否
+28148,eye_cybergirlad,夜视镜,3,史诗,37747,GP（1）; CP（2）,cat,eye,是
+11824,fpa_ninjaciv,夜行侠套装 裤子,3,史诗,13452; 13461,GP（1）; CP（2）,cat,fpa,是
+11821,heg_ninjaciv,夜行侠套装 帽子,3,史诗,13450; 13460; 13461,GP（1）; CP（2）,cat,heg,是
+16945,han_chameleonfe,变色龙战甲 护手,0,普通,15348; 22747,GP（1）; CP（2）,cat,han,是
+16946,han_chameleonfe_02,变色龙战甲 护手,0,普通,18226; 22748,GP（1）; CP（2）,cat,han,是
+11823,fja_ninjaciv,夜行侠套装 上衣,3,史诗,13451; 13461,GP（1）; CP（2）,cat,fja,是
+17196,hea_shredder,Default head of INFILTRATOR,0,普通,24011,CP（2）,cat,hea,否
+17197,hea_shredderfe,Default head of INFILTRATOR Female,0,普通,24214,CP（2）,cat,hea,否
+17198,heg_blackwarrior,曜石战袍头盔,0,普通,23389; 24215,GP（1）; CP（2）,cat,heg,是
+17444,heg_wmfighter,Headgrear for cha_wmfighter,0,普通,24654,GP（1）; CP（2）,cat,heg,否
+17445,fja_wmfighter,Jacket for cha_wmfighter,0,普通,24655,GP（1）; CP（2）,cat,fja,否
+17446,hea_wmfighter,Head for cha_wmfighter,0,普通,24656,GP（1）; CP（2）,cat,hea,否
+17447,fpa_wmfighter,Pants for cha_wmfighter,0,普通,24657,GP（1）; CP（2）,cat,fpa,否
+17448,heg_wmfighter_solider,战争经典头盔,1,非普通,24658,GP（1）; CP（2）,cat,heg,否
+11825,han_ninjaciv,夜行侠套装 手套,3,史诗,13453; 13461,GP（1）; CP（2）,cat,han,是
+17830,heg_solidershield,铁面头盔,1,非普通,25365,GP（1）; CP（2）,cat,heg,否
+17920,fja_assassin,盖尔默认上衣,0,普通,25490,GP（1）; CP（2）,cat,fja,否
+17921,fpa_assassin,盖尔默认长裤,0,普通,25491,GP（1）; CP（2）,cat,fpa,否
+17922,han_assassin,盖尔默认手套,0,普通,25492,GP（1）; CP（2）,cat,han,否
+17923,heg_assassin,盖尔默认发型,0,普通,25493,GP（1）; CP（2）,cat,heg,否
+17924,ves_assassin,盖尔默认背甲,0,普通,25494,GP（1）; CP（2）,cat,ves,否
+12947,heg_infiltrator_f_ironman,银面死神头盔,2,稀有,14896,GP（1）; CP（2）,cat,heg,是
+17926,hea_assassin,盖尔帅气的脸庞,0,普通,25496,GP（1）; CP（2）,cat,hea,否
+17927,heg_assassinmask,DMZ Assassin Mask,0,普通,25497,GP（1）; CP（2）,cat,heg,否
+17928,heg_soliderhelmet,战争经典头盔-褐色,1,非普通,25498,GP（1）; CP（2）,cat,heg,是
+17933,hea_assassinfe,凯特妮丝美丽的脸庞,0,普通,25503,GP（1）; CP（2）,cat,hea,否
+17934,heg_assassinfe,凯特妮丝默认发型,0,普通,25504,GP（1）; CP（2）,cat,heg,否
+17935,fja_assassinfe,凯特妮丝默认上装,0,普通,25505,GP（1）; CP（2）,cat,fja,否
+17936,fpa_assassinfe,凯特妮丝默认长裤,0,普通,25506,GP（1）; CP（2）,cat,fpa,否
+17937,han_assassinfe,凯特妮丝默认手套,0,普通,25507,GP（1）; CP（2）,cat,han,否
+10263,fja_bountyhunter,银色紧身机车手上装,3,史诗,10418,GP（1）; CP（2）,cat,fja,是
+18460,eye_crownlevel3,勇者铂金头饰,2,稀有,26385,GP（1）; CP（2）,cat,eye,否
+19471,eye_crownbcl3,勇者联赛S1-竞逐者头饰,2,稀有,28182,CP（2）,cat,eye,否
+19472,eye_crownbcl4,勇者联赛S1-挑战者头饰,2,稀有,28183,CP（2）,cat,eye,否
+19473,eye_crownbcl5,勇者联赛S1-王冠,3,史诗,28184,CP（2）,cat,eye,否
+21061,eye_crownplt3,勇者联赛S2-竞逐者头饰,2,稀有,29897,CP（2）,cat,eye,否
+21062,eye_crownplt4,勇者联赛S2-挑战者头饰,2,稀有,29898,CP（2）,cat,eye,否
+21063,eye_crownplt5,勇者联赛S2-王冠,3,史诗,29899,CP（2）,cat,eye,否
+18319,han_battlecity,勇者手套（男性）,2,稀有,26134; 26135,GP（1）; CP（2）,cat,han,是
+22639,han_battlecitys2,勇者手套（男性）- 勇者联赛S2,2,稀有,31022,CP（2）,cat,han,否
+18218,ves_assassinfe,凯特妮丝的默认背甲,0,普通,25975,GP（1）; CP（2）,cat,ves,否
+18449,han_battlecityfe,勇者手套（女性）,2,稀有,26374,GP（1）; CP（2）,cat,han,否
+18462,eye_crownlevel5,勇者王冠,3,史诗,26387,GP（1）; CP（2）,cat,eye,否
+18226,fja_clotjacket,CLOT夹克,0,普通,25983,GP（1）; CP（2）,cat,fja,否
+18317,fja_battlecity,勇者战衣（男性）,2,稀有,26132,GP（1）; CP（2）,cat,fja,否
+22636,fja_battlecitys2,勇者战衣（男性）- 勇者联赛S2,2,稀有,31018,CP（2）,cat,fja,否
+18447,fja_battlecityfe,勇者战衣（女性）,2,稀有,26372,GP（1）; CP（2）,cat,fja,否
+18318,fpa_battlecity,勇者长裤（男性）,2,稀有,26133; 26135,GP（1）; CP（2）,cat,fpa,是
+22638,fpa_battlecitys2,勇者长裤（男性）- 勇者联赛S2,2,稀有,31019,CP（2）,cat,fpa,否
+18448,fpa_battlecityfe,勇者长裤（女性）,2,稀有,26373,GP（1）; CP（2）,cat,fpa,否
+18458,eye_crownlevel1,勇者白银头饰,1,非普通,26383,GP（1）; CP（2）,cat,eye,否
+18459,eye_crownlevel2,勇者黄金头饰,1,非普通,26384,GP（1）; CP（2）,cat,eye,否
+18461,eye_crownlevel4,勇者钻石头饰,2,稀有,26386,GP（1）; CP（2）,cat,eye,否
+690,heg_masqueghost,幽灵面具,2,稀有,1605,GP（1）; CP（2）,cat,heg,是
+11463,heg_ghostmasque,幽灵战术面具,2,稀有,20365,GP（1）; CP（2）,cat,heg,是
+10551,eye_zombiegoggles,游骑兵护目镜,3,史诗,10662,GP（1）; CP（2）,cat,eye,是
+18779,han_qqvip,QQ会员手套,0,普通,26708,GP（1）; CP（2）,cat,han,否
+19098,hea_jpngirl,飞鸟默认头部,0,普通,27485,CP（2）,cat,hea,是
+19099,fja_jpngirl,飞鸟默认上衣,0,普通,27486,CP（2）,cat,fja,是
+19100,fpa_jpngirl,飞鸟默认下装,0,普通,27487,CP（2）,cat,fpa,是
+19101,han_jpngirl,绒手套,0,普通,27488,CP（2）,cat,han,否
+19102,ves_jpngirl,战术背包,0,普通,27489,CP（2）,cat,ves,否
+19103,heg_jpngirl,飞鸟默认帽子,0,普通,27490,CP（2）,cat,heg,是
+19104,han_wgsilver,战神战术手套-晋升者,1,非普通,27492,EPICHEROPOINT（9）,cat,han,否
+10459,fja_zombierangerlmg,游骑兵机枪战甲,2,稀有,10643,GP（1）; CP（2）,cat,fja,是
+10934,fja_zrraincoat,游骑兵全天候防风服,3,史诗,10710,GP（1）; CP（2）,cat,fja,是
+2006,fpa_snowwolf,游骑兵战术裤装,2,稀有,12142; 12418,GP（1）; CP（2）,cat,fpa,否
+2008,heg_snowwolf,游骑兵战术头盔,2,稀有,12144; 12418,GP（1）; CP（2）,cat,heg,否
+19314,heg_beret_jpngirl,贝雷帽,0,普通,27904,GP（1）; CP（2）,cat,heg,是
+19435,heg_jpnearphone,复古耳机,0,普通,28123,GP（1）; CP（2）,cat,heg,否
+19436,heg_jpnshorthair,短发,0,普通,28124,GP（1）; CP（2）,cat,heg,是
+19437,heg_jpnlonghair,长发,0,普通,28125,GP（1）; CP（2）,cat,heg,是
+19468,han_jpnadvanced,皮手套,0,普通,28177,GP（1）; CP（2）,cat,han,否
+19469,eye_crownbcl1,勇者联赛S1-优胜者头饰,1,非普通,28180,CP（2）,cat,eye,否
+19470,eye_crownbcl2,勇者联赛S1-晋升者头饰,1,非普通,28181,CP（2）,cat,eye,否
+2005,fja_snowwolf,游骑兵作战上衣,2,稀有,12141; 12418,GP（1）; CP（2）,cat,fja,否
+2007,han_snowwolf,游骑兵作战手套,2,稀有,12143; 12418,GP（1）; CP（2）,cat,han,否
+28741,fja_manson,远征战术上装,3,史诗,38817; 38822,GP（1）; CP（2）,cat,fja,否
+19474,fja_jpnadvanced,迷彩外套,0,普通,28185,GP（1）; CP（2）,cat,fja,是
+19475,fpa_jpnadvanced,迷彩裤子,0,普通,28186,GP（1）; CP（2）,cat,fpa,是
+19476,ves_jpnadvanced,防弹背心,0,普通,28187,GP（1）; CP（2）,cat,ves,否
+19677,heg_jpn_helmet,军绿色头盔,0,普通,28560,GP（1）; CP（2）,cat,heg,是
+28742,fpa_manson,远征战术下装,3,史诗,38818,GP（1）; CP（2）,cat,fpa,否
+2146,han_eveguard,月神机械手臂-金,2,稀有,17362,GP（1）; CP（2）,cat,han,是
+2145,han_evegrunt,月神机械手臂-绿,3,史诗,17361,GP（1）; CP（2）,cat,han,是
+11195,heg_aimyshort,月兔-学生发型,2,稀有,19943,GP（1）; CP（2）,cat,heg,是
+19915,heg_wargod_mask1,战神战术头盔-晋升者,1,非普通,28949,EPICHEROPOINT（9）,cat,heg,否
+26782,heg_mr18sportmask,运动面罩,4,传奇,36127,GP（1）; CP（2）,cat,heg,否
+738,eye_usarmyyel,战地护目镜-澄黄,2,稀有,1656; 6713,GP（1）; CP（2）,cat,eye,否
+341,heg_merc,战地鹰眼,2,稀有,1089,GP（1）; CP（2）,cat,heg,是
+16152,heg_wffighter_helmet,战斗钢盔,2,稀有,22220,GP（1）; CP（2）,cat,heg,是
+1997,fja_infsase,战斧作战套装-铁面,2,稀有,11313; 11914,GP（1）; CP（2）,cat,fja,否
+1998,fpa_infsase,战斧作战套装-铁面,2,稀有,11314; 11914,GP（1）; CP（2）,cat,fpa,否
+21059,eye_crownplt1,勇者联赛S2-优胜者头饰,1,非普通,29895,CP（2）,cat,eye,否
+21060,eye_crownplt2,勇者联赛S2-晋升者头饰,1,非普通,29896,CP（2）,cat,eye,否
+1999,heg_infconcept,战斧作战套装-铁面,2,稀有,11315; 11914,GP（1）; CP（2）,cat,heg,否
+2000,ves_infkaifula,战斧作战套装-铁面,2,稀有,11316; 11914,GP（1）; CP（2）,cat,ves,否
+1884,ves_armour,战国铠甲,2,稀有,6059,CP（2）,cat,ves,是
+27205,heg_mr18wargodhelmet4,战神S10-裁决者头盔,3,史诗,36641,EPICHEROPOINT（9）,cat,heg,否
+21933,han_lavaclaw,炼狱之拳,0,普通,30201,CP（2）,cat,han,否
+22476,han_lavaclaw_kingpin,炼狱之拳,0,普通,30741,CP（2）,cat,han,否
+22477,han_lavaclaw_l,炼狱之拳,0,普通,30742,CP（2）,cat,han,否
+22478,han_lavaclaw_xl,炼狱之拳,0,普通,30743,CP（2）,cat,han,否
+27203,heg_mr18wargodhelmet2,战神S10-竞逐者头盔,2,稀有,36639,HEROPOINT（8）; EPICHEROPOINT（9）,cat,heg,否
+27204,heg_mr18wargodhelmet3,战神S10-挑战者头盔,3,史诗,36640,EPICHEROPOINT（9）,cat,heg,否
+27214,heg_mr18wargodhelmet5,战神S10-战神头盔,4,传奇,36642,EPICHEROPOINT（9）,cat,heg,否
+28876,fja_s11wargod2,战神S11 上装 2,2,稀有,38991; 39001,GP（1）; CP（2）; HEROPOINT（8）; EPICHEROPOINT（9）,cat,fja,否
+28877,fja_s11wargod3,战神S11 上装 3,3,史诗,38992; 39002,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fja,否
+28878,fja_s11wargod4,战神S11 上装 4,4,传奇,38993; 39003,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fja,否
+28879,fja_s11wargod5,战神S11 上装 5,3,史诗,38994; 39004,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fja,否
+28869,hea_s11wargod5,战神S11头5,4,传奇,38984; 39004,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,hea,否
+29342,heg_s12wargod2,战神S12头2,2,稀有,39850; 39855,GP（1）; CP（2）; HEROPOINT（8）; EPICHEROPOINT（9）,cat,heg,是
+22966,ves_rampart,尼古拉默认背包,0,普通,31602,CP（2）,cat,ves,否
+22983,hea_price,普莱斯默认头部,0,普通,31622,GP（1）; CP（2）,cat,hea,是
+22984,fja_price,普莱斯默认上衣,0,普通,31623,GP（1）; CP（2）,cat,fja,是
+22985,fpa_price,普莱斯默认下装,0,普通,31624,GP（1）; CP（2）,cat,fpa,是
+22986,han_price,普莱斯默认手套,0,普通,31625,GP（1）; CP（2）,cat,han,是
+22987,heg_price,普莱斯默认圆帽,0,普通,31626,GP（1）; CP（2）,cat,heg,是
+22988,fja_priceadvanced,普莱斯行军夹克,1,非普通,31627; 31843,GP（1）; CP（2）,cat,fja,是
+22989,fpa_priceadvanced,普莱斯行军约束裤,1,非普通,31628; 31843,GP（1）; CP（2）,cat,fpa,是
+22990,heg_priceadvanced,普莱斯行军防毒面具,1,非普通,31629; 31843,GP（1）; CP（2）,cat,heg,是
+23379,fja_wargodjugg1,战神S7-晋升者战术上衣,1,非普通,32342; 32353,GP（1）; CP（2）; HEROPOINT（8）; EPICHEROPOINT（9）,cat,fja,否
+23380,fpa_wargodjugg1,战神S7-晋升者战术裤装,1,非普通,32343; 32353,GP（1）; CP（2）; HEROPOINT（8）; EPICHEROPOINT（9）,cat,fpa,否
+23381,han_wargodjugg1,战神S7-晋升者战术手套,1,非普通,32344; 32353,GP（1）; CP（2）; HEROPOINT（8）; EPICHEROPOINT（9）,cat,han,否
+29347,heg_s12wargod3,战神S12头3,3,史诗,39856; 39860,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,heg,是
+29351,heg_s12wargod4,战神S12头4,3,史诗,39861; 39865,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,heg,是
+29355,heg_s12wargod5,战神S12头5,4,传奇,39866; 39870,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,heg,是
+16924,fpa_esportsbundleb,战神S3-白银段位套装裤子,2,稀有,23766; 23768,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fpa,是
+16923,fja_esportsbundleb,战神S3-白银段位套装上衣,2,稀有,23765; 23768,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fja,是
+16925,han_esportsbundleb,战神S3-白银段位套装手套,2,稀有,23767; 23768,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,han,是
+13693,fpa_esportsbundle_wargod_b,战神S3-铂金段位套装裤子,3,史诗,16341; 16345,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fpa,是
+13691,fja_esportsbundle_wargod_b,战神S3-铂金段位套装上衣,3,史诗,16341; 16343,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fja,是
+24683,fja_polaris,佐伊默认上装,0,普通,33480,GP（1）; CP（2）,cat,fja,是
+24684,fpa_polaris,佐伊默认裤装,0,普通,33481,GP（1）; CP（2）,cat,fpa,是
+24685,han_polaris,佐伊默认手套,0,普通,33482,GP（1）; CP（2）,cat,han,是
+24686,hea_polaris,佐伊默认头部,0,普通,33483,GP（1）; CP（2）,cat,hea,是
+24687,heg_polaris,佐伊默认发型,0,普通,33484,GP（1）; CP（2）,cat,heg,是
+13695,han_esportsbundle_wargod_b,战神S3-铂金段位套装手套,3,史诗,16341; 16347,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,han,是
+16927,fpa_esportsbundlev,战神S3-黄金段位套装裤子,2,稀有,23770; 23772,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fpa,是
+16926,fja_esportsbundlev,战神S3-黄金段位套装上衣,2,稀有,23769; 23772,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fja,是
+16928,han_esportsbundlev,战神S3-黄金段位套装手套,2,稀有,23771; 23772,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,han,是
+16933,fpa_esportsbundlee,战神S3-战神段位套装裤子,4,传奇,23778; 23781,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fpa,是
+25240,heg_hannia_basic,战神S8-优胜者面罩,1,非普通,34302,HEROPOINT（8）; EPICHEROPOINT（9）,cat,heg,否
+25241,fja_hannia_basic,战神S8-晋升者作战夹克,1,非普通,34303,HEROPOINT（8）; EPICHEROPOINT（9）,cat,fja,否
+16932,fja_esportsbundlee,战神S3-战神段位套装上衣,4,传奇,23777; 23781,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fja,是
+16934,han_esportsbundlee,战神S3-战神段位套装手套,4,传奇,23779; 23781,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,han,是
+16935,heg_esportsbundlee,战神S3-战神段位套装头盔,4,传奇,23780; 23781,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,heg,是
+16930,fpa_esportsbundlep,战神S3-钻石段位套装裤子,3,史诗,23774; 23776,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fpa,是
+16929,fja_esportsbundlep,战神S3-钻石段位套装上衣,3,史诗,23773; 23776,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fja,是
+16931,han_esportsbundlep,战神S3-钻石段位套装手套,3,史诗,23775; 23776,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,han,是
+18119,ves_s4wargodsnow,战神S4-战术背包,3,史诗,25812,EPICHEROPOINT（9）,cat,ves,否
+18116,fpa_s4wargodsnow,战神S4-战术裤,3,史诗,25809,EPICHEROPOINT（9）,cat,fpa,否
+18118,heg_s4wargodsnow,战神S4-战术面罩,3,史诗,25811,EPICHEROPOINT（9）,cat,heg,否
+18117,han_s4wargodsnow,战神S4-战术手套,3,史诗,25810,EPICHEROPOINT（9）,cat,han,否
+18115,fja_s4wargodsnow,战神S4-作战卫衣,3,史诗,25808,EPICHEROPOINT（9）,cat,fja,否
+23386,heg_wargodjugg2,战神S7-裁决者战术头盔,3,史诗,32349,EPICHEROPOINT（9）,cat,heg,否
+23382,heg_wargodjugg1,战神S7-竞逐者战术头盔,2,稀有,32345,HEROPOINT（8）; EPICHEROPOINT（9）,cat,heg,否
+23384,fpa_wargodjugg2,战神S7-挑战者战术裤装,3,史诗,32347; 32354,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fpa,否
+23383,fja_wargodjugg2,战神S7-挑战者战术上衣,3,史诗,32346; 32354,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fja,否
+25858,hea_hkpolice,Madam default head,0,普通,34959,GP（1）; CP（2）,cat,hea,是
+25859,fja_hkpolice,Madam default jacket,0,普通,34981,GP（1）; CP（2）,cat,fja,是
+25860,fpa_hkpolice,Madam default pants,0,普通,34982,GP（1）; CP（2）,cat,fpa,是
+25861,heg_hkpolice,Madam default headgear,0,普通,34983,GP（1）; CP（2）,cat,heg,是
+25862,ves_hkpolice,Madam default vest,0,普通,34984,GP（1）; CP（2）,cat,ves,是
+25863,han_hkpolice,Madam default gloves,0,普通,34985,GP（1）; CP（2）,cat,han,是
+23385,han_wargodjugg2,战神S7-挑战者战术手套,3,史诗,32348; 32354,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,han,否
+23388,fpa_wargodjugg3,战神S7-战神重型裤装,4,传奇,32351; 32355,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fpa,否
+23387,fja_wargodjugg3,战神S7-战神重型上衣,4,传奇,32350; 32355,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fja,否
+26177,eye_mr17wargod,战神S9-雪枭套装头盔,0,普通,35456,GP（1）; CP（2）,cat,eye,是
+26178,han_mr17wargod,战神S9-雪枭手套,1,非普通,35457,HEROPOINT（8）; EPICHEROPOINT（9）,cat,han,否
+23390,han_wargodjugg3,战神S7-战神重型手套,4,传奇,32352; 32355,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,han,否
+25243,heg_hannia_prestige,战神S8-裁决者战盔,3,史诗,34305,EPICHEROPOINT（9）,cat,heg,否
+26181,fpa_mr17wargod,战神S9-轻型雪枭套装下装,0,普通,35460; 35534,GP（1）; CP（2）; HEROPOINT（8）; EPICHEROPOINT（9）,cat,fpa,是
+25242,fpa_hannia_basic,战神S8-竞逐者作战长裤,2,稀有,34304,HEROPOINT（8）; EPICHEROPOINT（9）,cat,fpa,否
+25244,fja_hannia_prestige,战神S8-挑战者作战夹克,3,史诗,34306,EPICHEROPOINT（9）,cat,fja,否
+25245,fja_hannia_elite,战神S8-战神作战夹克,4,传奇,34307,EPICHEROPOINT（9）,cat,fja,否
+26179,fja_mr17wargod,战神S9-轻型雪枭套装上衣,2,稀有,35458; 35534,GP（1）; CP（2）; HEROPOINT（8）; EPICHEROPOINT（9）,cat,fja,是
+26176,heg_mr17wargod,战神S9-雪枭绒帽,3,史诗,35455,EPICHEROPOINT（9）,cat,heg,否
+26290,fpa_mr17wargod1,战神S9-雪枭套装下装,0,普通,35535; 35537,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fpa,是
+26310,fja_mr17wargod1,战神S9-雪枭套装上衣,0,普通,35536; 35537,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fja,是
+26180,ves_mr17wargod,战神S9-雪枭套装背心,3,史诗,35459; 35537,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,ves,是
+26311,heg_mr17wargod1,战神S9-雪枭作战头盔,4,传奇,35538,EPICHEROPOINT（9）,cat,heg,否
+12996,fpa_esportsbundle,战神崇拜者套装裤子,3,史诗,14946; 14948,GP（1）; CP（2）,cat,fpa,否
+12995,fja_esportsbundle,战神崇拜者套装上衣,3,史诗,14945; 14948,GP（1）; CP（2）,cat,fja,否
+12997,han_esportsbundle,战神崇拜者套装手套,3,史诗,14947; 14948,GP（1）; CP（2）,cat,han,否
+13039,fpa_esportsbundle_b,战神第二赛季专属套装裤子,3,史诗,12466; 12467,GP（1）; CP（2）,cat,fpa,否
+13041,fja_esportsbundle_b,战神第二赛季专属套装上衣,3,史诗,12466; 12469,GP（1）; CP（2）,cat,fja,否
+27008,fja_mr18zhloot,乌拉尔战斗防护服 上装,0,普通,36374; 36400,GP（1）; CP（2）,cat,fja,否
+27009,fpa_mr18zhloot,乌拉尔战斗防护服 裤子,0,普通,36398; 36400,GP（1）; CP（2）,cat,fpa,否
+27010,han_mr18zhloot,乌拉尔战斗防护服 手套,0,普通,36399; 36400,GP（1）; CP（2）,cat,han,否
+27202,heg_mr18wargodhelmet1,战神S10-晋升者头盔,1,非普通,36638,HEROPOINT（8）; EPICHEROPOINT（9）,cat,heg,否
+13040,han_esportsbundle_b,战神第二赛季专属套装手套,3,史诗,12466; 12468,GP（1）; CP（2）,cat,han,否
+13692,fpa_esportsbundle_wargod,战神第一赛季专属套装裤子,3,史诗,16340; 16344,GP（1）; CP（2）,cat,fpa,是
+13690,fja_esportsbundle_wargod,战神第一赛季专属套装上衣,3,史诗,16340; 16342,GP（1）; CP（2）,cat,fja,是
+13694,han_esportsbundle_wargod,战神第一赛季专属套装手套,3,史诗,16340; 16346,GP（1）; CP（2）,cat,han,是
+27228,han_mr18bladedglove,拳刃,0,普通,36650,CP（2）,cat,han,否
+27229,han_mr18bladedglove_kingpin,拳刃,0,普通,36651,CP（2）,cat,han,否
+27230,han_mr18bladedglove_eve,拳刃,0,普通,36652,CP（2）,cat,han,否
+19107,han_wgdiamond,战神战术手套-裁决者,3,史诗,27495,EPICHEROPOINT（9）,cat,han,否
+27386,fja_mr18battlepass,通行证精英套装-上衣,0,普通,36122; 36812,GP（1）; CP（2）,cat,fja,否
+27387,fpa_mr18battlepass,通行证精英套装-裤子,0,普通,36809; 36812,GP（1）; CP（2）,cat,fpa,否
+27388,han_mr18battlepass,通行证精英套装-手套,0,普通,36810; 36812,GP（1）; CP（2）,cat,han,否
+27389,ves_mr18battlepass,通行证精英套装-防弹衣,0,普通,36811; 36812,GP（1）; CP（2）,cat,ves,否
+28135,hea_cybergirl,朋克,0,普通,37734,GP（1）; CP（2）,cat,hea,是
+28136,heg_cybergirl,朋克,0,普通,37735,GP（1）; CP（2）,cat,heg,是
+28137,fja_cybergirl,朋克,0,普通,37736,GP（1）; CP（2）,cat,fja,是
+28138,fpa_cybergirl,朋克,0,普通,37737,GP（1）; CP（2）,cat,fpa,是
+28139,han_cybergirl,朋克,0,普通,37738,GP（1）; CP（2）,cat,han,是
+28141,eye_cybergirl,太阳镜,0,普通,37740,GP（1）; CP（2）,cat,eye,是
+28142,fja_cybergirlad3,战斗上装,0,普通,37741,GP（1）; CP（2）,cat,fja,是
+19105,han_wggold,战神战术手套-竞逐者,2,稀有,27493,EPICHEROPOINT（9）,cat,han,否
+19106,han_wgplatinum,战神战术手套-挑战者,3,史诗,27494,EPICHEROPOINT（9）,cat,han,否
+28145,fpa_cybergirlad,金属朋克裤子,0,普通,37744,GP（1）; CP（2）,cat,fpa,是
+19108,han_wgwargod,战神战术手套-战神,4,传奇,27496,EPICHEROPOINT（9）,cat,han,否
+19918,heg_wargod_mask4,战神战术头盔-裁决者,3,史诗,28952,EPICHEROPOINT（9）,cat,heg,否
+28149,heg_cybergirlad,棕色盘发,0,普通,37748,GP（1）; CP（2）,cat,heg,是
+28276,heg_elena,白发,0,普通,37984,GP（1）; CP（2）,cat,heg,是
+28696,fja_elena,艾莲娜 上装,0,普通,38873,GP（1）; CP（2）,cat,fja,是
+28697,fpa_elena,艾莲娜 裤子,0,普通,38871,GP（1）; CP（2）,cat,fpa,是
+28698,hea_elena,艾莲娜 头部,0,普通,38747,GP（1）; CP（2）,cat,hea,是
+28699,han_elena,艾莲娜 手套,0,普通,38870,GP（1）; CP（2）,cat,han,是
+19916,heg_wargod_mask2,战神战术头盔-竞逐者,2,稀有,28950,EPICHEROPOINT（9）,cat,heg,否
+19917,heg_wargod_mask3,战神战术头盔-挑战者,3,史诗,28951,EPICHEROPOINT（9）,cat,heg,否
+19919,heg_wargod_mask5,战神战术头盔-战神,4,传奇,28953,EPICHEROPOINT（9）,cat,heg,否
+22827,ves_jetpack,战术机动装置J-09 原型机,4,传奇,31370,CP（2）,cat,ves,否
+10557,eye_ghostblue,战术镭射眼镜-蓝色,2,稀有,18682,GP（1）; CP（2）,cat,eye,是
+26369,heg_hkpolicehelmet,战术头盔,3,史诗,35552,GP（1）; CP（2）,cat,heg,是
+28743,ves_manson,曼森防弹服,0,普通,38819; 38822,GP（1）; CP（2）,cat,ves,是
+28744,han_manson,曼森战斗手套,0,普通,38820; 38822,GP（1）; CP（2）,cat,han,否
+12941,heg_infiltrator_f_monkey,侦察兵头盔,2,稀有,14890,GP（1）; CP（2）,cat,heg,是
+28865,hea_s11wargod1,战神S11头1,0,普通,38980; 39000,GP（1）; CP（2）; HEROPOINT（8）; EPICHEROPOINT（9）,cat,hea,否
+28866,hea_s11wargod2,战神S11头2,0,普通,38981; 39001,GP（1）; CP（2）; HEROPOINT（8）; EPICHEROPOINT（9）,cat,hea,否
+28867,hea_s11wargod3,战神S11头3,0,普通,38982; 39002,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,hea,否
+28868,hea_s11wargod4,战神S11头4,0,普通,38983; 39003,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,hea,否
+1992,eye_steampunkthin,蒸汽机车眼镜,2,稀有,10837,GP（1）; CP（2）,cat,eye,是
+28870,fpa_s11wargod1,战神S11 裤子1,0,普通,38985; 39000,GP（1）; CP（2）; HEROPOINT（8）; EPICHEROPOINT（9）,cat,fpa,否
+28871,fpa_s11wargod2,战神S11 裤子2,0,普通,38986; 39001,GP（1）; CP（2）; HEROPOINT（8）; EPICHEROPOINT（9）,cat,fpa,否
+28872,fpa_s11wargod3,战神S11 裤子3,0,普通,38987; 39002,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fpa,否
+28873,fpa_s11wargod4,战神S11 裤子4,0,普通,38988; 39003,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fpa,否
+28874,fpa_s11wargod5,战神S11 裤子5,0,普通,38989; 39004,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fpa,否
+28875,fja_s11wargod1,战神S11 上装 1,1,非普通,38990; 39000,GP（1）; CP（2）; HEROPOINT（8）; EPICHEROPOINT（9）,cat,fja,否
+813,fpa_manveterana,制服套装裤子,3,史诗,1737; 16761,GP（1）; CP（2）,cat,fpa,否
+812,fja_manveterana,制服套装上衣,3,史诗,1736; 16761,GP（1）; CP（2）,cat,fja,否
+1339,han_manveterana00,制服套装手套,3,史诗,5200; 16761,GP（1）; CP（2）,cat,han,否
+14950,fpa_studentrobot,智能机械套装 裤子,3,史诗,18953; 18956,GP（1）; CP（2）,cat,fpa,是
+28880,han_s11wargod1,战神S11 手套 1,0,普通,38995; 39000,GP（1）; CP（2）; HEROPOINT（8）; EPICHEROPOINT（9）,cat,han,否
+28881,han_s11wargod2,战神S11 手套 2,0,普通,38996; 39001,GP（1）; CP（2）; HEROPOINT（8）; EPICHEROPOINT（9）,cat,han,否
+28882,han_s11wargod3,战神S11 手套 3,0,普通,38997; 39002,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,han,否
+28883,han_s11wargod4,战神S11 手套 4,0,普通,38998; 39003,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,han,否
+28884,han_s11wargod5,战神S11 手套 5,0,普通,38999; 39004,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,han,否
+14949,fja_studentrobot,智能机械套装 上衣,3,史诗,18952; 18956,GP（1）; CP（2）,cat,fja,是
+14951,han_studentrobot,智能机械套装 手套,3,史诗,18954; 18956,GP（1）; CP（2）,cat,han,是
+14952,heg_studentrobot,智能机械套装 头盔,3,史诗,18955; 18956,GP（1）; CP（2）,cat,heg,是
+1898,ves_hmpeshotgun,重甲防弹衣,3,史诗,6113,CP（2）,cat,ves,是
+589,ves_acubasea,重型防弹衣,2,稀有,1475,GP（1）; CP（2）,cat,ves,是
+2151,han_titantech,重型机械手臂-白,2,稀有,17367,GP（1）; CP（2）,cat,han,是
+2150,han_titanguard,重型机械手臂-金,2,稀有,17366,GP（1）; CP（2）,cat,han,是
+2149,han_titangrunt,重型机械手臂-绿,3,史诗,17365,GP（1）; CP（2）,cat,han,是
+29338,heg_s12wargod1,战神S12头1,1,非普通,39845; 39849,GP（1）; CP（2）; HEROPOINT（8）; EPICHEROPOINT（9）,cat,heg,是
+29339,fja_s12wargod1,战神S12上衣1,0,普通,39846; 39849,GP（1）; CP（2）; HEROPOINT（8）; EPICHEROPOINT（9）,cat,fja,是
+29340,fpa_s12wargod1,战神S12裤子1,0,普通,39847; 39849,GP（1）; CP（2）; HEROPOINT（8）; EPICHEROPOINT（9）,cat,fpa,是
+29341,han_s12wargod1,战神S12手套1,0,普通,39848; 39849,GP（1）; CP（2）; HEROPOINT（8）; EPICHEROPOINT（9）,cat,han,是
+576,fja_acuprestigea,重型战斗护甲,2,稀有,1462; 6648,GP（1）; CP（2）,cat,fja,是
+29343,fja_s12wargod2,战神S12上衣2,0,普通,39851; 39855,GP（1）; CP（2）; HEROPOINT（8）; EPICHEROPOINT（9）,cat,fja,是
+29344,fpa_s12wargod2,战神S12裤子2,0,普通,39852; 39855,GP（1）; CP（2）; HEROPOINT（8）; EPICHEROPOINT（9）,cat,fpa,是
+29345,han_s12wargod2,战神S12手套2,0,普通,39853; 39855,GP（1）; CP（2）; HEROPOINT（8）; EPICHEROPOINT（9）,cat,han,是
+29346,ves_s12wargod2,战神S12防弹衣,0,普通,39854; 39855,GP（1）; CP（2）; HEROPOINT（8）; EPICHEROPOINT（9）,cat,ves,是
+18071,heg_bamboo,竹笠,2,稀有,25754,GP（1）; CP（2）,cat,heg,否
+29348,fja_s12wargod3,战神S12上衣3,0,普通,39857; 39860,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fja,是
+29349,fpa_s12wargod3,战神S12裤子3,0,普通,39858; 39860,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fpa,是
+29350,han_s12wargod3,战神S12手套3,0,普通,39859; 39860,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,han,是
+24707,heg_bamboo2019,竹笠 限定版,2,稀有,33504,GP（1）; CP（2）,cat,heg,否
+29352,fja_s12wargod4,战神S12上衣4,0,普通,39862; 39865,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fja,是
+29353,fpa_s12wargod4,战神S12裤子4,0,普通,39863; 39865,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fpa,是
+29354,han_s12wargod4,战神S12手套4,0,普通,39864; 39865,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,han,是
+10273,han_ufc,自由搏击手套,2,稀有,10438,GP（1）; CP（2）,cat,han,是
+29356,fja_s12wargod5,战神S12上衣5,0,普通,39867; 39870,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fja,是
+29357,fpa_s12wargod5,战神S12裤子5,0,普通,39868; 39870,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,fpa,是
+29358,han_s12wargod5,战神S12手套5,0,普通,39869; 39870,GP（1）; CP（2）; EPICHEROPOINT（9）,cat,han,是
+26175,heg_hkpolicehari,棕色盘发,3,史诗,35454,GP（1）; CP（2）,cat,heg,是
+25230,heg_polarisa,棕色齐肩长发,3,史诗,34294; 34427,GP（1）; CP（2）,cat,heg,是
+16158,ves_wffighter_backpack,作战背包,2,稀有,22249,GP（1）; CP（2）,cat,ves,是
+16156,fpa_wffighter_hotpant,作战热裤,2,稀有,22244,GP（1）; CP（2）,cat,fpa,是
+545,cha_infbasea,尤里,0,普通,1432; 31516,GP（1）; CP（2）,cha,cha,是
+592,cha_acubasea,威,0,普通,1478,GP（1）; CP（2）,cha,cha,是
+612,cha_grebasea,马库斯,0,普通,1498; 6645,GP（1）; CP（2）,cha,cha,是
+789,cha_infbaseb,安德烈,0,普通,1707,GP（1）; CP（2）,cha,cha,是
+792,cha_infbasee,赫尔南德斯,0,普通,1710,GP（1）; CP（2）,cha,cha,是

@@ -10,6 +10,41 @@ ROOT=Path(__file__).resolve().parents[2]
 
 
 class BridgeTests(unittest.TestCase):
+    def test_weapon_experience_adapter_preserves_query_and_limits_writes(self):
+        from codol_rebuild.adapters.game.v1649370.accounts.profile import install_maximum_weapon_experience
+        image = pefile.PE(str(ROOT/'client/bin/v1649370/codol1649370-offline.exe'))
+        class ProcessMemory:
+            def __init__(self):
+                self.writes = {}
+            def read(self, address, size):
+                if address in self.writes:
+                    return self.writes[address][:size]
+                return image.get_data(address - 0x400000, size)
+            def write(self, address, content):
+                self.writes[address] = content
+            def allocate(self, size):
+                return 0x20000000
+            def executable(self, address, size):
+                pass
+        process = ProcessMemory()
+        original_entry = process.read(0x5E3760, 9)
+        install_maximum_weapon_experience(process)
+        self.assertEqual(set(process.writes), {0x20000000, 0x20000200, 0x5E3760})
+        self.assertEqual(len(process.writes[0x5E3760]), 5)
+        self.assertEqual(process.writes[0x20000200][:9], original_entry)
+        instructions = list(Cs(CS_ARCH_X86, CS_MODE_32).disasm(process.writes[0x20000000], 0x20000000))
+        calls = [instruction.op_str for instruction in instructions if instruction.mnemonic == 'call']
+        self.assertEqual(calls, ['0x20000200', '0x660c90', '0x4740d0', '0x474130'])
+        output_writes = [instruction.op_str for instruction in instructions
+                         if instruction.mnemonic == 'mov' and instruction.op_str.startswith('dword ptr [edi')]
+        self.assertEqual(output_writes, ['dword ptr [edi + 0x1c], eax'])
+        # 库存未就绪、无效物品和非武器均跳过经验覆盖。
+        branches = [instruction for instruction in instructions if instruction.mnemonic in ('je', 'jne')]
+        self.assertEqual(len(branches), 3)
+        self.assertEqual(len({instruction.op_str for instruction in branches}), 1)
+        with self.assertRaises(ValueError):
+            install_maximum_weapon_experience(process)
+
     def test_local_welcome_patch_preserves_gfx_boolean_cleanup_and_callback_abi(self):
         from codol_rebuild.adapters.game.v1649370.frontend.local_ui_services import local_welcome_page_patch
         pe=pefile.PE(str(ROOT/'client/bin/v1649370/codol1649370-offline.exe'))
@@ -118,6 +153,17 @@ class BridgeTests(unittest.TestCase):
             with self.assertRaises(ValueError):publish_empty_local_store(read,write,21738)
             self.assertEqual(writes,[])
             memory[address]=old
+
+    def test_empty_inventory_completes_without_granting_items(self):
+        memory = {0x82C4A8C: 0, 0x82C4AA4: 1}
+        def read_memory(address, size):
+            return b'\x01' if address == 0x82C4A86 else struct.pack('<I', memory.get(address, 0))
+        def write_memory(address, content):
+            memory[address] = struct.unpack('<I', content)[0]
+        result = publish_empty_local_store(read_memory, write_memory, 0)
+        self.assertTrue(result['initial_data_fetch_performed'])
+        self.assertEqual(memory[0x82C4A8C], 0)
+        self.assertEqual(memory[0x82C4AA4], 7)
 
     def test_initial_fetch_predicate_and_native_completion_match_image(self):
         pe=pefile.PE(str(ROOT/'client/bin/v1649370/codol1649370-offline.exe'))

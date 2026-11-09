@@ -155,6 +155,28 @@ class LocalProfileBridge:
             self._service.consume_state(item_id),
             lambda: self._service.commit_consumption(item_id))
 
+    def prepare_supply_drop(self, crate_item_id):
+        """以当前账号库存规划单次开箱；奖池来自客户端固定依赖。"""
+        from codol_rebuild.adapters.game.v1649370.accounts.supply_drop import load_reward_pool
+        from codol_rebuild.core.paths import REBUILD_ROOT
+        if not self._ready or not self._account:
+            raise ValueError('本地档案尚未就绪')
+        reward_pool = load_reward_pool(REBUILD_ROOT / 'resources/商城抽卡.csv', self._catalog)
+        plan = self._service.prepare_supply_drop(reward_pool, crate_item_id)
+        return {**plan, 'crate_item_id': crate_item_id}
+
+    def commit_supply_drop(self, plan):
+        """组合原有库存暂存与回滚能力，一次提交扣箱、发奖及进度。"""
+        from codol_rebuild.adapters.game.v1649370.accounts.profile import publish_consumption
+        from codol_rebuild.adapters.game.v1649370.accounts.purchase import publish_transaction
+        return publish_consumption(
+            self.process.read, self.process.write, self._inventory,
+            plan['crate_item_id'], plan['state'],
+            lambda: publish_transaction(
+                self.process.read, self.process.write, self._inventory,
+                self._catalog[plan['reward']['item_id']], plan['state'],
+                lambda: self._service.commit_supply_drop(plan)))
+
     def check_name_card(self):
         """发送前确认本地档案有一张可消耗改名卡。"""
         from codol_rebuild.adapters.game.v1649370.accounts.player_name import NAME_CARD

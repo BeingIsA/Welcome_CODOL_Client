@@ -10,6 +10,26 @@ class RevisionConflict(ValueError):
     """保存基于过期版本，调用方必须重新读取而不能静默覆盖。"""
 
 
+class InventoryEditorStore(Protocol):
+    """离线库存编辑端口：读取、备份及按修订号原子保存。"""
+
+    def inventory_accounts(self) -> list[str]:
+        """只读列举已有账号，不创建存档。"""
+        ...
+
+    def inventory_snapshot(self, name: str) -> dict:
+        """读取账号修订号和授权状态，缺失状态时拒绝编辑。"""
+        ...
+
+    def backup_inventory_database(self) -> str:
+        """生成数据库一致备份，失败时不得继续保存。"""
+        ...
+
+    def save_inventory(self, name: str, revision: int, inventory_state: dict) -> int:
+        """按读取的修订号提交整批库存变更。"""
+        ...
+
+
 class AccountStore(Protocol):
     """账号身份、档案读取和原子保存的最小业务端口。"""
 

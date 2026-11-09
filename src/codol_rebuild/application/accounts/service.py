@@ -125,6 +125,24 @@ class AccountSession:
             raise ValueError('旧版全解锁档案没有可消耗物品')
         return consume_entitlement(state, item)
 
+    def prepare_supply_drop(self, reward_pool, crate_item_id):
+        """只抽样一次，返回带账号版本的开箱计划，提交阶段不得重新抽奖。"""
+        from codol_rebuild.application.accounts.supply_drop import draw_reward
+        state = self.account.get('initialization')
+        if state is None:
+            raise ValueError('旧版全解锁档案不支持开箱')
+        next_state, reward = draw_reward(state, reward_pool, crate_item_id)
+        return {'revision': self.account['revision'], 'state': next_state, 'reward': reward}
+
+    def commit_supply_drop(self, plan):
+        """原子提交已抽取结果、扣箱及进度；失败时保留已确认账号状态。"""
+        from codol_rebuild.application.accounts.contracts import RevisionConflict
+        if plan['revision'] != self.account['revision']:
+            raise RevisionConflict('开箱期间账号已变化')
+        revision = self.repository.save_inventory(self.name, plan['revision'], plan['state'])
+        self.account = {**self.account, 'revision': revision, 'initialization': plan['state']}
+        return plan['state']
+
     def commit_consumption(self, item_id):
         """通过既有账号事务保存一次道具消耗；提交失败不推进已确认快照。"""
         next_state = self.consume_state(item_id)

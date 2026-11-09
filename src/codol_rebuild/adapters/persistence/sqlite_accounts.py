@@ -23,6 +23,38 @@ class AccountRepository:
     def __init__(self, path):
         self.path = Path(path)
 
+    def _existing_read_connection(self):
+        """离线工具只打开现有数据库，避免路径错误生成空存档。"""
+        if not self.path.is_file():
+            raise ValueError(f'未找到存档：{self.path}；请先启动游戏创建账号。')
+        return sqlite3.connect(self.path.resolve().as_uri() + '?mode=ro', uri=True, timeout=5)
+
+    def inventory_accounts(self):
+        """读取已有账号列表，不迁移或创建数据库表。"""
+        with closing(self._existing_read_connection()) as database:
+            return [row[0] for row in database.execute('SELECT name FROM accounts ORDER BY name')]
+
+    def inventory_snapshot(self, name):
+        """单次查询读取授权及修订号，拒绝没有初始化状态的历史账号。"""
+        with closing(self._existing_read_connection()) as database:
+            row = database.execute('SELECT accounts.revision, account_initialization.state '
+                'FROM accounts LEFT JOIN account_initialization ON accounts.name=account_initialization.account '
+                'WHERE accounts.name=?', (name,)).fetchone()
+            if row is None or row[1] is None:
+                raise ValueError('账号没有物品授权状态，不能直接编辑；不会自动重置存档。')
+            return {'revision': row[0], 'state': json.loads(row[1])}
+
+    def backup_inventory_database(self):
+        """SQLite 在线备份包含 WAL 已提交内容，备份失败阻止后续解锁。"""
+        from datetime import datetime
+        directory = self.path.parent / 'item-unlocker-backups'
+        directory.mkdir(parents=True, exist_ok=True)
+        destination = directory / f'local-{datetime.now():%Y%m%d-%H%M%S-%f}-{secrets.token_hex(3)}.sqlite3'
+        with closing(self._existing_read_connection()) as source_database:
+            with closing(sqlite3.connect(destination)) as target_database:
+                source_database.backup(target_database)
+        return str(destination)
+
     def _connect(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         db=sqlite3.connect(self.path, timeout=5)

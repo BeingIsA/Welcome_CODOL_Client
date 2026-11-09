@@ -1,4 +1,5 @@
 """验证新档授权、余额保存与旧档兼容，不接入游戏运行目录。"""
+import csv
 import copy
 import json
 import re
@@ -16,43 +17,43 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class InitializationTests(unittest.TestCase):
-    def test_bounty_hunter_new_archive_and_existing_archive_preserved(self):
-        import bisect
-        from codol_rebuild.adapters.game.v1649370.accounts.profile import gp_cp_market_items
+    def test_csv_grants_and_existing_archive_preserved(self):
         from codol_rebuild.adapters.game.v1649370.accounts.profile_codec import AccountCodec
         captured = json.loads((ROOT/'research/account-initialization/capture/market-memory.json').read_text(encoding='utf-8'))
-        blocks = {int(a, 16): bytes.fromhex(v) for a, v in captured['memory_chunks'].items()}
-        starts = sorted(blocks)
-        def read(address, size):
-            if not size:
-                return b''
-            start = starts[bisect.bisect_right(starts, address)-1]
-            result = blocks[start][address-start:address-start+size]
-            self.assertEqual(len(result), size)
-            return result
-        bounty = copy.deepcopy(next(r for r in captured['catalog'] if r['id'] == 2056))
-        self.assertEqual(bounty['name'], 'cha_cowgirl')
-        bounty['market_sale'] = True
-        sales = bytearray(65536)
-        sales[21039] = 1  # 实际普通 CP SKU。
-        self.assertEqual(gp_cp_market_items(read, [bounty], sales), {2056})
-        sales[28436] = 1  # 实际排位赛荣誉 SKU，位于另一个产品。
-        self.assertEqual(gp_cp_market_items(read, [bounty], sales), set())
-        bounty['gp_cp_sale'] = False
+        with (ROOT/'client/resources/初始化.csv').open(encoding='utf-8-sig', newline='') as resource_file:
+            expected_ids = sorted(int(item_row['物品ID']) for item_row in csv.DictReader(resource_file))
         tables = {**captured['tables'], 'mp/coStartingLoadoutSetting.csv': []}
         schemas = {kind: json.loads(Path(captured['schemas'][label]['schema']).read_text(encoding='utf-8'))
                    for kind, label in [('public', 'playerdata'), ('secure', 'playersecuredata')]}
-        defaults = [dict(row, gp_cp_sale=False) for row in captured['catalog']
-                    if row['id'] in (30000, 30060, 30061)]
-        codec = AccountCodec(schemas, tables, [bounty, *defaults])
+        codec = AccountCodec(schemas, tables, captured['catalog'])
         folder = ROOT/'verification/client/workspaces'
         with tempfile.TemporaryDirectory(dir=folder) as tmp:
             repo = AccountRepository(Path(tmp)/'honor.sqlite3')
             session = AccountSession(repo, codec)
             created = session.initialize()
             self.assertTrue(created['new_account'])
-            self.assertEqual(created['initialization']['owned_ids'], [2056, 30000, 30060, 30061])
-            self.assertEqual(codec.validate_snapshot(created['profiles']), 2056)
+            self.assertEqual(created['initialization']['gp'], 2000000000)
+            self.assertEqual(created['initialization']['cp'], 100000)
+            selected_policy = new_account_policy(codec.initialization_data())
+            self.assertTrue(selected_policy['fill_unlock_flags'])
+            self.assertEqual(selected_policy['unlock_threshold'], 32767)
+            self.assertEqual(created['progression'], selected_policy['progression'])
+            inventory_memory = bytearray(CAPACITY * STRIDE)
+            for inventory_index in range(CAPACITY):
+                struct.pack_into('<I', inventory_memory, inventory_index * STRIDE, 0xD59C78)
+            def read_inventory(address, size):
+                return bytes(inventory_memory[address:address + size])
+            def write_inventory(address, content):
+                inventory_memory[address:address + len(content)] = content
+            inventory_report = populate_inventory(read_inventory, write_inventory, 0,
+                captured['catalog'], 0, created['initialization']['owned_ids'])
+            self.assertEqual(inventory_report['items'], len(expected_ids))
+            inventory_items = [struct.unpack_from('<II', inventory_memory, inventory_index * STRIDE + 0x40)
+                               for inventory_index in range(len(expected_ids))]
+            self.assertEqual(sorted(inventory_items), [(item_id, 1) for item_id in expected_ids])
+
+            self.assertEqual(created['initialization']['owned_ids'], expected_ids)
+            self.assertEqual(codec.validate_snapshot(created['profiles']), 545)
             # 现有档案启动不重新执行新档授权策略；即使新策略不同也不得迁移。
             def forbidden(*args):
                 raise AssertionError('Existing archive must not regenerate entitlements')
@@ -94,84 +95,6 @@ class InitializationTests(unittest.TestCase):
                  'fill_unlock_flags': True, 'unlock_threshold': 32767})
             self.assertEqual(legacy['public'], existing_profiles['public'])
 
-    def test_gp_cp_skus_require_both_currency_and_native_sale(self):
-        from codol_rebuild.adapters.game.v1649370.accounts.profile import gp_cp_market_items
-        memory = {}
-        def put(address, blob):
-            memory.update((address+i, value) for i, value in enumerate(blob))
-        def read(address, size):
-            return bytes(memory[address+i] for i in range(size))
-        def table(pointer_at, count_at, base, count, stride):
-            put(pointer_at, struct.pack('<I', base))
-            put(count_at, struct.pack('<I', count))
-            put(base, bytes(count*stride))
-        table(0x7797FE8, 0x7797FEC, 0x10000, 10, 28)
-        table(0x7797FF8, 0x7797FFC, 0x20000, 10, 2)
-        table(0x7798000, 0x7798004, 0x30000, 10, 24)
-        table(0x7798008, 0x779800C, 0x40000, 10, 2)
-        put(0xE57364, struct.pack('<H', 0x1234))
-        catalog, sales = [], bytearray(65536)
-        # GP, CP, other currency, expired GP, mixed, hidden GP, non-sale.
-        for item_id, sku_ids, visible in [
-            (1, [1], True), (2, [2], True), (3, [3], True),
-            (4, [4, 3], True), (5, [3, 2], True),
-            (6, [1], False), (7, [], False),
-        ]:
-            raw = bytearray(40)
-            struct.pack_into('<HI', raw, 34, 1, 0x50000+item_id*2)
-            put(0x50000+item_id*2, struct.pack('<H', item_id))
-            put(0x20000+item_id*2, struct.pack('<H', item_id))
-            put(0x10000+item_id*28+20, bytes([len(sku_ids)]))
-            put(0x10000+item_id*28+24, struct.pack('<I', 0x60000+item_id*20))
-            put(0x60000+item_id*20, struct.pack(f'<{len(sku_ids)}H', *sku_ids))
-            catalog.append({'id': item_id, 'raw': raw.hex(), 'market_sale': visible})
-        for sku_id, currency, active in [(1, 1, True), (2, 2, True), (3, 7, True), (4, 1, False)]:
-            put(0x40000+sku_id*2, struct.pack('<H', sku_id))
-            address = 0x30000+sku_id*24+6
-            encoded = ((currency >> 4) | (currency << 12)) & 65535
-            put(address, struct.pack('<H', encoded ^ (address & 65535) ^ 0x1234))
-            sales[sku_id] = active
-        self.assertEqual(gp_cp_market_items(read, catalog, sales), {1, 2, 5})
-        data = {'progression': {}, 'default_character': 0, 'starting_loadouts': [],
-                'items': [{'id': r['id'], 'category': 'character', 'slot_group': (2, 0),
-                           'marketplace_only': r['id'] in {1, 2, 5}, 'reserved': False} for r in catalog]}
-        self.assertEqual(new_account_policy(data)['initialization']['owned_ids'], [3, 4, 6, 7])
-        # 原生动态 SKU 使用扩展 ID 映射和扩展记录池，不能误当成非卖品。
-        put(0x60000+3*20, struct.pack('<H', 10))
-        put(0x8301AE8, struct.pack('<H', 10))
-        put(0x8301AE4, struct.pack('<H', 1))
-        address = 0x7798918+6
-        put(address, struct.pack('<H', 0x2000 ^ (address & 65535) ^ 0x1234))
-        sales[10] = 1
-        self.assertEqual(gp_cp_market_items(read, catalog, sales), {1, 2, 3, 5})
-        # 与赏金猎人相同：普通 CP 产品在前，另一个产品提供排位荣誉兑换。
-        raw = bytearray.fromhex(catalog[1]['raw'])
-        struct.pack_into('<H', raw, 34, 2)
-        catalog[1]['raw'] = raw.hex()
-        put(0x50000+2*2, struct.pack('<2H', 2, 8))
-        put(0x20000+8*2, struct.pack('<H', 8))
-        put(0x10000+8*28+2, struct.pack('<H', 3))
-        put(0x10000+8*28+20, b'\x01')
-        put(0x10000+8*28+24, struct.pack('<I', 0x61000))
-        put(0x61000, struct.pack('<H', 8))
-        put(0x40000+8*2, struct.pack('<H', 8))
-        address = 0x30000+8*24+6
-        for currency in (8, 9):
-            put(address, struct.pack('<H', (currency << 12) ^ (address & 65535) ^ 0x1234))
-            sales[8] = 1
-            self.assertNotIn(2, gp_cp_market_items(read, catalog[:2], sales))
-            # 产品顺序不影响荣誉渠道优先级。
-            put(0x50000+2*2, struct.pack('<2H', 8, 2))
-            self.assertNotIn(2, gp_cp_market_items(read, catalog[:2], sales))
-            put(0x50000+2*2, struct.pack('<2H', 2, 8))
-        sales[8] = 0
-        self.assertIn(2, gp_cp_market_items(read, catalog[:2], sales))
-        sales[8] = 1
-        put(0x10000+8*28+2, struct.pack('<H', 1))
-        self.assertIn(2, gp_cp_market_items(read, catalog[:2], sales))
-        with self.assertRaises(ValueError):
-            gp_cp_market_items(read, catalog, sales[:-1])
-
     def test_native_contract_matches_image_and_rejects_mismatch(self):
         import pefile
         from codol_rebuild.adapters.game.v1649370.accounts.profile import validate_account_native_contract
@@ -180,22 +103,14 @@ class InitializationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_account_native_contract(lambda a, n: bytes(n))
 
-    def test_market_exclusion_and_loadout_dependencies(self):
-        row = {'primary': {'base': 1, 'attachments': [3, 0]}, 'secondary': {'base': 0, 'attachments': [0]},
-               'perks': [0, 0, 0], 'wildcards': [0], 'lethal': 1, 'tactical': 0,
-               'lethal_double_ammo': True, 'tactical_double_ammo': False}
-        data = {'progression': {'rank': 70}, 'default_character': 545, 'starting_loadouts': [row, row, row],
-                'items': [{'id': i, 'category': 'character' if kind == 2 else 'equipment',
-                           'slot_group': (kind, 0), 'marketplace_only': sale, 'reserved': False}
-                          for i, kind, sale in [(1, 0, True), (2, 0, False), (3, 1, False),
-                                                (545, 2, True), (570, 2, False)]]}
-        before = copy.deepcopy(data)
+    def test_new_account_uses_explicit_grants(self):
+        from codol_rebuild.application.accounts.policy import validate_initialization
+        data = {'progression': {'rank': 70}, 'default_character': 545, 'starting_loadouts': [], 'initial_item_ids': [570, 2]}
         policy = new_account_policy(data)
-        self.assertEqual(policy['initialization'], {'version': 1, 'owned_ids': [2, 3, 570], 'gp': 2000000000, 'cp': 100000})
-        self.assertEqual(policy['character'], 570)
-        self.assertEqual(policy['loadouts'][0]['primary'], {'base': 2, 'attachments': [0, 0]})
-        self.assertFalse(policy['loadouts'][0]['lethal_double_ammo'])
-        self.assertEqual(before, data)
+        self.assertEqual(policy['initialization'], {'version': 1, 'owned_ids': [2, 570], 'gp': 2000000000, 'cp': 100000})
+        self.assertEqual(validate_initialization(policy['initialization']), policy['initialization'])
+        self.assertTrue(policy['fill_unlock_flags'])
+        self.assertEqual(policy['unlock_threshold'], 32767)
 
     def test_policy_layer_free_of_native_format(self):
         # 架构断言：应用层策略不得出现 DDL 字段路径或原生分类数字。
@@ -214,10 +129,6 @@ class InitializationTests(unittest.TestCase):
             self.assertNotIn(token, strategy)
         for number in ('15400', '20000', '545'):
             self.assertIsNone(re.search(rf'(?<!\d){number}(?!\d)', strategy))
-
-    def test_unclassified_catalog_refused(self):
-        with self.assertRaises(ValueError):
-            new_account_policy({'items': [{'id': 5}]})
 
     def test_currency_preserves_native_objects_and_other_currencies(self):
         memory = bytearray(b'\xA5' * (11*32))

@@ -1,0 +1,3 @@
+# 独立图形工具与打包依赖；不影响游戏启动依赖。
+PySide6-Essentials==6.12.0
+PyInstaller==6.22.3

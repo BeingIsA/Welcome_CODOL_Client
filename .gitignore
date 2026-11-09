@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 workspaces/
 /resources/*
+!/resources/商城抽卡.csv
 !/resources/v1649370/
 /resources/v1649370/*
 !/resources/v1649370/README.md

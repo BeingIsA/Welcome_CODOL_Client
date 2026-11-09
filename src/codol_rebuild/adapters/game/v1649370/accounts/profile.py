@@ -114,7 +114,7 @@ def publish_empty_local_store(read, write, inventory_count):
     """
     def u32(address):
         return struct.unpack('<I', read(address, 4))[0]
-    if not inventory_count or u32(0x82C4A8C) != inventory_count or read(0x82C4A86, 1) != b'\x01':
+    if inventory_count < 0 or u32(0x82C4A8C) != inventory_count or read(0x82C4A86, 1) != b'\x01':
         raise ValueError('Local inventory must be published before store completion')
     counts = {hex(a): u32(a) for a in (0x82C4A90, 0x82C4A94, 0x82C4AA0)}
     if any(counts.values()):
@@ -218,81 +218,6 @@ def build_initializer(entry: int, data: int, pool: int) -> dict:
     return {'code': bytes(code), 'data': bytes(payload), 'trap': trap,'after':after}
 
 
-def gp_cp_market_items(read, catalog, sku_sales):
-    """新档排除清单：在售 GP/CP 物品，但排位赛荣誉兑换渠道优先授予。"""
-    if len(sku_sales) != 65536:
-        raise ValueError('Incomplete native SKU classification')
-
-    def u16(address):
-        return struct.unpack('<H', read(address, 2))[0]
-
-    def table(pointer_at, count_at, stride):
-        pointer = struct.unpack('<I', read(pointer_at, 4))[0]
-        count = struct.unpack('<I', read(count_at, 4))[0]
-        if not 0 < count <= 65536:
-            raise ValueError('Invalid native marketplace table size')
-        return pointer, count, read(pointer, count * stride)
-
-    _, product_count, products = table(0x7797FE8, 0x7797FEC, 28)
-    _, product_map_count, product_map = table(0x7797FF8, 0x7797FFC, 2)
-    sku_base, sku_count, skus = table(0x7798000, 0x7798004, 24)
-    _, sku_map_count, sku_map = table(0x7798008, 0x779800C, 2)
-    salt = u16(0xE57364)
-    currency_cache = {}
-
-    def sale_currency(sku_id):
-        if not sku_sales[sku_id]:
-            return None
-        if sku_id not in currency_cache:
-            if sku_id < sku_map_count:
-                index = struct.unpack_from('<H', sku_map, sku_id * 2)[0]
-            elif sku_id < sku_map_count + 5000:
-                index = u16(0x8301AE8 + (sku_id - sku_map_count) * 2)
-            else:
-                raise ValueError('Active SKU outside native mapping')
-            if 0 < index < sku_count:
-                address = sku_base + index * 24 + 6
-                encoded = struct.unpack_from('<H', skus, index * 24 + 6)[0]
-            elif sku_count <= index < sku_count + u16(0x8301AE4):
-                address = 0x7798918 + (index - sku_count) * 24 + 6
-                encoded = u16(address)
-            else:
-                raise ValueError('Active SKU outside native records')
-            value = encoded ^ (address & 65535) ^ salt
-            currency_cache[sku_id] = ((value << 4) | (value >> 12)) & 65535
-        return currency_cache[sku_id]
-
-    result = set()
-    for item in catalog:
-        if not item['market_sale']:
-            continue
-        raw = bytes.fromhex(item['raw'])
-        count, pointer = struct.unpack_from('<HI', raw, 34)
-        if count > 4096:
-            raise ValueError('Invalid native product association count')
-        has_gp_cp = False
-        has_ranked_honor = False
-        for product_id in struct.unpack(f'<{count}H', read(pointer, count * 2)):
-            if not 0 < product_id < product_map_count:
-                continue
-            index = struct.unpack_from('<H', product_map, product_id * 2)[0]
-            if not 0 < index < product_count:
-                continue
-            offset = index * 28
-            count_skus = products[offset + 20]
-            pointer_skus = struct.unpack_from('<I', products, offset + 24)[0]
-            ids = struct.unpack(f'<{count_skus}H', read(pointer_skus, count_skus * 2))
-            currencies = {sale_currency(sku_id) for sku_id in ids}
-            has_gp_cp |= bool(currencies & {1, 2})
-            # 产品 +2 是 unlockFlags ID；3 对应 uf_wargod_rank。
-            # 荣誉渠道使用 8/9，不能仅凭名称或等级要求放开普通 GP/CP 商品。
-            ranked = struct.unpack_from('<H', products, offset + 2)[0] == 3
-            has_ranked_honor |= ranked and bool(currencies & {8, 9})
-        if has_gp_cp and not has_ranked_honor:
-            result.add(item['id'])
-    return result
-
-
 def capture(read, data: int, folder: Path, pool: int = INVENTORY) -> dict:
     from codol_rebuild.adapters.game.profile_format.schema import capture_schema
     folder.mkdir(parents=True, exist_ok=True)
@@ -339,9 +264,6 @@ def capture(read, data: int, folder: Path, pool: int = INVENTORY) -> dict:
         catalog.append({'id':item_id,'name':string(struct.unpack_from('<I',row,8)[0]),
                         'market_sale': bool(market_flags[item_id]),
                         'type_bytes':list(row[4:8]),'raw':row.hex(),'words':list(struct.unpack('<10I',row))})
-    gp_cp_ids = gp_cp_market_items(read, catalog, read(data + SKU_SALE_OFFSET, 65536))
-    for item in catalog:
-        item['gp_cp_sale'] = item['id'] in gp_cp_ids
     result={'tables':tables,'catalog':catalog,'schemas':schemas,
             'inventory_first':read(pool,STRIDE).hex(),
             'public_record':read(PUBLIC,144).hex(),'secure_record':read(SECURE,144).hex()}
@@ -356,7 +278,7 @@ def populate_inventory(read, write, pool, catalog, weapon_xp, owned_ids=None, qu
         if len(requested) != len(owned_ids) or not requested <= {r['id'] for r in items}:
             raise ValueError('Saved entitlement absent from current catalog')
         items = [r for r in items if r['id'] in requested]
-    if not 0<len(items)<=CAPACITY or len({r['id'] for r in items})!=len(items):
+    if not 0<=len(items)<=CAPACITY or len({r['id'] for r in items})!=len(items):
         raise ValueError('Invalid local entitlement count or duplicate item ID')
     blob=bytearray(read(pool,CAPACITY*STRIDE))
     for i in range(CAPACITY):
@@ -414,3 +336,53 @@ def publish_currency(read, write, balances):
         if read(address, len(value)) != value:
             raise ValueError('Native currency readback mismatch')
     return currency_snapshot(read)
+
+
+def install_maximum_weapon_experience(process):
+    """仅覆盖物品查询输出的武器经验；保留拥有、数量、期限和原生等级表。"""
+    query_address = 0x5E3760
+    original_bytes = bytes.fromhex('55 8b ec 8b 0d d4 13 91 0c')
+    if process.read(query_address, len(original_bytes)) != original_bytes:
+        raise ValueError('Native item query entry mismatch')
+    adapter_address = process.allocate(4096)
+    trampoline_address = adapter_address + 512
+    trampoline = original_bytes + b'\xe9' + struct.pack('<i', query_address + len(original_bytes) - trampoline_address - len(original_bytes) - 5)
+    # 原入口以 EAX 接收物品 ID、EDI 接收结果指针，无栈参数。
+    code = bytearray(b'\x50')
+    def call_native(target_address):
+        code.extend(b'\xe8' + struct.pack('<i', target_address - adapter_address - len(code) - 5))
+    call_native(trampoline_address)
+    code.extend(bytes.fromhex('9c 60 83 3d 10 13 2e 08 00'))
+    branches = []
+    def skip_if(opcode):
+        code.extend(opcode)
+        branches.append(len(code))
+        code.extend(bytes(4))
+    skip_if(b'\x0f\x84')
+    code.extend(bytes.fromhex('8b 44 24 24'))
+    call_native(0x660C90)
+    code.extend(bytes.fromhex('85 c0'))
+    skip_if(b'\x0f\x84')
+    code.extend(bytes.fromhex('80 78 05 00'))
+    skip_if(b'\x0f\x85')
+    # 与原生武器等级读取一致：分类字段 +6 小于6使用主武器表。
+    code.extend(bytes.fromhex('0f b6 40 06 83 f8 06 0f 9c c3 0f b6 db 53'))
+    call_native(0x4740D0)
+    code.extend(bytes.fromhex('83 c4 04 53 50'))
+    call_native(0x474130)
+    code.extend(bytes.fromhex('83 c4 08 89 47 1c'))
+    finish_offset = len(code)
+    code.extend(bytes.fromhex('61 9d 8d 64 24 04 c3'))
+    for branch_offset in branches:
+        struct.pack_into('<i', code, branch_offset, finish_offset - branch_offset - 4)
+    process.write(adapter_address, bytes(code))
+    process.write(trampoline_address, trampoline)
+    if process.read(adapter_address, len(code)) != bytes(code) or process.read(trampoline_address, len(trampoline)) != trampoline:
+        raise ValueError('Weapon experience adapter readback mismatch')
+    process.executable(adapter_address, 4096)
+    # 只替换入口五字节；跳板执行被覆盖指令的完整九字节后返回。
+    patch = b'\xe9' + struct.pack('<i', adapter_address - query_address - 5)
+    process.write(query_address, patch)
+    if process.read(query_address, len(patch)) != patch:
+        raise ValueError('Weapon experience entry readback mismatch')
+    return {'entry': hex(adapter_address), 'query': hex(query_address), 'field': 'weapon_experience'}

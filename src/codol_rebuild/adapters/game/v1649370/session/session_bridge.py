@@ -19,7 +19,9 @@ class GameSessionBridge:
         self.profile_traps={}; self.name_adapter=None; self.pending_name=None
         self.recharge_adapter=None
         self.purchase_adapter=None
+        from codol_rebuild.adapters.game.v1649370.accounts.supply_drop import SupplyDropBridge
         self.profiles=LocalProfileBridge(process, account_factory, log, record)
+        self.supply_drop_bridge = SupplyDropBridge(process, self.profiles, record, account_errors)
         self.debug=None
         self.schema_captured=False
         self.preview_caller_return = 0x5EBFF8
@@ -105,6 +107,7 @@ class GameSessionBridge:
             initializer_address = self._install_player_name_adapter(profile_data_address, initializer_address)
             self._install_recharge_adapter()
             self._install_purchase_adapter(profile_data_address)
+            self.supply_drop_bridge.install(profile_data_address + 72)
         self._install_lobby_entry(lobby_entry, initializer_address, profile_data_address, room_plan)
         self.melee_input.install()
 
@@ -180,6 +183,8 @@ class GameSessionBridge:
             raise ValueError('Local viewer adapter readback mismatch')
         self.log['local_viewer_adapter'] = {'patch_va': hex(viewer['patch_va']), 'local_modes': viewer['local_modes'], 'body_va': hex(viewer['body_va']), 'exit_va': hex(viewer['exit_va'])}
         self.record({'local_viewer_adapter': self.log['local_viewer_adapter']})
+        from codol_rebuild.adapters.game.v1649370.accounts.profile import install_maximum_weapon_experience
+        self.log['maximum_weapon_experience'] = install_maximum_weapon_experience(self.process)
         return initializer_address, profile_data_address, inventory_pool_address, initialization_plan
 
     def _install_playlist_adapter(self, profile_data_address):
@@ -423,6 +428,9 @@ class GameSessionBridge:
         return result
 
     def handle_exception(self, event, code, address, row):
+        if code in (2147483651, 1073741855) and address in self.supply_drop_bridge.traps:
+            self.supply_drop_bridge.handle(event, address)
+            return True
         if code in (2147483651, 1073741855) and address in self.melee_input.traps:
             self.melee_input.handle(event, address)
             return True
