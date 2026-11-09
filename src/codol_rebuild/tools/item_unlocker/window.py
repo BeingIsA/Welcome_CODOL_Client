@@ -1,5 +1,6 @@
 """双表物品选择界面；筛选和分页不改变待解锁清单。"""
 from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QHBoxLayout, QLabel,
     QLineEdit, QMainWindow, QMessageBox, QPushButton, QSpinBox, QSplitter,
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QHeaderView)
@@ -10,6 +11,7 @@ class UnlockWindow(QMainWindow):
 
     def __init__(self, catalog, repository, service, database_path):
         super().__init__()
+        self.setFont(QFont('Microsoft YaHei UI', 10))
         self.catalog = catalog
         self.catalog_by_id = {row[0]: row for row in catalog}
         self.repository = repository
