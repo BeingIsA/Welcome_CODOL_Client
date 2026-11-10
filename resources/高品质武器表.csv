@@ -1,0 +1,470 @@
+﻿物品ID,原英文名,中文名,品质值,商品ID列表,类别,子类别
+10070,an94hellwalker_mp,AN94 地狱行者,3,11812; 11813; 14121,wea,ast
+10071,acrhellwalker_mp,雷明登A.C.R.地狱行者,3,10031; 11920; 14121,wea,ast
+10072,as50hellwalker_mp,北极.50 地狱行者,3,12502; 12503,wea,snp
+10075,mg4heaven_mp,MAG43-圣光之翼,3,13238; 13239; 24840,wea,lmg
+10081,cheytachw_mp,CheyTacM200海之翼,3,15887; 15888; 24841,wea,snp
+10082,vectorhw_mp,短剑 海之翼,3,15997; 24838,wea,smg
+10083,m14ebrwargod_mp,MK14 战神,3,16221,wea,ast
+10089,mkingstaff_mp,如意金箍棒,3,11877; 17728,wea,
+10265,electricbaton_mp,军用电棍,3,10420; 10421,wea,
+10353,rpgdragon_mp,RPG 龙,3,10674; 10675,wea,rkt
+10396,aa12zombie_mp,艾奇逊 AA-12 丧尸,3,10808; 10809,wea,sho
+10464,miniuziirradiated_mp,迷你乌兹 毒龙,3,11073; 11081,wea,smg
+10496,fn2000tiger_mp,BPR2000 猛虎,3,11192; 11193,wea,ast
+10657,axezom_mp,丧尸战斧,3,11372; 11526,wea,
+10677,m4a1techzombie_mp,M4A1 Tech 丧尸,3,11409; 11410,wea,ast
+10693,rpdhellwalker_mp,RPD-地狱行者,3,11440; 11441; 31993,wea,lmg
+10777,m21ebrirradiated_mp,M21 EBR 灵狐,3,11641; 11642,wea,snp
+10938,spas12irradiated_mp,弗兰基-12 毒麟,3,19379; 19380,wea,sho
+11454,spbcglasswork_mp,SPBC 紫晶,3,12769; 12770,wea,ast
+11533,msrornate_mp,纵横尸海-狩猎,3,12858; 12859,wea,snp
+11554,ak104heaven_mp,AK117-圣光之翼,3,12896; 12897,wea,ast
+11576,m14ebrornate_mp,纵横尸海-独步,3,12936; 12937,wea,ast
+11644,rangerblunder_mp,纵横尸海-突袭,3,13195; 13196,wea,sho
+11649,cutlass_mp,海盗弯刀,3,13202; 13203,wea,
+11722,g36cmurder_mp,G37H-处决者,3,13338; 13339,wea,ast
+11754,cutlassrusty_mp,海盗弯刀-印迹,3,13370; 13371,wea,
+11796,fn2000tigeragi_mp,BPR2000 灵虎,3,13425; 13426,wea,ast
+11980,rsrt3judge_mp,Type 85 Evolution 裁决者,3,21232; 21233,wea,snp
+12036,type95space_mp,Type 95 太空战士,3,21296; 21297; 22538,wea,ast
+12103,ak104manowar_mp,AK117 黑色行动,3,13819; 13820,wea,ast
+12143,rsrt3murder_mp,Type85 Evolution 处决者,3,13888; 13889,wea,snp
+12158,csg12death_mp,CSG-12 黑洞,3,13916; 13917,wea,sho
+12196,scarsaprwargod_mp,MR23 战神,3,13958; 13959,wea,ast
+12197,flamingblade_mp,九环虎头刀 魂焰,3,13960; 13961,wea,
+12216,ump45platinum_mp,UMG 白金时代,3,13992; 13993,wea,smg
+12237,mg4blops_mp,MAG43 黑色行动,3,14026; 14027,wea,lmg
+12242,ak47irradiated_mp,AK-47 毒凰,3,21651; 21652,wea,ast
+12820,cheytacfa_mp,CheyTacM200 堕落天使,3,14640; 14641,wea,snp
+13056,aa12platinum_mp,艾奇逊AA-12 白金时代,3,14986; 14987,wea,sho
+13072,cheytacplatinum_mp,CheyTacM200 白金时代,3,15016; 15017,wea,snp
+13094,scarsaprplatinum_mp,MR23 白金时代,3,15058; 15059,wea,ast
+13115,ak47platinum_mp,AK-47 白金时代,3,15098; 15099,wea,ast
+13135,g36cbrick_mp,G37H 积木,3,15136; 15137,wea,ast
+13226,ak47irradiatedblue_mp,AK-47 辐射,3,15260; 15261,wea,ast
+13258,miniuziirradiatedblue_mp,迷你乌兹 辐射,3,15310; 15311,wea,smg
+13278,m4a1techfuture_mp,M4A1 Tech 湛蓝,3,15346; 15347,wea,ast
+13293,aa12future_mp,艾奇逊 AA-12 湛蓝,3,15435; 15436,wea,sho
+13309,cheytaccell_mp,CheyTacM200 次元,3,15471; 15472,wea,snp
+13428,miniuzideath_mp,迷你乌兹 黑洞,3,15743; 15744,wea,smg
+13446,skorpionspace_mp,星际-穿梭,3,15777; 15778,wea,smg
+13447,chainsword_mp,锯齿长刀,3,15779; 15780,wea,
+13462,model1887argus_mp,M1887 蒸汽朋克,3,15807; 15808,wea,sho
+13484,scarsaprww2_mp,FG42-战争经典,3,15849; 15850,wea,ast
+13504,type95techmurder_mp,97式 处决者,3,15898; 15899,wea,ast
+13520,msrmw_mp,莫辛纳甘-战争经典,3,15928; 15929,wea,snp
+13540,an94mw_mp,星际-猎手,3,15982; 15983,wea,ast
+13557,ump45mw_mp,M3-战争经典,3,16017; 16018,wea,smg
+13578,m14ebrspace_mp,星际-独步,3,16080; 16083,wea,ast
+13596,rpdornate_mp,纵横尸海-压制,3,16120; 16121,wea,lmg
+13616,m4a1techdeath_mp,M4A1 Tech 黑洞,3,16158; 16159,wea,ast
+13637,ak47ornate_mp,纵横尸海-突击,3,16199; 16200,wea,ast
+13764,cheytacdeath_mp,CheyTacM200 黑洞,3,16450; 16451,wea,snp
+13802,mg4platinum_mp,MAG43 白金时代,3,16522; 16523,wea,lmg
+13822,an94platinum_mp,AN94 白金时代,3,16560; 16561,wea,ast
+13842,ak104platinum_mp,AK117 白金时代,3,16629; 16631,wea,ast
+13858,msrplatinum_mp,雷明登 MSR 白金时代,3,16694; 16695,wea,snp
+14075,ak104rm_mp,AK117 末日,3,16993; 16994,wea,ast
+14102,mp5sdplus_mp,SMG5SD 游灵,3,17115; 17116,wea,smg
+14133,cheytacwargod_mp,CheyTacM200 战神,3,17186; 17187,wea,snp
+14169,cheytacseeker_mp,CheyTacM200 末日,3,17274; 17275,wea,snp
+14203,type95techslime_mp,97式 生化,3,17336; 17337,wea,ast
+14296,cnsword_mp,大砍刀,3,17483; 17484,wea,
+14326,aa12destroyer_mp,艾奇逊 AA-12 末日,3,17552; 17553,wea,sho
+14406,rpdplatinum_mp,RPD 白金时代,3,17735; 17736,wea,lmg
+14421,spas12platinum_mp,弗兰基-12 白金时代,3,17770; 17771,wea,sho
+14439,miniuziplatinum_mp,迷你乌兹 白金时代,3,17804; 17805,wea,smg
+14461,m14ebrplatinum_mp,MK14 白金时代,3,17866; 17867,wea,ast
+14498,msrsd_mp,雷明登 MSR 科技之光 -「C」,3,17931; 17932,wea,snp
+14523,bowfire_mp,复合弓 烈焰,3,17984; 17990,wea,snp
+14529,bowice_mp,复合弓 冰霜,3,18034; 18035,wea,snp
+14625,m4a1techsd_mp,M4A1 Tech 科技之光 -「C」,3,18224; 18225,wea,ast
+14778,csg12tarantula_mp,CSG-12 狼蛛,3,18544; 18545,wea,sho
+14782,knifecurseblade_mp,诅咒之刃,3,18553; 18554,wea,
+14803,acrtarantula_mp,雷明登 A.C.R. 狼蛛,3,18611; 18612,wea,ast
+14834,m93dystopian_mp,贝瑞塔M93R 末日,3,18695; 18697,wea,mps
+14855,ak47wrath_mp,刀锋-狂怒,3,18782; 18783,wea,ast
+14863,m79dystopian_mp,M79 废托邦,3,18810; 18811,wea,rkt
+14895,msrtarantula_mp,雷明登 MSR 狼蛛,3,18884; 18885,wea,snp
+14973,scarsaprsd_mp,MR23 科技之光 -「C」,3,18995; 18996,wea,ast
+14994,ak47esports_mp,AK-47 CCL S2全明星,3,19035; 19036,wea,ast
+15019,ff58platinum_mp,FA7.62-L 白金时代,3,19080; 19081,wea,ast
+15034,aa12zombieblue_mp,艾奇逊 AA-12 异化,3,19108; 19109,wea,sho
+15054,m4a1techzb_mp,M4A1 Tech 异化,3,19146; 19147,wea,ast
+15071,mp5kdystopic_mp,SMG5 末日,3,19179; 19180,wea,smg
+15073,cheytacseekerult_mp,CheyTacM200 末日,3,19183; 19184,wea,snp
+15096,aa12destroyerzc_mp,艾奇逊 AA-12 末日,3,19233; 19234,wea,sho
+15137,mg4dystopian_mp,MAG43 末日,3,19316; 19317,wea,lmg
+15178,skorpionsd_mp,Vz.61 蝎式 科技之光 -「C」,3,19367; 19368,wea,smg
+15202,acrblops_mp,雷明登 A.C.R. 黑色行动,3,19416; 19417,wea,ast
+15260,m4a1techtungsten_mp,M4A1Tech 电镀紫,3,19520; 19521,wea,ast
+15278,rpdtungsten_mp,RPD 电镀紫,3,19571; 19584,wea,lmg
+15293,model1887tungsten_mp,温切斯特M1887 电镀紫,3,19624; 19632,wea,sho
+15308,mp5sdtungsten_mp,SMG5SD 电镀紫,3,19662; 19663,wea,smg
+15353,g36cplatinum_mp,G37H 白金时代,3,19772; 19773,wea,ast
+15445,ak47cell_mp,AK-47 次元,3,20017; 20018,wea,ast
+15468,ak104cell_mp,AK117 次元,3,20065; 20066,wea,ast
+15483,mp5sdcell_mp,SMG5SD 次元,3,20109; 20122,wea,smg
+15505,acrnuke_mp,雷明登 A.C.R. 裂变,3,20190; 20191; 36128,wea,ast
+15712,rpdtungstenblk_mp,RPD 钨金,3,20705; 20706,wea,lmg
+15727,model1887tungstenblk_mp,温切斯特M1887 钨金,3,20735; 20736,wea,sho
+15743,mp5sdtungstenblk_mp,SMG5SD 钨金,3,20791; 20792,wea,smg
+15764,m4a1techtungstenblk_mp,M4A1Tech 钨金,3,20875; 20876,wea,ast
+15841,ff58ww2_mp,FAL 战争经典,3,21024; 21025,wea,ast
+15890,ak47ww2_mp,STG42 战争经典,3,21234; 21235,wea,ast
+15908,tommygunww2_mp,汤姆逊 战争经典,3,21313; 21314,wea,smg
+15928,m4a1techstinger_mp,M4A1 Tech 钻&瓷,3,21373; 21380,wea,ast
+15993,mp5sdholiday_mp,SMG5 黑&白斗牛犬,3,21494; 21495,wea,smg
+16027,aa12btf_mp,艾奇逊 AA-12 电磁,3,21592; 21593,wea,sho
+16048,m4a1techverc_mp,M4A1 Tech 风驰&电掣,3,21633; 21634; 31517,wea,ast
+16073,model1887cellshade_mp,温切斯特M1887 次元,3,21752; 21753,wea,sho
+16128,fa1911two_mp,FA1911 骷髅,3,21994; 22002,wea,mps
+16142,energybat_mp,地狱战棍,3,22153; 22182,wea,
+16160,katanaheloderma_mp,军用长刀 毒蜥,3,22273; 22274,wea,
+16171,pp2000cell_mp,PDW2000 次元,3,22459; 22554,wea,mps
+16211,miniuzicell_mp,迷你乌兹 次元,3,22623; 22624,wea,smg
+16232,m4a1techcell_mp,M4A1Tech 次元,3,22663; 22664,wea,ast
+16254,ak104water_mp,AK117 特种行动,3,22706; 22707,wea,ast
+16257,ak104waterblue_mp,AK117 海豹行动,3,21445; 22710,wea,ast
+16274,as50heloderma_mp,北极.50 BMG 毒蜥,3,22742; 22743,wea,snp
+16320,g36cwater_mp,G37H 特种行动,3,22807; 22808,wea,ast
+16341,g36cwaterblue_mp,G37H 海豹行动,3,22847; 22848,wea,ast
+16357,mp5sdwater_mp,SMG5SD 特种行动,3,22878; 22879,wea,smg
+16373,mp5sdwaterblue_mp,SMG5SD 海豹行动,3,22909; 22910,wea,smg
+16389,msrwater_mp,雷明登 MSR 特种行动,3,22941; 22942,wea,snp
+16405,msrwaterblue_mp,雷明登 MSR 海豹行动,3,22971; 22972,wea,snp
+16424,rpdwater_mp,RPD 特种行动,3,23007; 23008,wea,lmg
+16443,rpdwaterblue_mp,RPD 海豹行动,3,23043; 23044,wea,lmg
+16461,mp5kwargod_mp,SMG5 战神,3,23648,wea,smg
+16467,fa1911wgdiamond_mp,FA1911 战神,3,23647,wea,mps
+16486,mg4heloderma_mp,MAG43 毒蜥,3,23124; 23125,wea,lmg
+16541,ak104esports_mp,AK117 CCL S3,3,23203; 23204,wea,ast
+16766,ump45storm_mp,UMG 电磁,3,23516; 23517,wea,smg
+16789,m14ebrheloderma_mp,MK14 毒蜥,3,23560; 23561,wea,ast
+16805,cheytacspy_mp,CheyTacM200 无间,3,23590; 23591,wea,snp
+16906,scarsaprspy_mp,MR23 无间,3,23745; 23746,wea,ast
+16974,acrww2_mp,ACR 战争经典,3,23815; 23816,wea,ast
+16998,an94heloderma_mp,AN94 毒蜥,3,23861; 23862,wea,ast
+17060,ak104bg_mp,AK117 古埃及,3,23981; 23982,wea,ast
+17075,aa12heloderma_mp,艾奇逊 AA-12 毒蜥,3,24009; 24010,wea,sho
+17191,scarsaprcell_mp,MR23 次元,3,24202; 24203,wea,ast
+17418,axezomsilver_mp,银质丧尸战斧,3,24605; 24606,wea,
+17441,m4a1techbluecell_mp,M4A1Tech 新次元,3,24649; 24650,wea,ast
+17450,sickle_mp,镰刀,3,24660; 24661,wea,
+17451,staff_mp,天谴之杖,3,24662; 24663,wea,
+17466,spas12wargod_mp,弗兰基-12 战神,3,24690,wea,sho
+17500,arx51blk_mp,X51 黑金,3,24755; 24756,wea,ast
+17546,m1garandww2_mp,M1加兰德 战争经典,3,24836; 24837,wea,ast
+17614,ak104dmz_mp,AK117 勇者,3,24955; 24956,wea,ast
+17630,ump45dmz_mp,UMG 勇者,3,24985; 24986,wea,smg
+17631,firecracker_mp,烟花棒,3,24987; 24988,wea,
+17684,mg4dmz_mp,MAG43 勇者,3,25087; 25088,wea,lmg
+17706,arx51dmz_mp,X51 勇者,3,25129; 25130,wea,ast
+17725,miniuziww2_mp,迷你乌兹 战争经典,3,25165; 25166,wea,smg
+17742,cheytacww2_mp,M200 战争经典,3,25197; 25198,wea,snp
+17760,mp5kww2_mp,毛瑟C91 战争经典,3,25231; 25232,wea,smg
+17782,m4a1techholiday_mp,M4A1Tech 锯齿 -「R」,3,25273; 25274,wea,ast
+17804,ak47holiday_mp,AK-47 锯齿 -「R」,3,25315; 25316,wea,ast
+17823,rpdholiday_mp,RPD 锯齿 -「R」,3,25351; 25352,wea,lmg
+17829,bowcupid_mp,复合弓 情人杀手,3,25363; 25364,wea,snp
+17855,mp5sdbg_mp,SMG5SD 黑金,3,25411; 25412,wea,smg
+17956,augwolf_mp,斯泰尔 AUG-H 狼魂,3,25542; 25543,wea,lmg
+17980,ff58wolf_mp,FA7.62-L 狼魂,3,25588; 25589,wea,ast
+17998,mp5kwolf_mp,SMG5 狼魂,3,25622; 25623,wea,smg
+18009,tmpcash_mp,斯泰尔TMP 财神,3,25643; 25644,wea,mps
+18031,tmps4wargodepic_mp,斯泰尔TMP 战神,3,25684,wea,mps
+18053,m4a1techcellshadeple_mp,M4A1Tech 次元限定,3,25725; 25726,wea,ast
+18070,g18wolf_mp,格洛克18 狼魂,3,25752; 25753,wea,mps
+18114,pp2000popart_mp,PDW2000 新次元,3,25806; 25807,wea,mps
+18151,aa12dmz_mp,艾奇逊 AA-12 勇者,3,25859; 25860,wea,sho
+18176,ak47wrathblk_mp,刀锋-狂怒 黑金,3,25907; 25908,wea,ast
+18194,rsrt3wolf_mp,Type85 Evolution 狼魂,3,25940; 25941,wea,snp
+18334,aa12dmzalt_mp,艾奇逊 AA-12 勇者无畏 -「C」,3,26162; 26163,wea,sho
+18356,ak104dmzalt_mp,AK117 勇者无畏 -「C」,3,26204; 26205,wea,ast
+18380,mg4dmzalt_mp,MAG43 勇者无畏 -「C」,3,26246; 26247,wea,lmg
+18398,ump45dmzalt_mp,UMG 勇者无畏 -「C」,3,26280; 26281,wea,smg
+18420,arx51dmzalt_mp,X51 勇者无畏 -「C」,3,26322; 26323,wea,ast
+18503,type95techutaca_mp,97式 鎏金,3,26443; 26444,wea,ast
+18525,type95techutacb_mp,97式 古铜,3,26485; 26486,wea,ast
+18547,ak104razorback_mp,AK117 利刃 -「C」,3,26527; 26528,wea,ast
+18575,ak47bo3_mp,AK-47 黑色行动,3,26575; 26576,wea,ast
+18597,m4a1techfrost_mp,M4A1Tech 锯齿 冰封,3,26617; 26618,wea,ast
+18619,ak47frost_mp,AK-47 锯齿 冰封,3,26697; 26723,wea,ast
+18638,rpdfrost_mp,RPD 锯齿 冰封,3,26764; 26765,wea,lmg
+18711,msrrazorback_mp,雷明登 MSR 利刃 -「C」,3,26874; 26875,wea,snp
+18735,scarsaprrazorback_mp,MR23 利刃 -「C」,3,26920; 26921,wea,ast
+18863,deserteaglewargod_mp,沙鹰 战神,3,27082,wea,pst
+18901,mg4wargod_mp,MAG43 战神,3,27154,wea,lmg
+19033,honeybadgerdis_mp,AAC 吉利 -「C」,3,27366; 27367,wea,ast
+19294,l115disguise_mp,L115A3 吉利 -「C」,3,27866; 27867,wea,snp
+19313,rpdtool_mp,RPD 匠心之力,3,27902; 27903,wea,lmg
+19315,nailbat_mp,露希尔,3,27905; 27906,wea,
+19342,ak47tool_mp,AK-47 匠心之力,3,27953; 27954; 30738,wea,ast
+19467,m4a1techbc_mp,M4A1 Tech 勇者游戏 -「C」,3,28175; 28176,wea,ast
+19499,m4a1techtool_mp,M4A1 Tech 匠心之力,3,28228; 28229,wea,ast
+19517,mp5ktool_mp,SMG5 匠心之力,3,28262; 28263,wea,smg
+19545,spbcclown_mp,SPBC 小丑,3,28310; 28311,wea,ast
+19568,type95clown_mp,Type95 小丑,3,28354; 28355,wea,ast
+19587,miniuzispstation_mp,迷你乌兹 太空,3,28390; 28391,wea,smg
+19605,ump45spstation_mp,UMG 太空,3,28424; 28425,wea,smg
+19628,ak104spstation_mp,AK117 太空,3,28468; 28469,wea,ast
+19651,ak104disguise_mp,AK117 吉利 -「C」,3,28512; 28513,wea,ast
+19676,an94spstation_mp,AN94 太空,3,28558; 28559,wea,ast
+19706,ak47cardboard_mp,AK-47 纸板 -「C」,3,28607; 28608,wea,ast
+19789,honeybadgerspstation_mp,AAC 太空,3,28739; 28740,wea,ast
+19806,msrbc_mp,雷明登 MSR 勇者游戏 -「C」,3,28771; 28772,wea,snp
+19831,m1garandbc_mp,M1加兰德 勇者游戏 -「C」,3,28819; 28820,wea,ast
+19837,fa1911clown_mp,FA1911 小丑,3,28830; 28831,wea,mps
+19860,fn2000techclown_mp,BPR2000 Tech 小丑,3,28874; 28875,wea,ast
+19878,csg12tool_mp,CSG-12 匠心之力,3,28897,wea,sho
+19914,mp5sdgeo_mp,SMG5SD 几何,3,28947; 28948,wea,smg
+19938,miniuzidis_mp,迷你乌兹 吉利 -「C」,3,28989; 28990,wea,smg
+19961,ak104geo_mp,AK117 几何,3,29033; 29034,wea,ast
+19984,m4a1techgeo_mp,M4A1Tech 几何,3,29077; 29078,wea,ast
+20055,scarsaprgeo_mp,MR23 几何,3,29126; 29127,wea,ast
+20102,cheytacgeo_mp,CheyTacM200 几何,3,29158; 29159,wea,snp
+20165,m4a1techbo3_mp,M4A1Tech 黑色行动,3,29202; 29203,wea,ast
+20235,scarsaprbo3_mp,MR23 黑色行动,3,29250; 29251,wea,ast
+20499,katanawargod_mp,军用长刀 战神,3,29401,wea,
+20671,an94wargod_mp,AN94 战神,3,29536,wea,ast
+20703,crossbowgear_mp,十字弩 军火,3,29559; 29560,wea,rkt
+20752,ak104smart_mp,AK117 智能风暴,3,29603; 29604,wea,ast
+20798,miniuzismart_mp,迷你乌兹 智能风暴,3,29639; 29640,wea,smg
+20830,m1garandsmart_mp,M1加兰德 智能风暴,3,29687; 29688,wea,ast
+20896,m4a1techsmart_mp,M4A1 Tech 智能风暴,3,29731; 29732,wea,ast
+20923,model1887smart_mp,温切斯特M1887 智能风暴,3,29759; 29760,wea,sho
+20988,ak47zhunter_mp,AK-47 异变危机,3,29812; 29813,wea,ast
+21006,ump45zhunter_mp,UMG 异变危机,3,29846; 29847,wea,smg
+21043,cheytaczhunter_mp,CheyTacM200 异变危机,3,29878; 29879,wea,snp
+21058,knifeclaw_mp,炼狱之拳,3,29894,wea,
+21144,stingerzhunter_mp,炼狱毒刺,3,29917; 29918,wea,rkt
+21242,rangerrusty_mp,纵横尸海-印迹,3,22502; 22503,wea,sho
+21593,miniuzithemed_mp,迷你乌兹 游戏王,3,30134; 30135,wea,smg
+22275,r5rgptyrant_mp,R5 RGP 贵族 -「C」,3,30366; 30367,wea,ast
+22319,scarsaprtyrant_mp,MR23 贵族 -「C」,3,30450; 30451,wea,ast
+22345,l115fusion_mp,L115A3 聚变,3,30491; 30492,wea,snp
+22364,rpdhive_mp,RPD 赤蜂,3,30527; 30528,wea,lmg
+22392,veprtyrant_mp,Vepr 贵族 -「C」,3,30580; 30581,wea,smg
+22411,skorpionhive_mp,Vz.61 蝎式 赤蜂,3,30616; 30617,wea,smg
+22426,spas12hive_mp,弗兰基-12 赤蜂,3,30644; 30645,wea,sho
+22543,rpdthemed_mp,RPD 游戏王,3,30846; 30847,wea,lmg
+22566,ak47themed_mp,AK-47 游戏王,3,30890; 30891,wea,ast
+22582,mp5sdfusion_mp,SMG5SD 聚变,3,30921; 30922,wea,smg
+22605,ak104fusion_mp,AK117 聚变,3,30965; 30966,wea,ast
+22629,acrfusion_mp,雷明登 A.C.R. 聚变,3,31010; 31011,wea,ast
+22672,ump45modern_mp,UMG 现代战争,3,31084; 31085,wea,smg
+22695,ak47modern_mp,AK-47 现代战争,3,31128; 31129,wea,ast
+22712,msrmodern_mp,MSR 现代战争,3,31160; 31161,wea,snp
+22735,m4a1techmodern_mp,M4A1Tech 现代战争,3,31204; 31205,wea,ast
+22750,aa12modern_mp,艾奇逊 AA-12 现代战争,3,31232; 31233,wea,sho
+22773,an94vulcan_mp,AN94 沃肯,3,31276; 31277,wea,ast
+22798,m1garandvulcan_mp,M1加兰德 沃肯,3,31324; 31325,wea,ast
+22816,veprvulcan_mp,Vepr 沃肯,3,31358; 31359,wea,smg
+22861,m79zhunt_mp,M79 猎人之心,3,31437; 31438,wea,rkt
+22942,pp2000hive_mp,PDW2000 青蜂,3,31575; 31576,wea,mps
+22967,bonestaff_mp,寒冰之脊,3,31603; 31604,wea,
+22970,katanaduairon_mp,双月之陨,3,31607; 31608,wea,
+22971,knifeballisticindia_mp,印第安吹箭,3,31609; 31610,wea,rkt
+23087,g18wgdiamond_mp,格洛克18 战神,3,31784,wea,mps
+23137,as50wargod_mp,北极.50 战神,3,31875,wea,snp
+23156,mg4anniversaryver2_mp,MAG43 2周年典藏,3,31911; 31912,wea,lmg
+23179,ak104neon_mp,AK117 炫色,3,31955; 31956,wea,ast
+23198,mp5kvictory_mp,毛瑟C91 战争胜利,3,31991; 31992,wea,smg
+23223,scarsaprvictory_mp,FG42 战争胜利,3,32040; 32041,wea,ast
+23240,l115victory_mp,L115A3 战争胜利,3,32072; 32073,wea,snp
+23266,g36chive_mp,G37H 青蜂,3,32122; 32123,wea,ast
+23294,mp5sdneon_mp,SMG5SD 炫色,3,32176; 32177,wea,smg
+23313,mg4neon_mp,MAG43 炫色,3,32212; 32213,wea,lmg
+23330,cheytacneon_mp,CheyTacM200 炫色,3,32244; 32245,wea,snp
+23357,r5rgpneon_mp,R5 RGP 炫色,3,32295; 32296,wea,ast
+23826,m4a1techheavy_mp,M4A1 Tech 重金属,3,32566; 32567,wea,ast
+23905,tmpsnake_mp,斯泰尔TMP 蛇纹,3,32612; 32613,wea,mps
+23989,arx51snake_mp,X51 蛇纹,3,32656; 32657,wea,ast
+24027,mg4heavy_mp,MAG43 重金属,3,32692; 32693,wea,lmg
+24050,ak47heavy_mp,AK-47 重金属,3,32736; 32737,wea,ast
+24075,scarsaprorbit_mp,MR23 银河星轨,3,32784; 32785,wea,ast
+24097,rpdorbit_mp,RPD 银河星轨,3,32820; 32821,wea,lmg
+24178,csg12orbit_mp,CSG-12 银河星轨,3,32847; 32848,wea,sho
+24201,ak47orbit_mp,AK-47 银河星轨,3,32891; 32892,wea,ast
+24301,p90orbit_mp,PDW90 银河星轨,3,32925; 32926,wea,smg
+24348,an94gldera_mp,AN94 光能纪元,3,33009; 33010,wea,ast
+24371,ak104gldera_mp,AK117 光能纪元,3,33053; 33054,wea,ast
+24387,mp5sdgldera_mp,SMG5SD 光能纪元,3,33084; 33085,wea,smg
+24459,ump45mustang_mp,UMG 野马,3,33120; 33121,wea,smg
+24476,l115mustang_mp,L115A3 野马,3,33152; 33153,wea,snp
+24497,honeybadgermustang_mp,AAC 野马,3,33192; 33193,wea,ast
+24552,scarmustang_mp,MK17-CQC 野马,3,33239; 33240,wea,ast
+24575,m4a1techmustang_mp,M4A1 Tech 野马,3,33283; 33284,wea,ast
+24600,m14ebrsnake_mp,MK14 蛇纹,3,33331; 33332,wea,ast
+24623,m4a1techcny_mp,M4A1 Tech 新年,3,33375; 33376,wea,ast
+24710,javelinzhunt_mp,标枪 昆德兰守护者,3,33507; 33508,wea,rkt
+24855,ak104block_mp,AK117 玩具战争,3,33717; 33718,wea,ast
+24873,mp5kblock_mp,SMG5 玩具战争,3,33751; 33752,wea,smg
+24915,as50block_mp,北极.50 玩具战争,3,33784; 33785,wea,snp
+24944,veprrekcol_mp,Vepr 进击,3,33818; 33819,wea,smg
+24987,acrrekcol_mp,雷明登 A.C.R. 进击,3,33863; 33864,wea,ast
+25010,type95techwargod_mp,97式 战神,3,33907,wea,ast
+25021,m93wgdiamond_mp,贝瑞塔M93R 战神,3,33928,wea,mps
+25093,ak104cny_mp,AK117 新春,3,34037; 34038,wea,ast
+25156,famasnyb_mp,法玛斯 新春典藏,3,34157; 34158,wea,ast
+25181,p90rainbow_mp,PDW90 彩虹蜂巢,3,34200; 34201,wea,smg
+25206,scarsaprrainbow_mp,MR23 彩色斑马,3,34248; 34249,wea,ast
+25229,ak47rainbow_mp,AK-47 迷幻花窗,3,34292; 34293,wea,ast
+25235,warhammer_mp,腐化者战锤,3,33632; 34299,wea,
+25470,honeybadgertank_mp,AAC 坦克,3,34465; 34466,wea,ast
+25485,model1887tank_mp,温切斯特 M1887 坦克,3,34493; 34494,wea,sho
+25508,ak47tank_mp,AK-47 坦克,3,34537; 34538,wea,ast
+25527,mg4tank_mp,MAG43 坦克,3,34573; 34574,wea,lmg
+25544,cheytactank_mp,CheyTacM200 坦克,3,34605; 34606,wea,snp
+25562,veprgraffiti_mp,Vepr 连环画,3,34639; 34640,wea,smg
+25585,tar21graffiti_mp,塔沃尔-21 连环画,3,34683; 34684,wea,ast
+25609,r5rgpred_mp,R5 RGP 鎏金,3,34728; 34729,wea,ast
+25681,m1garandpatriot_mp,M1加兰德 爱国者,3,34844; 34845,wea,ast
+26012,m16police_mp,M16A4 战警,3,35188; 35189,wea,ast
+26033,aa12plc_mp,艾奇逊 AA-12 战警,3,35218; 35219,wea,sho
+26065,m21ebrsupplydp_mp,M21 EBR 天马,3,35252; 35253,wea,snp
+26090,m4a1techplc_mp,M4A1 Tech 战警,3,35298; 35299,wea,ast
+26109,aks74uwargod_mp,AKS-74U 战神,3,35334,wea,smg
+26110,knifeballisticdmd_mp,战术弹簧刀 战神,3,35336,wea,rkt
+26147,p90plc_mp,PDW90 战警,3,35405; 35406,wea,smg
+26172,miniuzigraffiti_mp,迷你乌兹 连环画,3,35449; 35450,wea,smg
+26399,rpdgraffiti_mp,RPD 连环画,3,35595; 35596,wea,lmg
+26423,ak104graffiti_mp,AK117 连环画,3,35641; 35642,wea,ast
+26502,acrknight_mp,ACR 维京海盗,3,35713; 35714,wea,ast
+26528,aks74uknight_mp,AKS-74U 帝国骑士,3,35749; 35750,wea,smg
+26591,scarknight_mp,MK17-CQC 帝国骑士,3,35818; 35819,wea,ast
+26654,skorpionknight_mp,Vz.61 蝎式 帝国骑士,3,35917; 35918,wea,smg
+26692,arx51zhunt_mp,X51 芬里尔之牙,3,35987; 35988,wea,ast
+26768,riotshieldzhloot_mp,夜空之壁,3,36099; 36100,wea,oth
+26786,rpgmr18wgdiamond_mp,RPG 战神,3,36133,wea,rkt
+26823,vpermr18wgdiamond_mp,Vepr 战神,3,36203,wea,smg
+26842,p90fighterjet_mp,PDW90 战机之魂,3,36236; 36237,wea,smg
+26887,ak47fighterjet_mp,AK-47 战机之魂,3,36282; 36283,wea,ast
+26905,svufighterjet_mp,Ots-03 战机之魂,3,36316; 36317,wea,snp
+26972,model1887fighterjet_mp,温切斯特 M1887 战机之魂,3,36346; 36347,wea,sho
+27006,ak104fighterjet_mp,AK117 战机之魂,3,36394; 36395,wea,ast
+27227,knifezhloot_mp,提尔之握,3,36649,wea,
+27385,m4a1techdeatheg_mp,M4A1 Tech 杀戮机器,3,36804; 36805,wea,ast
+27429,acrdeatheg_mp,A.C.R 杀戮机器,3,36856; 36857,wea,ast
+27446,m21ebrbattlepass_mp,M21 EBR 樱花,3,36888; 36889,wea,snp
+27464,mp5kbattlepass_mp,SMG5 樱花,3,36922; 36923,wea,smg
+27482,m93battlepass_mp,贝瑞塔M93R 樱花,3,36943; 36944,wea,mps
+27552,scarsaprreskin_mp,MR23 赤狐,3,36991; 36992,wea,ast
+27571,pechenegreskin_mp,PKP 赤狐,3,37027; 37028,wea,lmg
+27580,rangerdeatheg_mp,游侠 杀戮机器,3,37044; 37045,wea,sho
+27624,rake_mp,钉耙,3,37103; 37104,wea,
+27665,spannersilver_mp,专家扳手,3,37161; 37162,wea,
+27780,gpas12reskin_mp,GPAS-12 赤狐,3,37237,wea,sho
+27867,tommygunstar_mp,汤姆逊 星标,3,37345; 37346,wea,smg
+27887,cheytacstar_mp,CheyTacM200 星标,3,37377; 37378,wea,snp
+27930,spbcstar_mp,SPBC 星标,3,37421; 37422,wea,ast
+27948,vectordeatheg_mp,短剑 杀戮机器,3,37455,wea,smg
+27960,g18deatheg_mp,格洛克18 杀戮机器,3,37477; 37478,wea,mps
+27997,r870ronin_mp,雷明登870 图腾之灵,3,37532; 37533,wea,sho
+28028,scarronin_mp,MK17-CQC 图腾之灵,3,37579; 37580,wea,ast
+28052,mp5sdronin_mp,SMG5SD 图腾之灵,3,37610; 37611,wea,smg
+28072,augronin_mp,斯泰尔 AUG-H 图腾之灵,3,37646; 37647,wea,lmg
+28178,akbptechsupplydrop_mp,AKBP Tech 传奇,3,37797; 37798,wea,ast
+28199,honeybadgerronin_mp,AAC 图腾之灵,3,37837; 37838,wea,ast
+28379,r5rgpsupplydp_mp,R5 RGP 炫翼,3,38144; 38145,wea,ast
+28396,msrhalloween_mp,雷明登 MSR 惊魂之夜,3,38176; 38177,wea,snp
+28421,m1garandhalloween_mp,M1加兰德 惊魂之夜,3,38224; 38225,wea,ast
+28439,veprhalloween_mp,Vepr 惊魂之夜,3,38258; 38259,wea,smg
+28440,javelinhalloween_mp,"""标枪""导弹 惊魂之夜",3,38260; 38261,wea,rkt
+28446,bowhalloween_mp,复合弓 惊魂之夜,3,38272; 38273,wea,snp
+28459,deserteaglehalloween_mp,沙鹰 惊魂之夜,3,38298; 38299,wea,pst
+28612,aa12anniversaryb_mp,艾奇逊 AA-12 3周年典藏,3,38586; 38587,wea,sho
+28627,strikerair_mp,打击者 未来战士,3,38614; 38615,wea,sho
+28652,acrair_mp,雷明登 A.C.R. 未来战士,3,38661; 38662,wea,ast
+28676,ak47air_mp,AK-47 未来战士,3,38707; 38708,wea,ast
+28694,cheytacair_mp,CheyTacM200 未来战士,3,38741; 38742,wea,snp
+28727,m4a1techtdreward_mp,M4A1 Tech 劫掠者,3,38792; 38793,wea,ast
+28739,crossbowtdreward_mp,爆炸十字弩 奥塔尔,3,38814; 38815,wea,rkt
+28864,mp7flanker_mp,MP7 重装奇袭,3,38978; 38979,wea,smg
+28908,an94flanker_mp,AN94 重装奇袭,3,39048; 39049,wea,ast
+28941,pechenegmarberry_mp,PKP 卡通魔力,3,39112; 39113,wea,lmg
+28960,p90marberry_mp,PDW90 卡通魔力,3,39148; 39149,wea,smg
+28984,m4a1techmarberry_mp,M4A1 Tech 卡通魔力,3,39194; 39195,wea,ast
+29003,as50marberry_mp,北极.50 卡通魔力,3,39229; 39230,wea,snp
+29027,type95techstar_mp,97式 星标,3,39275; 39276,wea,ast
+29045,ump45supplydp_mp,UMG 赤翼,3,39309; 39310,wea,smg
+29056,tmpstar_mp,斯泰尔TMP 星标,3,39330; 39331,wea,mps
+29086,honeybadgerwargod_mp,AAC 战神,3,39381,wea,ast
+29167,m14ebrcampaigner_mp,MK14 复古精英,3,39525; 39526,wea,ast
+29210,r870star_mp,雷明登870 星标,3,39603; 39604,wea,sho
+29235,scarsaprstar_mp,MR23 星标,3,39651; 39652,wea,ast
+29256,honeybadgerstar_mp,AAC 星标,3,39691; 39692,wea,ast
+29273,l115supplydp_mp,L115A3 天空之翼,3,39723; 39724,wea,snp
+29381,ak47wargod_mp,AK-47 战神,3,39913,wea,ast
+29413,magnumdiamond_mp,.44马格南 战神,3,39974,wea,pst
+29428,fa1911campaigner_mp,FA1911 复古精英,3,40002; 40003,wea,mps
+29452,famasflanker_mp,法玛斯 重装奇袭,3,40047; 40048,wea,ast
+29477,scarflanker_mp,MK17-CQC 重装奇袭,3,40094; 40095,wea,ast
+29504,ak104campaigner_mp,AK117 复古精英,3,40159; 40160,wea,ast
+29523,mg4campaigner_mp,MAG43 复古精英,3,40195; 40196,wea,lmg
+29578,m4mwreskin_mp,M4A1 现代战争,3,40287; 40288,wea,ast
+29707,scarstar_mp,MK17-CQC 星标,3,40436; 40437,wea,ast
+29731,acrstar_mp,雷明登 A.C.R. 星标,3,40481; 40482,wea,ast
+29754,arx51circus_mp,X51 精英玩家纪念,3,40525; 40526,wea,ast
+29827,mp7cyberpunk_mp,MP7 赛博朋克-「C」,3,40662; 40663,wea,smg
+10007,csg12ss_mp,自由,4,17081,wea,sho
+10080,g36css_mp,命运,4,14747,wea,ast
+10553,csg12sscny_mp,自由 荣耀,4,18672,wea,sho
+10604,g36csscny_mp,命运 荣耀,4,18766,wea,ast
+10609,ak104ss_mp,AK117 熔岩,4,11275; 11276,wea,ast
+11462,csg12ssblk_mp,自由 黑金,4,20363,wea,sho
+11497,g36cssblk_mp,命运 黑金,4,20429,wea,ast
+11857,famasss_mp,特斯拉 电鳗,4,21005; 21006,wea,ast
+12709,ak47ss_mp,正义,4,14450; 14451,wea,ast
+12749,famassscny_mp,特斯拉 电鳗 荣耀,4,14488; 14489,wea,ast
+12851,ak104sscny_mp,AK117 熔岩 荣耀,4,14689; 14690,wea,ast
+13200,g36cssyellow_mp,命运 辉煌,4,15215; 15216,wea,ast
+13327,ak47ssblack_mp,正义 黑金,4,15524; 15540,wea,ast
+13346,csg12ssblkred_mp,自由 天火,4,15594,wea,sho
+14117,miniuziss_mp,审判,4,17156; 17157,wea,smg
+14153,ak104ssice_mp,AK117 白色巨人,4,17244; 17245,wea,ast
+14878,gpas12slick_mp,GPAS-12 液化,4,18838,wea,sho
+15092,miniuzissblk_mp,审判 黑金,4,19223; 19224,wea,smg
+15864,scarsaprtesla_mp,MR23 电磁风暴,4,21097; 21098,wea,ast
+16141,m4a1techss_mp,天命,4,22129; 22148,wea,ast
+16185,m4a1techssblk_mp,天命 黑金,4,22579; 22580,wea,ast
+17164,an94ss_mp,混沌,4,24154; 24155,wea,ast
+17844,an94sswht_mp,混沌 青花瓷,4,25390; 25391,wea,ast
+18208,miniuzisscny_mp,审判 寒梅,4,25965; 25966,wea,smg
+18245,ak47sscny_mp,正义 荣耀,4,26018; 26019,wea,ast
+19047,an94ssblk_mp,混沌 黑金,4,27396; 27397,wea,ast
+19069,ak104ssblk_mp,AK117熔岩黑金 -「C」,4,27438; 27439,wea,ast
+19084,ump45ss_mp,天启,4,27470; 27471,wea,smg
+19744,ump45ssblk_mp,天启 死亡骑士,4,28657; 28658,wea,smg
+19766,m4a1techssstar_mp,天命 星标 -「C」,4,28697; 28698,wea,ast
+20277,honeybadgerss_mp,死神,4,29271; 29272,wea,ast
+20323,an94ssstar_mp,混沌 星标,4,29296; 29297,wea,ast
+20329,bowss_mp,风暴之怒,4,29308; 29309; 31519,wea,snp
+22374,honeybadgerssblk_mp,死神 星标,4,30546; 30547,wea,ast
+22660,scarsaprss_mp,幻视,4,31064; 31065,wea,ast
+23074,ak104ssstar_mp,AK117 熔岩 星标,4,31761; 31762,wea,ast
+23278,miniuzissstar_mp,审判 星标,4,32145; 32146,wea,smg
+23719,scarsaprssstar_mp,幻视 星标,4,32502; 32503,wea,ast
+24325,veprss_mp,泰坦,4,32965; 32966,wea,smg
+24798,csg12ssstar_mp,自由 星标,4,33623,wea,sho
+24813,aa12ss_mp,众神之力,4,33650; 33651; 34428,wea,sho
+24832,m4a1techsscny_mp,天命 荣耀,4,33673; 33674,wea,ast
+25645,veprssstar_mp,泰坦 星标,4,34796; 34797,wea,smg
+25856,scarss_mp,毁灭,4,34977; 34978,wea,ast
+26612,ak47ssstar_mp,正义 星标,4,35858; 35859,wea,ast
+26663,katanass_mp,克洛诺斯之刃,4,35934; 35935; 36806,wea,
+26666,mg4ss_mp,盖亚之臂,4,35940; 35941; 36806,wea,lmg
+26767,g36cssstar_mp,命运 星标,4,36098,wea,ast
+26781,deserteaglespecial_mp,乌拉诺斯之脉,4,36125; 36126; 36806,wea,pst
+27675,spannergold_mp,大工程师扳手,4,37163; 37164,wea,
+27732,veprsslava_mp,泰坦 熔岩,4,37209; 37210,wea,smg
+27811,an94sslava_mp,混沌 熔岩,4,37285; 37286,wea,ast
+27975,scarssstar_mp,毁灭 星标,4,37503; 37504,wea,ast
+28288,pechenegss_mp,凯旋,4,38007; 38008,wea,lmg
+28342,ak47sslava_mp,正义 熔岩,4,38074; 38075,wea,ast
+28355,honeybadgersslava_mp,死神 熔岩,4,38099; 38100,wea,ast
+28825,csg12sslava_mp,自由 熔岩,4,38925,wea,sho
+28922,m4a1techsslava_mp,天命 熔岩,4,39076; 39077,wea,ast
+29179,miniuzisslava_mp,审判 熔岩,4,39548; 39549,wea,smg
+29194,scarsslava_mp,毁灭 熔岩,4,39574; 39575,wea,ast

@@ -7,7 +7,7 @@ from codol_rebuild.adapters.game.v1649370.native_state import checked_write, u32
 HANDLER_SLOT = 0xDCD8C8
 HANDLER = 0x6A7970
 SUCCESS, ARRAY, RESPONSE, ITEMS, REWARD, UNDEFINED = 0, 32, 64, 96, 128, 160
-FIELDS, MESSAGE, CAPACITY = 256, 1536, 4096
+FIELDS, MESSAGE, CAPACITY = 2048, 1536, 16384
 REWARD_FIELDS = ('itemID', 'productID', 'rentalDurationSeconds', 'wasCrushed',
                  'crushCurrencyID', 'crushAmount', 'isFeatured', 'quantity',
                  'quantityDelta', 'isPartialCrushed', 'showOff')
@@ -26,36 +26,58 @@ CONTRACT = {
 
 
 def load_reward_pool(path, catalog):
-    """读取固定奖池，保留原显示品质，仅把0级归入业务1级。"""
+    """读取商品内容或武器物品表，按原生目录识别可叠加物品。"""
     rewards = []
     seen_ids = set()
     with path.open(encoding='utf-8-sig', newline='') as stream:
         for row in csv.DictReader(stream):
-            item_id, tier = int(row['物品ID']), int(row['品质值'])
-            if item_id in seen_ids or item_id not in catalog or tier not in range(5):
-                raise ValueError(f'奖池物品或品质无效：{item_id}')
-            seen_ids.add(item_id)
-            rewards.append({'item_id': item_id, 'tier': max(1, tier),
-                            'stackable': bool(bytes.fromhex(catalog[item_id]['raw'])[32] & 2)})
+            product_pool = '商品ID' in row
+            reward_id = int(row['商品ID'] if product_pool else row['物品ID'])
+            if reward_id in seen_ids:
+                raise ValueError(f'奖池编号重复：{reward_id}')
+            seen_ids.add(reward_id)
+            entries = row['物品列表（ID:数量）'].split(';') if product_pool else [f'{reward_id}:1']
+            contents = []
+            for entry in entries:
+                item_id, count = map(int, entry.strip().split(':'))
+                if item_id not in catalog or count <= 0:
+                    raise ValueError(f'奖池物品或数量无效：{item_id}')
+                stackable = bool(bytes.fromhex(catalog[item_id]['raw'])[32] & 2)
+                contents.append({'item_id': item_id, 'stackable': stackable,
+                                 'count': count if stackable else 1})
+            rewards.append({'product_id': reward_id if product_pool else 0, 'contents': contents})
     if not rewards:
         raise ValueError('奖池为空')
     return tuple(rewards)
 
 
 def encode_result(state, crate_id, reward):
-    """描述永久奖励字段；构造器负责初始化依赖数组，不伪造商品或碎片。"""
-    payload = bytearray(MESSAGE + 384)
+    """将商品展开为原生物品奖励，保留实际物品编号及数量变化。"""
+    contents = reward['contents']
+    payload = bytearray(max(MESSAGE + 384, FIELDS + (len(contents) * len(REWARD_FIELDS) + 1) * 36))
+    if len(payload) > CAPACITY:
+        raise ValueError('开箱奖励结果超出数据页')
+    struct.pack_into('<I', payload, 4, len(contents))
     for offset in (ARRAY, RESPONSE, ITEMS, REWARD, UNDEFINED):
         struct.pack_into('<IIII', payload, offset, 0xffffffff, 0xffffffff, 0, 0)
     names_offset = 768
-    values = (reward['item_id'], 0, 0, False, 0, 0, False, 1, 1, False, False)
-    for field_index, (name, value) in enumerate(zip((*REWARD_FIELDS, 'supplyDropID'), (*values, crate_id))):
+    name_addresses = {}
+    for name in (*REWARD_FIELDS, 'supplyDropID'):
         name_bytes = name.encode('ascii') + b'\0'
         payload[names_offset:names_offset + len(name_bytes)] = name_bytes
-        struct.pack_into('<IIIIII', payload, FIELDS + field_index * 36,
-                         state + names_offset, 0xffffffff, 0xffffffff, 0,
-                         2 if type(value) is bool else 3, int(value))
+        name_addresses[name] = state + names_offset
         names_offset += len(name_bytes)
+    field_values = []
+    for content in contents:
+        # 原生 UI 将非零 productID 解释为礼包；逐物品回显必须走 GetItemInfo。
+        values = (content['item_id'], 0, 0, False, 0, 0, False,
+                  content['quantity'], content['quantity_delta'], False, False)
+        field_values.extend(zip(REWARD_FIELDS, values))
+    field_values.append(('supplyDropID', crate_id))
+    for field_index, (name, value) in enumerate(field_values):
+        struct.pack_into('<IIIIII', payload, FIELDS + field_index * 36,
+                         name_addresses[name], 0xffffffff, 0xffffffff, 0,
+                         2 if type(value) is bool else 3, int(value))
     payload[1200:1213] = b'grantedItems\0'
     error_bytes = '开箱结果构造失败，未消耗军火箱'.encode('utf-8') + b'\0'
     payload[MESSAGE:MESSAGE + len(error_bytes)] = error_bytes
@@ -96,13 +118,17 @@ def build_adapter(entry, state, ready_address):
     for offset in (ARRAY, ITEMS):
         push(state + offset); call(0x72FDD0); emit('83c404'); check_result()
     create_named(RESPONSE, 0xDD5654)
+    emit('be'); word(state + FIELDS)
+    labels['reward'] = len(instructions)
     create_named(REWARD, 0xDD5590)
-    emit('be'); word(state + FIELDS); emit('bf'); word(len(REWARD_FIELDS))
+    emit('bf'); word(len(REWARD_FIELDS))
     labels['field'] = len(instructions)
     emit('8d4604 50 ff36'); object_pointer(REWARD); call(0x436750); check_result()
     emit('83c624 4f'); branch('0f85', 'field')
-    emit('8d4604 50 ff36'); object_pointer(RESPONSE); call(0x436750); check_result()
     append(ITEMS, REWARD)
+    object_pointer(REWARD); call(0x436660)
+    emit('ff0d'); word(state + 4); branch('0f85', 'reward')
+    emit('8d4604 50 ff36'); object_pointer(RESPONSE); call(0x436750); check_result()
     push(state + ITEMS); push(state + 1200); object_pointer(RESPONSE); call(0x436750); check_result()
     append(ARRAY, RESPONSE)
     phase('commit')
@@ -157,7 +183,7 @@ class SupplyDropBridge:
             try:
                 if phase == 'request':
                     self.pending = None
-                    checked_write(self.process, self.state, encode_result(self.state, 0, {'item_id': 0}))
+                    checked_write(self.process, self.state, encode_result(self.state, 0, {'product_id': 0, 'contents': []}))
                     frame = struct.unpack_from('<I', context, 180)[0]
                     if frame != struct.unpack_from('<I', context, 196)[0]:
                         raise ValueError('开箱桥保存帧不匹配')

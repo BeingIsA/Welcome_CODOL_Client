@@ -1,38 +1,32 @@
-"""单箱奖励规则：未拥有物品等概率抽取，十次和百次保底随库存保存。"""
+"""单箱奖励规则：按商品或物品候选等概率抽取并原子规划库存。"""
 import secrets
 
 from codol_rebuild.application.accounts.purchase import consume_entitlement
+from codol_rebuild.application.accounts.policy import validate_initialization
 
 
 def draw_reward(state, reward_pool, crate_item_id):
-    """规划一次扣箱、发奖和进度变化；不写存储，也不接触原生对象。"""
+    """排除全部已拥有的单件奖励，规划扣箱与整份商品发奖。"""
     next_state = consume_entitlement(state, crate_item_id)
     owned_ids = set(state['owned_ids'])
-    candidates = [reward for reward in reward_pool if reward['item_id'] not in owned_ids]
+    candidates = [reward for reward in reward_pool
+                  if any((reward['product_id'] != 0 and content['stackable'])
+                         or content['item_id'] not in owned_ids
+                         for content in reward['contents'])]
     if not candidates:
-        raise ValueError('奖池物品已全部拥有')
-    progress = state.get('supply_drop_progress', {})
-    third_count = progress.get('since_third', 0)
-    fourth_count = progress.get('since_fourth', 0)
-    if (type(third_count) is not int or not 0 <= third_count <= 9
-            or type(fourth_count) is not int or not 0 <= fourth_count <= 99):
-        raise ValueError('抽箱进度无效')
-    guarantee_tier = 4 if fourth_count == 99 else 3 if third_count == 9 else 0
-    selection = candidates
-    if guarantee_tier:
-        for candidate_tier in range(guarantee_tier, 0, -1):
-            selection = [reward for reward in candidates if reward['tier'] == candidate_tier]
-            if selection:
-                break
-        else:
-            raise ValueError('保底品质及以下物品已全部拥有')
-    reward = dict(selection[secrets.randbelow(len(selection))])
-    next_state['owned_ids'] = sorted(set(next_state['owned_ids']) | {reward['item_id']})
-    if reward['stackable']:
-        next_state['quantities'] = {**next_state.get('quantities', {}), str(reward['item_id']): 1}
-    # 降级发放仍消耗此次保底；否则空品质会使之后每次都进入保底。
-    next_state['supply_drop_progress'] = {
-        'since_third': 0 if reward['tier'] >= 3 or guarantee_tier else third_count + 1,
-        'since_fourth': 0 if reward['tier'] >= 4 or guarantee_tier == 4 else fourth_count + 1,
-    }
-    return next_state, reward
+        raise ValueError('奖池奖励已全部拥有')
+    selected_reward = candidates[secrets.randbelow(len(candidates))]
+    granted_contents = []
+    next_owned_ids = set(next_state['owned_ids'])
+    quantities = dict(next_state.get('quantities', {}))
+    for content in selected_reward['contents']:
+        item_id = content['item_id']
+        previous_quantity = quantities.get(str(item_id), 1 if item_id in next_owned_ids else 0)
+        quantity_delta = content['count'] if content['stackable'] else int(item_id not in next_owned_ids)
+        quantity = previous_quantity + quantity_delta
+        if content['stackable']:
+            quantities[str(item_id)] = quantity
+        next_owned_ids.add(item_id)
+        granted_contents.append({**content, 'quantity': quantity, 'quantity_delta': quantity_delta})
+    next_state.update(owned_ids=sorted(next_owned_ids), quantities=quantities)
+    return validate_initialization(next_state), {**selected_reward, 'contents': granted_contents}

@@ -161,12 +161,13 @@ class LocalProfileBridge:
         from codol_rebuild.core.paths import REBUILD_ROOT
         if not self._ready or not self._account:
             raise ValueError('本地档案尚未就绪')
-        reward_pool = load_reward_pool(REBUILD_ROOT / 'resources/商城抽卡.csv', self._catalog)
+        pool_name = '高品质武器表.csv' if crate_item_id == 11861 else '军火箱发放商品表.csv'
+        reward_pool = load_reward_pool(REBUILD_ROOT / 'resources' / pool_name, self._catalog)
         plan = self._service.prepare_supply_drop(reward_pool, crate_item_id)
         return {**plan, 'crate_item_id': crate_item_id}
 
     def commit_supply_drop(self, plan):
-        """组合原有库存暂存与回滚能力，一次提交扣箱、发奖及进度。"""
+        """组合原有库存暂存与回滚能力，一次提交扣箱与整份奖励。"""
         from codol_rebuild.adapters.game.v1649370.accounts.profile import publish_consumption
         from codol_rebuild.adapters.game.v1649370.accounts.purchase import publish_transaction
         return publish_consumption(
@@ -174,7 +175,7 @@ class LocalProfileBridge:
             plan['crate_item_id'], plan['state'],
             lambda: publish_transaction(
                 self.process.read, self.process.write, self._inventory,
-                self._catalog[plan['reward']['item_id']], plan['state'],
+                [self._catalog[content['item_id']] for content in plan['reward']['contents']], plan['state'],
                 lambda: self._service.commit_supply_drop(plan)))
 
     def check_name_card(self):

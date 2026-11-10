@@ -135,7 +135,7 @@ class AccountSession:
         return {'revision': self.account['revision'], 'state': next_state, 'reward': reward}
 
     def commit_supply_drop(self, plan):
-        """原子提交已抽取结果、扣箱及进度；失败时保留已确认账号状态。"""
+        """原子提交已抽取结果与扣箱；失败时保留已确认账号状态。"""
         from codol_rebuild.application.accounts.contracts import RevisionConflict
         if plan['revision'] != self.account['revision']:
             raise RevisionConflict('开箱期间账号已变化')
