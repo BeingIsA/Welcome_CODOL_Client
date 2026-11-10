@@ -1,5 +1,4 @@
 """验证新档授权、余额保存与旧档兼容，不接入游戏运行目录。"""
-import csv
 import copy
 import json
 import re
@@ -43,11 +42,10 @@ class InitializationTests(unittest.TestCase):
         preserved, _ = codec.initialize({'profiles': profiles, 'uid': 1}, policy)
         self.assertEqual(preserved['public'], profiles['public'])
 
-    def test_csv_grants_and_existing_archive_preserved(self):
+    def test_no_initial_grants_and_existing_archive_preserved(self):
         from codol_rebuild.adapters.game.v1649370.accounts.profile_codec import AccountCodec
         captured = json.loads((ROOT/'research/account-initialization/capture/market-memory.json').read_text(encoding='utf-8'))
-        with (ROOT/'client/resources/初始化.csv').open(encoding='utf-8-sig', newline='') as resource_file:
-            expected_ids = sorted(int(item_row['物品ID']) for item_row in csv.DictReader(resource_file))
+        expected_ids = []
         tables = {**captured['tables'], 'mp/coStartingLoadoutSetting.csv': []}
         schemas = {kind: json.loads(Path(captured['schemas'][label]['schema']).read_text(encoding='utf-8'))
                    for kind, label in [('public', 'playerdata'), ('secure', 'playersecuredata')]}

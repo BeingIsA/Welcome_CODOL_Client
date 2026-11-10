@@ -1,7 +1,5 @@
 """1649370 账号格式适配：游戏表解析、DDL 编码、快照校验与归档验证。"""
-import csv
 import struct
-from codol_rebuild.core.paths import REBUILD_ROOT
 from codol_rebuild.adapters.game.v1649370.layout import BUFFER_CAPACITY, PUBLIC_IDENTITY, SECURE_IDENTITY
 from codol_rebuild.adapters.game.v1649370.accounts.profile_unlock import apply_full_unlock, UnlockError
 from codol_rebuild.adapters.game.profile_format.fields import Fields
@@ -86,7 +84,7 @@ class AccountCodec:
         self.schemas, self.tables, self.catalog = schemas, tables, catalog
 
     def initialization_data(self, new_account=True):
-        """解析为业务结构：配装按武器/附件/技能分组，读取初始物品清单；DDL 字段路径与原生分类数字只存在于本版本适配层。"""
+        """解析为业务结构：配装按武器/附件/技能分组，不额外授予初始物品；DDL 字段路径与原生分类数字只存在于本版本适配层。"""
         byname={r['name'].lower():r['id'] for r in self.catalog if r['id']}
         def item(value):
             if not value: return 0
@@ -101,11 +99,7 @@ class AccountCodec:
                      'lethal': item(row[9]), 'tactical': item(row[11]),
                      'lethal_double_ammo': row[10]=='1', 'tactical_double_ammo': row[12]=='1'}
             loadouts.append(loadout)
-        initial_item_ids = []
-        if new_account:
-            with (REBUILD_ROOT / 'resources' / '初始化.csv').open(encoding='utf-8-sig', newline='') as resource_file:
-                initial_item_ids = [int(item_row['物品ID']) for item_row in csv.DictReader(resource_file)]
-        return {'initial_item_ids': initial_item_ids, 'progression': progression(self.tables), 'default_character': 545,
+        return {'initial_item_ids': [], 'progression': progression(self.tables), 'default_character': 545,
                 'starting_loadouts': loadouts}
 
     def initialize(self, saved, policy):
