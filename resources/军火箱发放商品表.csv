@@ -35,7 +35,6 @@
 40,teamreviveadvanced,高级全队复活币,60254:1,exp,,CP（2）
 41,teamreviveadvanced,高级全队复活币,60254:10,exp,,CP（2）
 42,emo_kipup,鲤鱼打挺,60262:1,exp,,CP（2）
-43,uav_pro,高级无人侦察机,60097:1,kis,,CP（2）
 44,han_tactical,特种部队,114:1,cat,han,GP（1）
 45,hea_socomb,洛奇,115:1,cat,hea,GP（1）
 48,pcn_bluetext,水蓝,30711:1,pcn,,CP（2）
@@ -138,21 +137,15 @@
 180,ret_hween,南瓜,26572:1,wat,ret,CP（2）
 181,ret_hwalkerred,地狱行者准星,25086:1,wat,ret,CP（2）
 182,ret_scrawl01,八卦,26980:1,wat,ret,CP（2）
-199,airdrop,空投补给箱,60077:1,kis,,GP（1）
 200,counter_uav,反侦察机,60078:1,kis,,GP（1）
-201,airdrop_sentry_minigun,哨戒机枪,60079:1,kis,,GP（1）
+7061,counter_uav,反侦察机,60078:1,kis,,CP（2）
 203,precision_airstrike,精确空袭,60081:1,kis,,GP（1）; CP（2）
-204,harrier_airstrike,悬停战机,60082:1,kis,,GP（1）
-206,airdrop_mega,紧急空投,60084:1,kis,,GP（1）
-207,helicopter_flares,重型直升机,60085:1,kis,,GP（1）
-208,stealth_airstrike,隐形轰炸机,60086:1,kis,,GP（1）
-209,helicopter_minigun,直升机射手,60087:1,kis,,CP（2）
-210,ac130,空中炮艇,60088:1,kis,,GP（1）
-211,emp,电磁脉冲弹,60089:1,kis,,CP（2）
-214,mortar_mp,迫击炮小队,60091:1,kis,,GP（1）
-216,sr71_mp,侦察卫星,60093:1,kis,,GP（1）
 217,dogs_mp,军犬,60094:1,kis,,GP（1）
-218,airdrop_sam_turret,萨姆防空导弹（空投）,60095:1,kis,,GP（1）
+7065,dogs_mp,军犬,60094:1,kis,,CP（2）
+199,airdrop,空投补给箱,60077:1,kis,,GP（1）
+10842,airdrop,空投补给箱,60077:1,kis,,CP（2）
+29446,airdrop_wargod,空投补给-战神S6,21305:1,kis,,EPICHEROPOINT（9）
+30066,airdrop_wargod,空投补给-战神S6,21305:1,kis,,EPICHEROPOINT（9）
 224,pci_emblems8,金质COD徽章,30007:1,pci,,
 225,pci_emblems7,银质骑兵徽章,30006:1,pci,,GP（1）; CP（2）
 226,pci_emblems6,刀客徽章,30005:1,pci,,
@@ -229,9 +222,8 @@
 1021,heg_chadg,查德奔尼帽,337:1,cat,heg,GP（1）
 1022,heg_boris,滑雪帽,338:1,cat,heg,GP（1）
 1035,heg_boonie,奔尼帽,153:1,cat,heg,GP（1）
-1044,mortar_mp_pro,高级迫击炮小队,60106:1,kis,,GP（1）; CP（2）
-1053,dogs_mp_pro,轻型军犬,60115:1,kis,,GP（1）; CP（2）
-1054,ac130_pro,轻型空中炮艇,60116:1,kis,,GP（1）; CP（2）
+210,ac130,空中炮艇,60088:1,kis,,GP（1）
+8351,ac130,空中炮艇,60088:1,kis,,CP（2）
 1067,hea_chao,超,185:1,cat,hea,GP（1）; CP（2）
 1070,hea_hjelmaa,FROST,189:1,cat,hea,GP（1）; CP（2）
 1081,m4a1tech_mp,M4A1 Tech 典藏版,10053:1,wea,ast,GP（1）
@@ -249,9 +241,8 @@
 1210,han_typeb,二战海军手表,151:1,cat,han,GP（1）
 1216,emo_christmas,圣诞舞王,60023:1,exp,,CP（2）
 1217,emo_envelope,幸运红包,60024:1,exp,,CP（2）
-1257,sentry,哨戒机枪,60090:1,kis,,GP（1）
-1258,sam_turret,萨姆防空导弹,60096:1,kis,,GP（1）
-1259,uav_pro,高级无人侦察机,60097:1,kis,,GP（1）
+214,mortar_mp,迫击炮小队,60091:1,kis,,GP（1）
+7062,mortar_mp,迫击炮小队,60091:1,kis,,CP（2）
 1311,heg_desert,沙漠之狐防弹头盔,354:1,cat,heg,GP（1）
 1319,eye_accessories,沙漠防尘眼镜-透明,362:1,cat,eye,GP（1）
 1320,eye_merc,高级防弹护目镜,363:1,cat,eye,GP（1）
@@ -1437,13 +1428,9 @@
 7055,han_typeb07,二战海军手表,906:1,cat,han,CP（2）
 7056,elp_niao,啸鹰,418:1,cat,elp,CP（2）
 7057,elp_zhongguo,盾,421:1,cat,elp,CP（2）
-7059,airdrop_sentry_minigun,哨戒机枪,60079:1,kis,,CP（2）
+1258,sam_turret,萨姆防空导弹,60096:1,kis,,GP（1）
 7060,sam_turret,萨姆防空导弹,60096:1,kis,,CP（2）
-7061,counter_uav,反侦察机,60078:1,kis,,CP（2）
-7062,mortar_mp,迫击炮小队,60091:1,kis,,CP（2）
-7063,sr71_mp,侦察卫星,60093:1,kis,,CP（2）
-7064,helicopter_flares,重型直升机,60085:1,kis,,CP（2）
-7065,dogs_mp,军犬,60094:1,kis,,CP（2）
+201,airdrop_sentry_minigun,哨戒机枪,60079:1,kis,,GP（1）
 7066,specialty_lightweight,轻装上阵,60041:1,per,pk1,CP（2）
 7067,specialty_scavenger,食腐鸟,60040:1,per,pk2,GP（1）; CP（2）
 7069,specialty_detectexplosive,军情报告,60047:1,per,pk1,CP（2）
@@ -1540,8 +1527,8 @@
 8277,han_lion,红豆沙战术手套,1964:1,cat,han,GP（1）; CP（2）
 8280,cnc_token,改名卡,50001:1,exp,,GP（1）; CP（2）
 8282,cnc_team_token,战队改名卡,50007:1,exp,,GP（1）; CP（2）
-8341,juggernaut,无畏战士,60131:1,kis,,CP（2）
-8342,juggernaut,无畏战士,60131:1,kis,,GP（1）
+7059,airdrop_sentry_minigun,哨戒机枪,60079:1,kis,,CP（2）
+27370,sentry_graffiti,哨戒机枪 - 涂鸦,60303:1,kis,,GP（1）
 8343,pcb_foolsday2015,愚人节背景,30489:1,pcb,,
 8344,pcb_lantern2015,元宵节背景,30490:1,pcb,,CP（2）
 8346,fa1911ncm_mp,FA1911,10145:1,wea,mps,GP（1）
@@ -1549,7 +1536,7 @@
 8348,pcb_monetizationob4,黄金机械僵尸背景,30492:1,pcb,,
 8349,pct_survivalambush,乘人不备,30493:1,pct,,CP（2）
 8350,pct_dmhunted,暗夜破坏者,30494:1,pct,,CP（2）
-8351,ac130,空中炮艇,60088:1,kis,,CP（2）
+27371,sentry_graffiti,哨戒机枪 - 涂鸦,60303:1,kis,,CP（2）
 8352,an94_mp,AN94,10149:1,wea,ast,GP（1）
 8353,g36c_mp,G37H,10150:1,wea,ast,GP（1）
 8354,katana_mp,军用长刀,10151:1,wea,,GP（1）
@@ -1715,7 +1702,7 @@
 10836,heg_headbandthin,爱国者头带,1991:1,cat,heg,CP（2）
 10837,eye_steampunkthin,蒸汽机车眼镜,1992:1,cat,eye,GP（1）; CP（2）
 10838,uspgeo_mp,USPT.45 恶灵,12727:1,wea,pst,CP（2）
-10842,airdrop,空投补给箱,60077:1,kis,,CP（2）
+27441,sentry_wargod,哨戒机枪-战神S5,60304:1,kis,,EPICHEROPOINT（9）
 10843,pcb_katanabronze,军用长刀 铜质精通,30531:1,pcb,,CP（2）
 10844,pcb_katanasilver,军用长刀 银质精通,30532:1,pcb,,CP（2）
 10845,pcb_katanagold,军用长刀 金质精通,30533:1,pcb,,CP（2）
@@ -2150,8 +2137,8 @@
 13646,pct_subreward,基地之王,11995:1,pct,,CP（2）
 13647,slaymorerare_mp,中华短剑,12004:1,wea,,CP（2）
 13648,slaymorerare_mp,中华短剑,12004:1,wea,,GP（1）
-13676,missile_drone,炸弹小飞机,60138:1,kis,,GP（1）
-13677,missile_drone,炸弹小飞机,60138:1,kis,,CP（2）
+27442,sentry_wargod,哨戒机枪-战神S5,60304:1,kis,,EPICHEROPOINT（9）
+8341,juggernaut,无畏战士,60131:1,kis,,CP（2）
 13678,ff58hero_mp,FA7.62-L 幽灵,10077:1,wea,ast,GP（1）
 13679,ff58hero_mp,FA7.62-L 幽灵,10077:1,wea,ast,CP（2）
 13685,mp5kvalentine_mp,SMG5 情人杀手,12025:1,wea,smg,GP（1）
@@ -2898,8 +2885,8 @@
 17869,concussion_betty_mp,震撼弹跳雷,14463:1,equ,tac,CP（2）
 17870,pct_mr13wargod1,惩罚者,23736:1,pct,,EPICHEROPOINT（9）
 17871,portable_radar_mp,便携式雷达,14465:1,equ,tac,CP（2）
-17872,armor_locker,防弹衣包,60165:1,kis,,CP（2）
-17873,umbrella_system,防护伞系统,60166:1,kis,,CP（2）
+8342,juggernaut,无畏战士,60131:1,kis,,GP（1）
+29402,juggernaut_wargod,无畏战士-战神S6,21265:1,kis,,EPICHEROPOINT（9）
 17877,cheytacseekerzc_mp,CheyTacM200 末日,14468:1,wea,snp,GP（1）
 17878,cheytacseekerzc_mp,CheyTacM200 末日,14468:1,wea,snp,CP（2）
 17882,marketplace_hanhan_racesuit_name,韩寒赛车服套装,14469:1; 14471:1; 14470:1,cat,fja; han; fpa,GP（1）; CP（2）
@@ -3967,8 +3954,8 @@
 24203,scarsaprcell_mp,MR23 次元,17191:1,wea,ast,CP（2）
 24210,silver_trophy_mp,银质防爆装置,17195:1,equ,tac,CP（2）
 24211,silver_trophy_mp,银质防爆装置,17195:1,equ,tac,GP（1）; CP（2）
-24212,juggernaut_pro,狂人,60301:1,kis,,GP（1）
-24213,juggernaut_pro,狂人,60301:1,kis,,CP（2）
+30009,juggernaut_wargod,无畏战士-战神S6,21265:1,kis,,EPICHEROPOINT（9）
+27368,helicopter_shark,武装直升机 - 飞鲨,60302:1,kis,,GP（1）
 24214,hea_shredderfe,Default head of INFILTRATOR Female,17197:1,cat,hea,CP（2）
 24215,heg_blackwarrior,曜石战袍头盔,17198:1,cat,heg,GP（1）; CP（2）
 24304,m1garand_mp,M1加兰德,17260:1,wea,ast,GP（1）
@@ -4365,18 +4352,16 @@
 27327,pcb_l115gold,L115A3 金质精通,19017:1,pcb,,CP（2）
 27366,honeybadgerdis_mp,AAC 吉利 -「C」,19033:1,wea,ast,GP（1）
 27367,honeybadgerdis_mp,AAC 吉利 -「C」,19033:1,wea,ast,CP（2）
-27368,helicopter_shark,武装直升机 - 飞鲨,60302:1,kis,,GP（1）
 27369,helicopter_shark,武装直升机 - 飞鲨,60302:1,kis,,CP（2）
-27370,sentry_graffiti,哨戒机枪 - 涂鸦,60303:1,kis,,GP（1）
-27371,sentry_graffiti,哨戒机枪 - 涂鸦,60303:1,kis,,CP（2）
+13676,missile_drone,炸弹小飞机,60138:1,kis,,GP（1）
 27396,an94ssblk_mp,混沌 黑金,19047:1,wea,ast,GP（1）
 27397,an94ssblk_mp,混沌 黑金,19047:1,wea,ast,CP（2）
 27438,ak104ssblk_mp,AK117熔岩黑金 -「C」,19069:1,wea,ast,GP（1）
 27439,ak104ssblk_mp,AK117熔岩黑金 -「C」,19069:1,wea,ast,CP（2）
-27441,sentry_wargod,哨戒机枪-战神S5,60304:1,kis,,EPICHEROPOINT（9）
-27442,sentry_wargod,哨戒机枪-战神S5,60304:1,kis,,EPICHEROPOINT（9）
+13677,missile_drone,炸弹小飞机,60138:1,kis,,CP（2）
 27443,missile_drone_wargod,炸弹小飞机-战神S5,60305:1,kis,,EPICHEROPOINT（9）
 27444,missile_drone_wargod,炸弹小飞机-战神S5,60305:1,kis,,EPICHEROPOINT（9）
+216,sr71_mp,侦察卫星,60093:1,kis,,GP（1）
 27445,pda_hack_silver_mp,银质黑帽干扰系统,19071:1,equ,tac,GP（1）
 27446,pda_hack_silver_mp,银质黑帽干扰系统,19071:1,equ,tac,CP（2）
 27453,pct_bcleague3,最佳上镜王,19075:1,pct,,CP（2）
@@ -4543,9 +4528,9 @@
 29399,katanawggold_mp,军用长刀 竞逐者,20498:1,wea,,EPICHEROPOINT（9）
 29400,an94wgplatinum_mp,AN94 挑战者,20530:1,wea,ast,EPICHEROPOINT（9）
 29401,katanawargod_mp,军用长刀 战神,20499:1,wea,,EPICHEROPOINT（9）
-29402,juggernaut_wargod,无畏战士-战神S6,21265:1,kis,,EPICHEROPOINT（9）
+7063,sr71_mp,侦察卫星,60093:1,kis,,CP（2）
 29445,an94wgplatinum_mp,AN94 挑战者,20530:1,wea,ast,EPICHEROPOINT（9）
-29446,airdrop_wargod,空投补给-战神S6,21305:1,kis,,EPICHEROPOINT（9）
+209,helicopter_minigun,直升机射手,60087:1,kis,,CP（2）
 29455,pct_frwar1,靶场突击周冠军 S1,20531:1,pct,,CP（2）
 29456,pct_frwar2,靶场突击周亚军 S1,20532:1,pct,,CP（2）
 29457,pct_frwar3,靶场突击周季军 S1,20533:1,pct,,CP（2）
@@ -4654,10 +4639,10 @@
 30005,type95techfriend_mp,97式 情义,21262:1,wea,ast,CP（2）
 30007,gold_phosphorus_grenade_mp,黄金重型手雷,21264:1,equ,let,GP（1）
 30008,gold_phosphorus_grenade_mp,黄金重型手雷,21264:1,equ,let,CP（2）
-30009,juggernaut_wargod,无畏战士-战神S6,21265:1,kis,,EPICHEROPOINT（9）
+207,helicopter_flares,重型直升机,60085:1,kis,,GP（1）
 30044,augprestige_mp,斯泰尔 AUG-H 空中力量,21284:1,wea,lmg,GP（1）
 30045,augprestige_mp,斯泰尔 AUG-H 空中力量,21284:1,wea,lmg,CP（2）
-30066,airdrop_wargod,空投补给-战神S6,21305:1,kis,,EPICHEROPOINT（9）
+7064,helicopter_flares,重型直升机,60085:1,kis,,CP（2）
 30067,bluing_phosphorus_grenade_mp,翡翠重型手雷,21306:1,equ,let,GP（1）; CP（2）
 30068,bluing_phosphorus_grenade_mp,翡翠重型手雷,21306:1,equ,let,CP（2）
 30074,pct_2018summer6,2018全锦赛夏季线上冠军,21312:1,pct,,CP（2）

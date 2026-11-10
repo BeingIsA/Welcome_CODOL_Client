@@ -324,10 +324,18 @@ class MultiplayerBridgeTests(unittest.TestCase):
         self.assertEqual(memory.read(owner+0x90, 1), b'\0')
         self.assertEqual(memory.read(local+0x92, 1), b'\0')
         self.assertEqual(memory.read(owner+0x92, 1), b'\x01')
+        self.assertEqual(memory.read(local+0x1A0, 1), b'\x02')
+        self.assertEqual(memory.read(owner+0x1A0, 1), b'\x02')
         self.assertEqual(memory.read(local+0x98, 2), bytes((60, 4)))
         self.assertEqual(memory.read(owner+0x98, 2), bytes((59, 3)))
         self.assertEqual(memory.read(local+0xB2, 10), struct.pack('<5H', *range(111, 116)))
         self.assertEqual(memory.read(owner+0xB2, 10), struct.pack('<5H', *range(101, 106)))
+        # 后续成员快照同样修正槽位残留资格，不能只在首次入房时填充。
+        memory.write(owner+0x1A0, b'\x00')
+        adapter.pending = ('members', room, session)
+        adapter._publish_join_snapshot()
+        self.assertEqual(memory.read(local+0x1A0, 1), b'\x02')
+        self.assertEqual(memory.read(owner+0x1A0, 1), b'\x02')
         adapter.port.begin.assert_not_called()
 
     def test_ready_echo_stages_changes_and_only_forces_requesting_member(self):

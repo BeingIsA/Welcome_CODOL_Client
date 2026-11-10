@@ -16,6 +16,8 @@ from codol_rebuild.adapters.game.v1649370.frontend.notifications import display_
 from codol_rebuild.adapters.game.v1649370.accounts.player_name import username
 
 ROOM_POINTER = 0x82E13FC
+# 本项目仅支持完整资源客户端；终版 GetMaxDLCLevel（0x695190）的默认最高等级为 2。
+FULL_CLIENT_DLC_LEVEL = 2
 # UI 的地图/模式修改与规则修改调用边；公共配置应用方法不承担网络请求。
 SETTINGS_COMMAND_SITES = {
     0x7CFE34: bytes.fromhex('8d54243052ffd0'),
@@ -606,6 +608,8 @@ class RoomSessionBridge:
                 # 入房快照本身带成员状态；不把初始化解释成逐个准备命令。
                 checked_write(self.process, address+0x90, bytes([confirmed_ready]))
             checked_write(self.process, address+0x92, bytes([member['playerId'] == data['ownerPlayerId']]))
+            # 原生刷新按全员最低 DLC 等级筛图；每次发布均补齐，避免新槽默认零或复用旧值。
+            checked_write(self.process, address+0x1A0, bytes([FULL_CLIENT_DLC_LEVEL]))
         checked_write(self.process, room+0x105D8,
                       struct.pack('<IIII', len(members), len(members), 0, data['maxPlayers']-len(members)))
         checked_write(self.process, room+0x278, bytes([int(self.is_owner)]))
