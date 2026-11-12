@@ -35,6 +35,8 @@ class GameSessionBridge:
         self.chat_bridge = None
         self.match_session = match_session
         self.match_bridge = None
+        from codol_rebuild.adapters.game.v1649370.matches.training_catalog import TrainingCatalog
+        self.training_catalog = TrainingCatalog(process, record) if multiplayer is not None else None
         from codol_rebuild.adapters.game.v1649370.matches.melee_input import MeleeInputBridge
         self.melee_input = MeleeInputBridge(process)
         if match_session is not None and multiplayer is not None:
@@ -389,6 +391,8 @@ class GameSessionBridge:
     def install_navigation_resource(self):
         """在原版主电影解析前安装已校验的会话内资源补丁，并回读数据及长度。"""
         from codol_rebuild.adapters.game.v1649370.session.ui_movie import find_resource_patch
+        if self.training_catalog is not None:
+            self.training_catalog.install()
         plan = find_resource_patch(self.process.read, self.process.regions())
         if plan['already_applied']:
             return {'installed': False, 'already_applied': True,
