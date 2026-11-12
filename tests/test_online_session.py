@@ -107,7 +107,6 @@ class OnlineSessionTests(unittest.TestCase):
         bridge.process = process
         bridge.match_bridge = None
         bridge.supply_drop_bridge = Mock(traps={})
-        bridge.melee_input = Mock(traps={})
         bridge.session_traps = {0x2000: 'session_poll'}
         bridge.online_bridge = Mock()
         bridge.realtime_dispatcher = Mock()

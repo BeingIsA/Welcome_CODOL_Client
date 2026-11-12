@@ -37,8 +37,6 @@ class GameSessionBridge:
         self.match_bridge = None
         from codol_rebuild.adapters.game.v1649370.matches.training_catalog import TrainingCatalog
         self.training_catalog = TrainingCatalog(process, record) if multiplayer is not None else None
-        from codol_rebuild.adapters.game.v1649370.matches.melee_input import MeleeInputBridge
-        self.melee_input = MeleeInputBridge(process)
         if match_session is not None and multiplayer is not None:
             from codol_rebuild.adapters.game.v1649370.matches.session_bridge import MatchBridge
             self.match_bridge = MatchBridge(process, match_session, multiplayer.confirmed_room_id,
@@ -111,7 +109,6 @@ class GameSessionBridge:
             self._install_purchase_adapter(profile_data_address)
             self.supply_drop_bridge.install(profile_data_address + 72)
         self._install_lobby_entry(lobby_entry, initializer_address, profile_data_address, room_plan)
-        self.melee_input.install()
 
     def _install_local_ui_hooks(self):
         """安装大厅资源加载观察点、局部 UI 补丁及角色查看事件。"""
@@ -434,9 +431,6 @@ class GameSessionBridge:
     def handle_exception(self, event, code, address, row):
         if code in (2147483651, 1073741855) and address in self.supply_drop_bridge.traps:
             self.supply_drop_bridge.handle(event, address)
-            return True
-        if code in (2147483651, 1073741855) and address in self.melee_input.traps:
-            self.melee_input.handle(event, address)
             return True
         if code in (2147483651, 1073741855) and self.match_bridge and address in self.match_bridge.traps:
             self.match_bridge.handle(event, address)
