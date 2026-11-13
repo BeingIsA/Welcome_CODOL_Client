@@ -21,12 +21,32 @@ class SupplyDropTests(unittest.TestCase):
     def test_every_unowned_item_has_one_selection_index(self):
         for selected_index in range(4):
             with patch('codol_rebuild.application.accounts.supply_drop.secrets.randbelow',
-                       return_value=selected_index) as random_choice:
+                       side_effect=[selected_index, 0, 0]) as random_choice:
                 next_state, reward = draw_reward(self.state, self.pool, 60216)
-            random_choice.assert_called_once_with(4)
+            self.assertEqual([call.args[0] for call in random_choice.call_args_list], [4, 3, 2])
+            self.assertEqual(len(reward['product_ids']), 3)
+            self.assertEqual(len(set(reward['product_ids'])), 3)
             self.assertEqual(reward['contents'][0]['item_id'], 101 + selected_index)
             self.assertEqual(next_state['quantities']['60216'], 4)
         self.assertEqual(self.state['owned_ids'], [60216])
+
+    def test_two_candidates_grant_both_and_consume_one_crate(self):
+        next_state, reward = draw_reward(self.state, self.pool[:2], 60216)
+        self.assertEqual(set(reward['product_ids']), {1101, 1102})
+        self.assertEqual(next_state['quantities']['60216'], 4)
+
+    def test_shared_stackable_contents_accumulate_across_products(self):
+        reward_pool = [{'product_id': product_id, 'contents': [
+            {'item_id': 201, 'stackable': True, 'count': 2}]}
+            for product_id in (901, 902, 903)]
+        next_state, reward = draw_reward(self.state, reward_pool, 60216)
+        self.assertEqual(next_state['quantities']['201'], 6)
+        self.assertEqual([content['quantity'] for content in reward['contents']], [2, 4, 6])
+
+    def test_weapon_pool_still_grants_one_reward(self):
+        reward_pool = [{**reward, 'product_id': 0} for reward in self.pool]
+        next_state, reward = draw_reward(self.state, reward_pool, 60216)
+        self.assertEqual(len(reward['contents']), 1)
 
     def test_owned_items_excluded(self):
         self.state['owned_ids'] += [101, 102, 103]
@@ -43,7 +63,7 @@ class SupplyDropTests(unittest.TestCase):
         next_state, reward = draw_reward(self.state, [product], 60216)
         self.assertEqual(next_state['quantities']['102'], 10)
         self.assertEqual([content['quantity_delta'] for content in reward['contents']], [0, 3, 1])
-        self.assertEqual(reward['product_id'], 900)
+        self.assertEqual(reward['product_ids'], [900])
         self.assertIn(103, next_state['owned_ids'])
         self.assertEqual(self.state['quantities']['102'], 7)
 
@@ -129,7 +149,7 @@ class SupplyDropTests(unittest.TestCase):
             {'item_id': 102, 'stackable': True, 'count': 3}]}
         next_state, reward = draw_reward(self.state, [product], 60216)
         payload = supply_drop.encode_result(0x11000000, 60216, reward)
-        self.assertEqual(reward['product_id'], 900)
+        self.assertEqual(reward['product_ids'], [900])
         self.assertEqual(struct.unpack_from('<I', payload, 4)[0], 2)
         for content_index, item_id in enumerate((101, 102)):
             field_offset = supply_drop.FIELDS + content_index * len(supply_drop.REWARD_FIELDS) * 36
