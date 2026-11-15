@@ -108,6 +108,9 @@ def read_settings(read, config):
         settings[key] = struct.unpack_from(form, read(config+offset, struct.calcsize(form)))[0]
         if form == '<f':
             settings[key] = round(settings[key], 6)
+    # 建房和房主提交设置共用此出站转换；训练局一律向 DS 声明不限时。
+    if settings['mode'] == 'training':
+        settings['modeTimeLimit'] = 0.0
     return settings
 
 

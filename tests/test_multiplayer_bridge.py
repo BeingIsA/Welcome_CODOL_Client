@@ -468,6 +468,13 @@ class MultiplayerBridgeTests(unittest.TestCase):
             for key in keys:
                 self.assertEqual(expected[key], actual[key])
 
+    def test_training_room_submits_unlimited_time(self):
+        memory = Memory()
+        room_address = 0x20000000
+        write_full_config(memory, room_address, mode='training', scalars={'modeTimeLimit': 30.0})
+        _, _, settings = bridge.room_options(memory.read, room_address)
+        self.assertEqual(settings['modeTimeLimit'], 0.0)
+
     def test_image_contract_and_password_capacity_offsets(self):
         image = Path(__file__).resolve().parents[1]/'bin/v1649370/codol1649370-offline.exe'
         pe = pefile.PE(str(image))
