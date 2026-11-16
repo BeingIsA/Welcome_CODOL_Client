@@ -177,6 +177,9 @@ class RoomSessionBridge:
         self.members_apply = None
         self.ready_buffer = None
         self.applying_members = False
+        self.returned_start_id = None
+        self.return_snapshot_prepared = False
+        self.return_ready_notification = False
         self.member_profiles = {}
         self.member_menu = None
         self.team_bridge = None
@@ -261,6 +264,9 @@ class RoomSessionBridge:
         self.ready_bridge = RoomReadyBridge(self.process, self.port, self._team_room_state,
                                            lambda: self.applying_members)
         ready_traps = self.ready_bridge.install()
+        self.return_sync_flag = self.process.allocate(4)
+        checked_write(self.process, self.return_sync_flag, bytes(4))
+        room_plan['entries']['return_sync_flag'] = self.return_sync_flag
         self.ready_buffer = self.process.allocate(4096)
         checked_write(self.process, self.ready_buffer, bytes(4096))
         checked_write(self.process, self.ready_buffer+1024, struct.pack('<IIII', 0xDC7624, 0x10, 0, 0))
@@ -408,6 +414,8 @@ class RoomSessionBridge:
                     self._publish_join_snapshot()
             elif phase == 'members_applied':
                 self.applying_members = False
+                if self.return_snapshot_prepared:
+                    self._finish_return_sync()
             elif phase == 'join_allocation_failed':
                 self._failure('join', '原生房间会话不可用，请重试')
                 self.join_cleanup = self.port.begin('leave', username(self.process.read))
@@ -443,6 +451,7 @@ class RoomSessionBridge:
                         if self.ready_bridge is not None:
                             self.ready_bridge.discard_pending_result()
                         self._word(56, 0)
+                        self._finish_return_sync()
                         self.current_room_id = None
                         if action == 7:
                             self.is_owner = False
@@ -603,7 +612,9 @@ class RoomSessionBridge:
             if self.pending[0] == 'members':
                 # 成员移动时按身份保留旧值；0x10 接收器负责应用准备变更。
                 old_ready = previous_ready.get(identity, 0)
-                checked_write(self.process, address+0x90, bytes([old_ready]))
+                # 返房先建立完整当前状态，避免列表通知或首个准备接收器看到半旧名单。
+                displayed_ready = confirmed_ready if self.returned_start_id is not None else old_ready
+                checked_write(self.process, address+0x90, bytes([displayed_ready]))
                 if (old_ready != confirmed_ready or identity not in previous_ready
                         or member['playerId'] == ready_player_id):
                     ready_changes.append((identity, confirmed_ready))
@@ -710,6 +721,24 @@ class RoomSessionBridge:
         except (OSError, ValueError) as error:
             self.record({'multiplayer_settings': 'error', 'error': str(error)})
 
+    def refresh_returned_room(self, room_id, start_id):
+        if room_id != self.current_room_id or not self.port.refresh_returned_room(room_id):
+            return
+        self.returned_start_id = start_id
+        self.return_snapshot_prepared = False
+        self._word(52, 0)
+        checked_write(self.process, self.return_sync_flag, b'\x01' + bytes(3))
+        self.return_ready_notification = self.ready_bridge.discard_pending_result()
+        self.team_bridge.discard_pending_result()
+        self.member_menu.discard_pending_snapshot()
+
+    def _finish_return_sync(self):
+        if self.returned_start_id is not None:
+            self.returned_start_id = None
+            self.return_snapshot_prepared = False
+            self.return_ready_notification = False
+            checked_write(self.process, self.return_sync_flag, bytes(4))
+
     def _poll_realtime_event(self):
         """主线程统一消费应用层事件，按类型分发原生回显。"""
         profile_result = self.port.poll_update_profile() if self.profile_update is not None else None
@@ -786,10 +815,15 @@ class RoomSessionBridge:
         session = u32(self.process.read, room+0x1C) if room >= 0x10000 else 0
         if not self._valid_room(room, session):
             return
+        if self.returned_start_id is not None:
+            # 清局前的查询仍可能看到上一局；等待后续成员通知触发既有查询。
+            if (payload.get('start') or {}).get('startId') == self.returned_start_id:
+                return
         self.pending = ('members', room, session)
         try:
             self._prepare_join_snapshot(payload, joining=False)
-            self._publish_join_snapshot(ready_player_id)
+            self._publish_join_snapshot(self.player_id if self.return_ready_notification else ready_player_id)
+            self.return_snapshot_prepared = self.returned_start_id is not None
         finally:
             self.pending = None
 

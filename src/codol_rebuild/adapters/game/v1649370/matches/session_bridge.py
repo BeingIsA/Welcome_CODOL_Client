@@ -30,6 +30,7 @@ class MatchBridge:
         self.allocation = None
         self.room_id = None
         self.room_pointer = None
+        self.returned_allocation = None
         self.pending_start_phase = None
         self.constructed = False
         self.callback_fields = None
@@ -298,6 +299,15 @@ class MatchBridge:
             if next_address is not None:
                 return next_address
         return self.poll_start_confirmation(resume_address)
+
+    def consume_returned_match(self):
+        """界面重新激活时，只交付一次确已通知入局且仍属于当前房间的对局。"""
+        if (self.allocation is None or self.room_id != self.current_room()
+                or self.delivered_allocation != self.allocation['allocationId']
+                or self.returned_allocation == self.delivered_allocation):
+            return None
+        self.returned_allocation = self.delivered_allocation
+        return self.room_id, self.allocation['startId']
 
     def clear_departed_room(self, resume_address):
         """不等待网络返回就撤销旧房间状态；持有通知时先执行原生释放。"""

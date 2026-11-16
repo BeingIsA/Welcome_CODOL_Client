@@ -619,6 +619,10 @@ class GameSessionBridge:
                     if row['catalog']['initialized'] != 1 or row['catalog']['count'] <= 0 or row['catalog']['records'] == '0x0' or (row['native_cpp_activate_called'] != 0) or (not row['observed_state']['client_object_ready']):
                         raise ValueError('离线UI激活真实本地对象尚未就绪')
                     row['activation_cycle'] = self.preview_cycles.begin(row['native_cpp_activate_called'])
+                    if self.preview_cycles.count > 1 and self.match_bridge is not None:
+                        returned_match = self.match_bridge.consume_returned_match()
+                        if returned_match is not None:
+                            self.multiplayer.refresh_returned_room(*returned_match)
                     self.log['offline_menu_preview_activation_count'] = self.preview_cycles.count
                     self.log['offline_menu_preview_attempted'] = True
                 else:

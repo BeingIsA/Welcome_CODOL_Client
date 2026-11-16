@@ -32,6 +32,27 @@ class ReadySessionTests(unittest.TestCase):
         self.assertEqual(session.poll_event().data, payload)
         gateway.room_detail.assert_called_once_with('pl_a', 'rm_test')
 
+    def test_return_replaces_completed_member_query_before_delivery(self):
+        room_id = 'rm_test'
+        member_event = {'type': 'room_members_updated', 'payload': {'roomId': room_id}}
+        inbox = Mock()
+        inbox.poll_event.side_effect = [member_event, None]
+        gateway = Mock()
+        previous = {'roomId': room_id, 'members': [
+            {'playerId': str(index), 'readyState': True} for index in range(5)]}
+        current = {'roomId': room_id, 'members': [
+            {'playerId': str(index), 'readyState': False} for index in range(6)]}
+        gateway.room_detail.side_effect = [previous, current]
+        session = RoomSession(gateway, Mock(), 'http://server', inbox)
+        self.addCleanup(session.close)
+        session._record = IdentityRecord('pl_owner', room_id)
+        self.assertIsNone(session.poll_event())
+        session._members_pending.result(timeout=5)
+        self.assertTrue(session.refresh_returned_room(room_id))
+        session._members_pending.result(timeout=5)
+        self.assertIs(session.poll_event().data, current)
+        self.assertIsNone(session.poll_event())
+
     def test_ready_cancel_deliver_confirmed_snapshot_once(self):
         gateway = Mock()
         session = RoomSession(gateway, Mock(), 'http://server')

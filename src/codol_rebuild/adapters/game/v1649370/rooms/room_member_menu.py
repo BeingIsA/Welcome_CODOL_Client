@@ -80,6 +80,7 @@ class RoomMemberMenu:
         self.process, self.port, self.state, self.record = process, port, state, record
         self.notify = notify
         self.busy = False
+        self.discard_snapshot = False
         self.plans = {}
 
     def install(self):
@@ -158,6 +159,10 @@ class RoomMemberMenu:
             target = handled
         struct.pack_into('<I', ctx, 184, target)
 
+    def discard_pending_snapshot(self):
+        """仍消费踢人结果，只丢弃返房前请求附带的成员名单。"""
+        self.discard_snapshot = self.busy
+
     def poll(self):
         """由会话桥在主线程消费结果，成功快照交回既有成员发布路径。"""
         if not self.busy:
@@ -166,8 +171,10 @@ class RoomMemberMenu:
         if result is None:
             return None
         self.busy = False
+        discard_snapshot = self.discard_snapshot
+        self.discard_snapshot = False
         self.record({'room_kick': result.error is None})
         if result.error:
             self.notify(str(result.error))
             return None
-        return result.data
+        return None if discard_snapshot else result.data

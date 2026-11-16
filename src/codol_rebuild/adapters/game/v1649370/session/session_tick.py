@@ -100,6 +100,9 @@ def build_tick(entry, state, ready, preview_entry, room_entries, list_publish=No
     label('done')
     if 'match_evaluate' in room_entries:
         emit('833d'); word(ready); emit('01'); branch('0f85', 'return')
+        if 'return_sync_flag' in room_entries:
+            # 只暂停适配层补调的周期判断，直到返房名单的原生接收流程结束。
+            emit('833d'); word(room_entries['return_sync_flag']); emit('00'); branch('0f85', 'return')
         emit('83e4f0'); call(room_entries['match_evaluate']); emit('8be5')
     label('return'); emit('8be5 619d c3')
     for offset, target in refs:

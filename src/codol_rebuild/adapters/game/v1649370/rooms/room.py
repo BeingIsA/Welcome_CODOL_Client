@@ -176,9 +176,11 @@ class RoomReadyBridge:
         return result if requested_room == self.room_state() else None
 
     def discard_pending_result(self):
-        """离房后继续消费在途结果，但不向重用的房间对象投递。"""
-        if self.pending_room is not None:
-            self.pending_room = ()
+        """丢弃旧请求的展示结果，并报告是否仍需用新状态完成本人通知。"""
+        if self.pending_room is None:
+            return False
+        self.pending_room = ()
+        return True
 
 
 def build_ready_failure_notification(entry, room_pointer_address):

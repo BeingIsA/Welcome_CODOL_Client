@@ -103,15 +103,17 @@ class RoomReadyFixture {
             NotifyEntry tick = (NotifyEntry)Marshal.GetDelegateForFunctionPointer(new IntPtr(0x20006000), typeof(NotifyEntry));
             for (int iteration = 0; iteration < 5; iteration++) tick();
             Require(Read(0x21000b18) == 5 && Read(0x21000b1c) == 0x22000000);
-            Word(0x21000d00, 0); tick(); Require(Read(0x21000b18) == 5);
+            Word(0x21000d04, 1); tick(); Require(Read(0x21000b18) == 5);
+            Word(0x21000d04, 0); tick(); Require(Read(0x21000b18) == 6);
+            Word(0x21000d00, 0); tick(); Require(Read(0x21000b18) == 6);
             int[] invalidAddresses = {0x21000b4c, 0x21000b10, 0x21000b04, 0x2200001c, 0x22018000, 0x2201a5c8};
             foreach (int address in invalidAddresses) {
                 int saved = Read(address);
                 Word(address, address == 0x21000b4c ? 1 : 0);
-                evaluate(); Require(Read(0x21000b18) == 5);
+                evaluate(); Require(Read(0x21000b18) == 6);
                 Word(address, saved);
             }
-            evaluate(); Require(Read(0x21000b18) == 6);
+            evaluate(); Require(Read(0x21000b18) == 7);
             Console.WriteLine("ready GFx, failure completion and receive ABI passed");
             return 0;
         } catch (Exception error) { Console.WriteLine(error); return 1; }

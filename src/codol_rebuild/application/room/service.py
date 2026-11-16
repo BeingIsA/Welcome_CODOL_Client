@@ -274,6 +274,15 @@ class RoomSession:
             logging.getLogger(__name__).exception('被动离房记录保存失败')
         return Completion(event_type, data={'roomId': room_id})
 
+    def refresh_returned_room(self, room_id: str) -> bool:
+        """在同一工作线程重新读取房间，不再交付激活前的成员查询结果。"""
+        if self._closed or self._record is None or self._record.room_id != room_id:
+            return False
+        if self._members_pending is not None:
+            self._members_pending.cancel()
+        self._members_pending = self._executor.submit(self._refresh_members, self._record)
+        return True
+
     def _handle_room_members_updated(self, payload):
         """成员通知只触发后台权威快照查询，迟到通知不能直接改写本地成员。"""
         if self._record is not None and self._record.room_id == payload.get('roomId'):

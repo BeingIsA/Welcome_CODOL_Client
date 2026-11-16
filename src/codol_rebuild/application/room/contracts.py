@@ -103,6 +103,10 @@ class RoomPort(Protocol):
     def poll_change_team(self) -> Completion | None:
         """消费换队完成结果；失败仅收尾，不驱动 UI 或自动重试。"""
         ...
+    def refresh_returned_room(self, room_id: str) -> bool:
+        """返房时替换待交付的成员查询；新读取在此前已提交的命令之后执行。"""
+        ...
+
     def poll_event(self) -> Completion | None:
         """消费当前房间的设置、成员更新及被踢/关闭完成事件。"""
         ...

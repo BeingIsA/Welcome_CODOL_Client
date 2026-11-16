@@ -338,6 +338,34 @@ class MultiplayerBridgeTests(unittest.TestCase):
         self.assertEqual(memory.read(owner+0x1A0, 1), b'\x02')
         adapter.port.begin.assert_not_called()
 
+    def test_return_ignores_finished_start_until_current_members_are_published(self):
+        memory, adapter, data, room, session = self.join_fixture()
+        adapter.current_room_id = data['roomId']
+        adapter.ready_buffer = 0x29000000
+        adapter.return_sync_flag = 0x29001000
+        adapter.ready_bridge = Mock()
+        adapter.ready_bridge.discard_pending_result.return_value = False
+        adapter.team_bridge = Mock()
+        adapter.member_menu = Mock()
+        adapter._prepare_join_snapshot(data)
+        memory.word(room+0x1C, session)
+        memory.word(session+0x25C8, room)
+        memory.write(session, bytes([1]))
+        adapter.pending = ('join', room, session)
+        adapter._publish_join_snapshot()
+        adapter.pending = None
+        memory.write(room+0xE3F8, bytes([1]))
+        adapter.refresh_returned_room(data['roomId'], 'finished')
+        adapter._apply_room_members(dict(data, start={'startId': 'finished'}))
+        self.assertEqual(memory.read(room+0xE3F8, 1), bytes([1]))
+        self.assertFalse(adapter.return_snapshot_prepared)
+        adapter._apply_room_members(dict(data, start=None))
+        self.assertTrue(adapter.return_snapshot_prepared)
+        self.assertEqual(memory.read(room+0xE3F8, 1), bytes([0]))
+        self.assertEqual(memory.read(adapter.return_sync_flag, 1), bytes([1]))
+        adapter._finish_return_sync()
+        self.assertEqual(memory.read(adapter.return_sync_flag, 1), bytes([0]))
+
     def test_ready_echo_stages_changes_and_only_forces_requesting_member(self):
         """初始化保留快照；后续回显交接收器，重复快照不能重复触发全员准备通知。"""
         memory, adapter, data, room, session = self.join_fixture()

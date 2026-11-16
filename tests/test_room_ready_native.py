@@ -50,7 +50,7 @@ class ReadyNativeTests(unittest.TestCase):
             (workspace/'evaluate.bin').write_bytes(evaluation_bytes)
             tick = build_tick(0x20006000, 0x21000C00, 0x21000D00, 0x28009010,
                               {'match_evaluate': 0x20005000, 'create_complete': 0x28009010,
-                               'leave_complete': 0x28009010})
+                               'leave_complete': 0x28009010, 'return_sync_flag': 0x21000d04})
             tick_bytes = bytearray(tick['code'])
             for address in tick['traps']:
                 tick_bytes[address-0x20006000] = 0x90

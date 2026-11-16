@@ -48,6 +48,17 @@ class MatchBridgeTests(unittest.TestCase):
             self.process.write(call_address, original_bytes)
         self.bridge.install(0x42000)
 
+    def test_return_requires_delivered_allocation_and_is_consumed_once(self):
+        self.bridge.room_id = 'room'
+        self.bridge.allocation = {'allocationId': 'one', 'startId': 'first'}
+        self.assertIsNone(self.bridge.consume_returned_match())
+        self.bridge.delivered_allocation = 'one'
+        self.assertEqual(self.bridge.consume_returned_match(), ('room', 'first'))
+        self.assertIsNone(self.bridge.consume_returned_match())
+        self.bridge.allocation = {'allocationId': 'two', 'startId': 'second'}
+        self.bridge.delivered_allocation = 'two'
+        self.assertEqual(self.bridge.consume_returned_match(), ('room', 'second'))
+
     def test_host_request_queues_lock_before_processing_results(self):
         self.process.write(ROOM_POINTER, struct.pack('<I', 0x40000))
         struct.pack_into('<I', self.process.registers, 196, 0x50000)
