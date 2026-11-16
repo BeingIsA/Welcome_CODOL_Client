@@ -851,13 +851,14 @@ class MultiplayerBridgeTests(unittest.TestCase):
         value, process, port, room, session = self.setup_bridge()
         port.begin_login.return_value = True
         port.poll_login.side_effect = [LoginCompletion(error=OnlineError('BANNED', '身份已封禁')), None, None]
-        login_bridge = online_session.OnlineSessionBridge(process, port, value.state, Mock(), Mock())
+        notify = Mock()
+        login_bridge = online_session.OnlineSessionBridge(process, port, value.state, Mock(), Mock(), notify)
         with mock.patch.object(online_session, 'username', return_value='测试'):
             login_bridge.poll()
             login_bridge.poll()
             login_bridge.poll()
         self.assertTrue(login_bridge.started)
-        self.assertEqual(process.read(value.state+bridge.MESSAGE, 64).split(b'\0')[0], '缺少文件'.encode('utf-8'))
-        self.assertEqual(bridge.u32(process.read, value.state+bridge.ACTION), 4)
+        notify.assert_called_once_with('缺少文件')
+        self.assertEqual(bridge.u32(process.read, value.state+bridge.ACTION), 0)
         port.begin_login.assert_called_once()
 

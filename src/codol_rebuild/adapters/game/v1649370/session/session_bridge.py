@@ -341,7 +341,8 @@ class GameSessionBridge:
             from codol_rebuild.adapters.game.v1649370.native_state import checked_write
             room_publication = self.multiplayer.install_adapters(room_plan)
             self.online_bridge = OnlineSessionBridge(
-                self.process, self.online_session, room_publication['state'], self._online_connected, self.record)
+                self.process, self.online_session, room_publication['state'], self._online_connected, self.record,
+                self.multiplayer.notifications.message)
             tick = self.process.allocate(4096)
             tick_plan = build_tick(tick, room_publication['state'], profile_data_address + 72,
                                    lobby_entry, room_publication['entries'], room_publication['list_publish'],

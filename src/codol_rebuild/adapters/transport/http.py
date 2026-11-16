@@ -86,12 +86,14 @@ class HttpGateway:
             body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
             headers['Content-Type'] = 'application/json; charset=utf-8'
         request = urllib.request.Request(self.server + path, body, headers, method=method)
+        response_status = None
         try:
             try:
                 response = self._opener.open(request, timeout=self.timeout)
             except urllib.error.HTTPError as error:
                 response = error
             with response:
+                response_status = response.status
                 raw = response.read(1024 * 1024 + 1)
                 if len(raw) > 1024 * 1024:
                     raise ValueError('接口响应过大')
@@ -111,8 +113,17 @@ class HttpGateway:
         except OnlineError:
             raise
         except (OSError, ValueError, urllib.error.URLError, http.client.HTTPException) as error:
-            raise OnlineError('NETWORK_ERROR', '无法完成服务端请求：' + str(error),
-                                   uncertain=method in ('POST', 'PUT')) from error
+            error_code = 'NETWORK_ERROR'
+            detail = '无法完成服务端请求：' + str(error)
+            if path == '/api/v1/login':
+                reason = error.reason if isinstance(error, urllib.error.URLError) else error
+                if isinstance(reason, TimeoutError):
+                    error_code = 'REQUEST_TIMEOUT'
+                elif isinstance(error, ValueError) and response_status != 502:
+                    error_code = 'INVALID_RESPONSE'
+                if response_status is not None:
+                    detail = f'HTTP {response_status}，{detail}'
+            raise OnlineError(error_code, detail, uncertain=method in ('POST', 'PUT')) from error
 
     def login(self, fingerprint, username, player_id):
         payload = {'fingerprint': fingerprint, 'username': username}

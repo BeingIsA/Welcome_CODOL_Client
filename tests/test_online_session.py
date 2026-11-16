@@ -1,5 +1,7 @@
 """会话与房间边界回归：生命周期顺序、身份保留、公共调度和单向依赖。"""
 import ast
+from io import BytesIO
+from urllib.error import HTTPError, URLError
 from pathlib import Path
 import struct
 import unittest
@@ -15,9 +17,36 @@ from codol_rebuild.adapters.game.v1649370.session import online_session
 from codol_rebuild.adapters.game.v1649370.session.session_bridge import GameSessionBridge
 from codol_rebuild.adapters.game.v1649370.native_state import LOGIN, IDENTITY
 from test_multiplayer_bridge import Memory
+from codol_rebuild.adapters.transport.http import HttpGateway
 
 
 class OnlineSessionTests(unittest.TestCase):
+    def test_login_transport_failures_show_once_and_keep_diagnostics(self):
+        unavailable = '登录失败：暂时无法连接服务器，请稍后再试。'
+        invalid_response = BytesIO(b'html')
+        invalid_response.status = 200
+        cases = [
+            (URLError(ConnectionRefusedError('connection refused')), unavailable, 'connection refused'),
+            (HTTPError('http://localhost', 502, 'Bad Gateway', {}, BytesIO()), unavailable, 'HTTP 502'),
+            (URLError(TimeoutError('timed out')), '登录超时，请稍后再试。', 'timed out'),
+            (invalid_response, '登录失败：服务器返回了异常数据。', 'HTTP 200'),
+        ]
+        for outcome, expected_message, diagnostic in cases:
+            with self.subTest(diagnostic=diagnostic):
+                gateway = HttpGateway('http://localhost')
+                gateway._opener = Mock()
+                gateway._opener.open.side_effect = [outcome]
+                with self.assertRaises(OnlineError) as caught:
+                    gateway.login('machine', '玩家', None)
+                port, record, notify = Mock(), Mock(), Mock()
+                port.poll_login.side_effect = [LoginCompletion(error=caught.exception), None]
+                bridge = online_session.OnlineSessionBridge(Mock(), port, 0, Mock(), record, notify)
+                with patch.object(online_session, 'username', return_value='玩家'):
+                    bridge.poll()
+                    bridge.poll()
+                notify.assert_called_once_with(expected_message)
+                self.assertIn(diagnostic, record.call_args.args[0]['error'])
+
     def test_login_preserves_order_and_close_keeps_connection_until_room_cleanup(self):
         calls = []
         gateway, store, rooms, realtime = Mock(), Mock(), Mock(), Mock()
@@ -92,12 +121,14 @@ class OnlineSessionTests(unittest.TestCase):
         port = Mock(begin_login=Mock(return_value=True))
         port.poll_login.side_effect = [LoginCompletion(data={'playerId': 'pl_self', 'displayName': '玩家'}), None]
         connected = Mock()
-        bridge = online_session.OnlineSessionBridge(process, port, state, connected, Mock())
+        notify = Mock()
+        bridge = online_session.OnlineSessionBridge(process, port, state, connected, Mock(), notify)
         with patch.object(online_session, 'username', return_value='玩家'):
             bridge.poll()
             bridge.poll()
         port.begin_login.assert_called_once_with('玩家')
         connected.assert_called_once_with('pl_self', '玩家')
+        notify.assert_not_called()
         self.assertEqual(struct.unpack('<I', process.read(state + LOGIN, 4))[0], 1)
         self.assertNotEqual(process.read(state + IDENTITY, 8), bytes(8))
 
