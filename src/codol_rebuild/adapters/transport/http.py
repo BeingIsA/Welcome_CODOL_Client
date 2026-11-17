@@ -56,9 +56,10 @@ class HttpGateway:
         return self._request('PATCH', '/api/v1/rooms/'+_identifier(room_id, 'rm')+'/members/me/team',
                              {'team': team}, player_id)
 
-    def start_match(self, player_id, room_id):
+    def start_match(self, player_id, room_id, banned_item_ids=()):
         """房主原生开局请求，结果资料由推送交付。"""
-        return self._request('POST', '/api/v1/rooms/'+_identifier(room_id, 'rm')+'/start', {}, player_id)
+        return self._request('POST', '/api/v1/rooms/'+_identifier(room_id, 'rm')+'/start',
+                             {'bannedItemIds': list(banned_item_ids)}, player_id)
 
     def broadcast_countdown(self, player_id, room_id, seconds):
         """转发原生房主倒计时命令。"""

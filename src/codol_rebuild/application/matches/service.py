@@ -37,13 +37,13 @@ class MatchSession:
         """由既有登录完成路径传入身份，不创建新身份或重复登录。"""
         self._player_id = player_id
 
-    def begin_start(self, room_id):
+    def begin_start(self, room_id, banned_item_ids=()):
         """接管原生房主 DS 申请；请求开局后等待同一局的准备结果。"""
         if (not self._player_id or room_id != self._current_room() or self._gateway is None
                 or self._allocation_request is not None or self._pending is not None):
             return False
         self._allocation_request = (room_id, self._executor.submit(
-            self._gateway.start_match, self._player_id, room_id))
+            self._gateway.start_match, self._player_id, room_id, banned_item_ids))
         return True
 
     def begin(self, operation: str, room_id: str, allocation_id=None, security_id=None, start_id=None) -> bool:

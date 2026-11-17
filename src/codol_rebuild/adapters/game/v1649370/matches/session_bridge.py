@@ -14,6 +14,45 @@ NOTIFICATION_SLOT = 0xDC7274 + 0x148
 NOTIFICATION_FRAME_CALL = 0x808259
 IDENTITY_CALLS = ((0x5BF864, bytes.fromhex('e8d7812400')),
                   (0x5C07BE, bytes.fromhex('e87d722400')))
+BAN_GROUP_COUNT = 0x84ABC60
+BAN_GROUPS = 0x84ABB70
+BAN_CATALOG_COUNT = 0x84AD5C0
+BAN_CATALOG = 0x84ABD60
+BAN_GROUP = struct.Struct('<BBQ')
+BAN_CATALOG_GROUP = struct.Struct('<BB2x64I')
+
+
+def starting_item_bans(process, room_pointer):
+    """在房主开局点读取原生 mmban 使用的分组位图及其基础物品目录。"""
+    group_count = int.from_bytes(process.read(BAN_GROUP_COUNT, 4), 'little')
+    if not group_count:
+        return ()
+    mode_pointer = int.from_bytes(process.read(room_pointer + 0x105F0, 4), 'little')
+    mode = process.cstring(mode_pointer)
+    if mode == 'playlist' or (mode == 'combat' and process.read(room_pointer + 0x105FC, 1) != b'\xff'):
+        return ()
+    catalog_count = int.from_bytes(process.read(BAN_CATALOG_COUNT, 4), 'little')
+    # 0x810C10 最多 24 组，0x811CBE 将第 n 件基础物品写入目录第 n 个 DWORD。
+    if not 0 < group_count <= 24 or not 0 < catalog_count <= 24:
+        raise ValueError('原生房间禁用目录未就绪')
+    catalog = process.read(BAN_CATALOG, catalog_count * BAN_CATALOG_GROUP.size)
+    groups = {(category, item_type): item_ids for category, item_type, *item_ids
+              in BAN_CATALOG_GROUP.iter_unpack(catalog)}
+    banned_item_ids = set()
+    masks = process.read(BAN_GROUPS, group_count * BAN_GROUP.size)
+    for category, item_type, mask in BAN_GROUP.iter_unpack(masks):
+        # 原生 0x811CE0 注册武器、配件、技能、装备、连杀及两种卡牌目录。
+        if item_type not in (0, 1, 4, 5, 6, 7, 8) or not mask:
+            continue
+        entries = groups.get((category, item_type))
+        if entries is None:
+            raise ValueError('原生禁用组缺少物品目录')
+        for index, item_id in enumerate(entries):
+            if mask & (1 << index):
+                if not 1 <= item_id <= 65534:
+                    raise ValueError('原生禁用位没有对应物品')
+                banned_item_ids.add(item_id)
+    return tuple(sorted(banned_item_ids))
 
 
 def replacements():
@@ -165,7 +204,12 @@ class MatchBridge:
                 room_pointer = self.integer(ROOM_POINTER)
                 parameters = struct.unpack('<5I', self.process.read(stack+4, 20))
                 if room_id and parameters[0] == 0x27 and parameters[3] == room_pointer+0x7470 and parameters[4] == 0x637930:
-                    accepted = self.session.begin_start(room_id)
+                    try:
+                        item_bans = starting_item_bans(self.process, room_pointer)
+                        accepted = self.session.begin_start(room_id, item_bans)
+                    except (OSError, ValueError) as error:
+                        self.record({'match_start_error': str(error)})
+                        accepted = False
                     if accepted:
                         self.room_id, self.room_pointer = room_id, room_pointer
                         self.host_lock_pending = True

@@ -43,7 +43,7 @@ class MatchSessionTests(unittest.TestCase):
         self.session.poll_start()
         self.session.acknowledge_start(self.room_id, 'first')
         self.assertEqual(self.session.poll().operation, 'allocate')
-        self.session._gateway.start_match.assert_called_once_with('player', self.room_id)
+        self.session._gateway.start_match.assert_called_once_with('player', self.room_id, ())
 
     def test_failed_broadcast_survives_ack_until_start_response(self):
         from unittest.mock import Mock

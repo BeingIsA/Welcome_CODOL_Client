@@ -61,10 +61,19 @@ class MatchBridgeTests(unittest.TestCase):
 
     def test_host_request_queues_lock_before_processing_results(self):
         self.process.write(ROOM_POINTER, struct.pack('<I', 0x40000))
+        self.process.cstring = Mock(return_value='combat')
+        self.process.write(0x40000 + 0x105FC, b'\xff')
+        self.process.write(0x84ABC60, struct.pack('<I', 2))
+        self.process.write(0x84ABB70, struct.pack('<BBQBBQ', 4, 0, 1 << 5, 3, 1, 1))
+        self.process.write(0x84AD5C0, struct.pack('<I', 2))
+        self.process.write(0x84ABD60, bytes((4, 0)))
+        self.process.write(0x84ABD60 + 4 + 5 * 4, struct.pack('<I', 10034))
+        self.process.write(0x84ABD60 + 260, struct.pack('<BB2xI', 3, 1, 10331))
         struct.pack_into('<I', self.process.registers, 196, 0x50000)
         self.process.write(0x50004, struct.pack('<5I', 0x27, 0, 0, 0x47470, 0x637930))
         self.session.begin_start.return_value = True
         self.bridge.handle(SimpleNamespace(tid=1), self.bridge.code)
+        self.session.begin_start.assert_called_once_with('room', (10034, 10331))
         self.assertTrue(self.bridge.host_lock_pending)
         self.assertEqual(self.bridge.poll(0x500123), self.bridge.code+2560)
         self.assertFalse(self.bridge.host_lock_pending)
@@ -566,7 +575,7 @@ class MatchBridgeTests(unittest.TestCase):
         session._allocation_request[1].result(timeout=2)
         self.assertEqual(native_calls(self.bridge.poll(0x500123)), ['0x830ac0', '0x730490'])
         self.assertEqual(native_calls(self.bridge.poll(0x500123)), ['0x806b50', '0x637930'])
-        gateway.start_match.assert_called_once_with('player', 'room')
+        gateway.start_match.assert_called_once_with('player', 'room', ())
 
         def native_send(body):
             """模拟既有房主专用消息边，不改动其他接收者和原生函数。"""
