@@ -114,6 +114,18 @@ class RoomReadyFixture {
                 Word(address, saved);
             }
             evaluate(); Require(Read(0x21000b18) == 7);
+            // 同一主线程执行点：本人准备只进入接收器。整房快照才先发布名单。
+            Write(0x28009020, new byte[]{0xff,5,0x30,0x0b,0,0x21,0xc3});
+            Word(0x21000d00, 1);
+            for (int publication = 2; publication >= 1; publication--) {
+                Word(0x21000c24, 5);
+                Word(0x21000c34, publication);
+                Word(0x21000004, 1);
+                int previous = Read(0x21000800);
+                tick();
+                Require(Read(0x21000800) == previous + 1 && Read(0x21000c34) == 0);
+                Require(Read(0x21000b30) == (publication == 1 ? 1 : 0));
+            }
             Console.WriteLine("ready GFx, failure completion and receive ABI passed");
             return 0;
         } catch (Exception error) { Console.WriteLine(error); return 1; }

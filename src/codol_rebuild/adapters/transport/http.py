@@ -115,7 +115,7 @@ class HttpGateway:
             raise
         except (OSError, ValueError, urllib.error.URLError, http.client.HTTPException) as error:
             error_code = 'NETWORK_ERROR'
-            detail = '无法完成服务端请求：' + str(error)
+            detail = str(error)
             if path == '/api/v1/login':
                 reason = error.reason if isinstance(error, urllib.error.URLError) else error
                 if isinstance(reason, TimeoutError):

@@ -1,8 +1,10 @@
 """房间应用端口与数据契约；不包含 HTTP、原生内存或文件实现。"""
 from codol_rebuild.application.errors import OnlineError
 from dataclasses import dataclass
+from collections.abc import Callable
 from typing import Protocol
 import re
+from codol_rebuild.application.realtime.contracts import EventSource
 from codol_rebuild.application.session.contracts import IdentityRecord
 
 
@@ -29,6 +31,14 @@ class RoomStateStore(Protocol):
         ...
 
 
+class RoomEventInbox(EventSource, Protocol):
+    """房间用例按顺序收件，入房或返房时可丢弃已有的同房成员快照。"""
+
+    def discard_matching(self, predicate: Callable[[dict], bool]) -> None:
+        """只移除已排队且符合条件的消息，保留其余消息的相对顺序。"""
+        ...
+
+
 class Gateway(Protocol):
     """玩家业务通信端口；所有方法在后台串行执行。"""
     def update_profile(self, player_id: str, room_id: str, profile: dict) -> dict:
@@ -36,11 +46,11 @@ class Gateway(Protocol):
         ...
 
     def change_ready(self, player_id: str, room_id: str, ready: bool) -> dict:
-        """设置本人准备状态，返回服务端确认的房间快照。"""
+        """提交本人的绝对准备状态，返回包含本人确认值的响应。"""
         ...
 
     def change_team(self, player_id: str, room_id: str, team: str) -> dict:
-        """提交本人的绝对目标阵营，返回服务端确认快照。"""
+        """提交本人的目标阵营，返回包含本人确认值的响应。"""
         ...
     def kick(self, player_id: str, room_id: str, target_player_id: str) -> dict:
         """以房主身份踢出目标，返回服务端确认的房间快照。"""
@@ -103,8 +113,8 @@ class RoomPort(Protocol):
     def poll_change_team(self) -> Completion | None:
         """消费换队完成结果；失败仅收尾，不驱动 UI 或自动重试。"""
         ...
-    def refresh_returned_room(self, room_id: str) -> bool:
-        """返房时替换待交付的成员查询；新读取在此前已提交的命令之后执行。"""
+    def refresh_returned_room(self, room_id: str, start_id: str) -> bool:
+        """返房时以新查询取代已有成员快照，成功后交付 returned_room_snapshot。"""
         ...
 
     def poll_event(self) -> Completion | None:

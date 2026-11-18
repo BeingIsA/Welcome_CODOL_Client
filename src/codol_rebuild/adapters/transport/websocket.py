@@ -122,6 +122,10 @@ class WebSocketConnection:
                             validate_room_snapshot(payload, payload['roomId'])
                             if any('profile' not in member for member in payload['members']):
                                 raise ValueError('成员推送缺少档案字段')
+                            reset_players = payload.get('resetReadyPlayerIds', [])
+                            if not isinstance(reset_players, list) or not all(
+                                    isinstance(player_id, str) for player_id in reset_players):
+                                raise ValueError('准备重置名单格式无效')
                         except (KeyError, TypeError, ValueError):
                             LOGGER.warning('拒绝格式无效的成员快照')
                             continue

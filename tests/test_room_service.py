@@ -5,6 +5,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest.mock import Mock
 from codol_rebuild.application.session.contracts import IdentityRecord
 from codol_rebuild.application.room.service import RoomSession
 from codol_rebuild.application.session.service import OnlineSession
@@ -78,6 +79,57 @@ class Gateway:
 
 
 class RoomTests(unittest.TestCase):
+    def test_membership_snapshot_updates_successor_and_cannot_cross_reentry(self):
+        self.assertIsNone(self.result('login').error)
+        room_id = 'rm_successor'
+        room = {'roomId': room_id, 'ownerPlayerId': 'pl_previous',
+                'members': [{'playerId': 'pl_previous'}, {'playerId': 'pl_test'}]}
+        self.gateway.join = Mock(return_value=room)
+        self.assertIsNone(self.result('join', room_id=room_id).error)
+        self.assertEqual(self.result('settings', settings={'mode': 'td'}).error.code, 'FORBIDDEN')
+
+        self.gateway.rooms[room_id] = {'roomId': room_id, 'ownerPlayerId': 'pl_test',
+                                      'members': [{'playerId': 'pl_test'}]}
+        self.session._inbox = Mock()
+        self.session._inbox.poll_event.side_effect = [
+            {'type': 'room_members_updated', 'payload': self.gateway.rooms[room_id]}, None]
+        self.assertIsNone(self.session.poll_event())
+        self.session._members_pending.result(timeout=5)
+        self.assertEqual(self.session.poll_event().data['ownerPlayerId'], 'pl_test')
+        self.assertIsNone(self.result('settings', settings={'mode': 'td'}).error)
+
+        self.assertTrue(self.session.refresh_returned_room(room_id, 'finished'))
+        self.session._members_pending.result(timeout=5)
+        self.assertIsNone(self.result('leave').error)
+        self.assertIsNone(self.result('join', room_id=room_id).error)
+        self.assertIsNone(self.session.poll_event())
+        self.assertEqual(self.result('settings', settings={'mode': 'td'}).error.code, 'FORBIDDEN')
+
+    def test_ready_and_team_confirm_personal_action_without_fetching_profiles_or_changing_owner(self):
+        self.assertIsNone(self.result('login').error)
+        room_id = self.result('create').data['roomId']
+        self.gateway.member_profile = Mock()
+        self.gateway.room_detail = Mock()
+        for operation, target_value in (('change_ready', True), ('change_team', 'scar')):
+            with self.subTest(operation=operation):
+                snapshot = {'roomId': room_id, 'ownerPlayerId': 'pl_previous',
+                            'members': [{'playerId': 'pl_previous'},
+                                        {'playerId': 'pl_test', 'readyState': True, 'team': 'scar'}]}
+                setattr(self.gateway, operation, Mock(return_value=snapshot))
+                if operation == 'change_ready':
+                    self.assertTrue(self.session.begin_change_ready(room_id, target_value))
+                    self.session._ready_pending.result(timeout=5)
+                    completion = self.session.poll_change_ready()
+                else:
+                    self.assertTrue(self.session.begin_change_team(room_id, target_value))
+                    self.session._team_pending.result(timeout=5)
+                    completion = self.session.poll_change_team()
+                self.assertEqual(completion.operation, operation)
+                self.assertIs(completion.data, snapshot)
+                self.assertTrue(self.session._is_owner)
+                self.gateway.room_detail.assert_not_called()
+                self.gateway.member_profile.assert_not_called()
+
     def test_join_saves_target_and_blocks_guest_settings(self):
         self.result('login')
         from unittest.mock import Mock

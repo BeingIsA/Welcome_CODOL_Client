@@ -30,6 +30,8 @@ MEMBER_REFRESH = 0x630635
 AVATAR_IDENTITY = 0x7C64AF
 # 仅本地房间命名空间的单人标识；不是平台账号或服务端玩家 ID。
 LOCAL_MEMBER_ID = 1
+# 前端帧收到这一发布类型时只运行准备接收器，跳过整张成员名单的 UI 刷新。
+READY_RECEIVE_ONLY = 2
 
 
 class RoomTeamBridge:
@@ -183,7 +185,7 @@ class RoomReadyBridge:
         return True
 
 
-def build_ready_failure_notification(entry, room_pointer_address):
+def build_local_ready_notification(entry, room_pointer_address):
     """准备请求失败时仅完成本人 UI 等待，保持已确认状态。"""
     instruction_bytes = bytearray.fromhex('9c60 8b1d')
     instruction_bytes.extend(struct.pack('<I', room_pointer_address))

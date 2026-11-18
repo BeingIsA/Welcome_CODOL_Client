@@ -118,28 +118,24 @@ class MemberProfileTests(unittest.TestCase):
         pe = pefile.PE(str(Path(__file__).resolve().parents[1]/'bin/v1649370/codol1649370-offline.exe'))
         self.assertEqual(pe.get_data(0x7F8F3D-0x400000, 3), bytes.fromhex('c20800'))
 
-    def test_member_notification_refreshes_authoritative_profiles(self):
+    def test_member_notification_delivers_broadcast_profiles_without_queries(self):
         from codol_rebuild.application.session.contracts import IdentityRecord
         from codol_rebuild.application.room.service import RoomSession
         gateway, inbox = Mock(), Mock()
-        payload = {'roomId': 'rm_test', 'members': [
+        payload = {'roomId': 'rm_test', 'ownerPlayerId': 'pl_b', 'resetReadyPlayerIds': ['pl_a'], 'members': [
             {'playerId': 'pl_a', 'profile': sample_profile()},
             {'playerId': 'pl_b', 'profile': sample_profile()}]}
         inbox.poll_event.return_value = {'type': 'room_members_updated', 'payload': payload}
         session = RoomSession(gateway, Mock(), 'http://localhost', inbox)
         self.addCleanup(session.close)
         session._record = IdentityRecord('pl_a', 'rm_test')
-        gateway.room_detail.return_value = {'roomId': 'rm_test', 'members': [
-            {'playerId': 'pl_a'}, {'playerId': 'pl_b'}]}
-        gateway.member_profile.return_value = sample_profile()
         self.assertIsNone(session.poll_event())
         session._members_pending.result(timeout=5)
         result = session.poll_event()
         self.assertEqual(result.operation, 'room_members_updated')
-        self.assertEqual(result.data, payload)
-        gateway.room_detail.assert_called_once_with('pl_a', 'rm_test')
-        self.assertEqual([entry.args for entry in gateway.member_profile.call_args_list],
-                         [('pl_a', 'rm_test', 'pl_a'), ('pl_a', 'rm_test', 'pl_b')])
+        self.assertIs(result.data, payload)
+        gateway.room_detail.assert_not_called()
+        gateway.member_profile.assert_not_called()
 
     def test_other_room_membership_refresh_is_discarded(self):
         from codol_rebuild.application.session.contracts import IdentityRecord
@@ -151,6 +147,13 @@ class MemberProfileTests(unittest.TestCase):
         for current_room in ('rm_other', None):
             session._record = IdentityRecord('pl_a', current_room)
             self.assertIsNone(session.poll_event())
+        session._record = IdentityRecord('pl_new', 'rm_test')
+        payload = {'roomId': 'rm_test', 'ownerPlayerId': 'pl_old', 'members': [{'playerId': 'pl_old'}]}
+        inbox.poll_event.return_value = {'type': 'room_members_updated', 'payload': payload}
+        self.assertIsNone(session.poll_event())
+        session._members_pending.result(timeout=5)
+        self.assertIsNone(session.poll_event())
+        self.assertIsNone(session._is_owner)
         self.assertEqual(gateway.mock_calls, [])
 
     def test_all_profile_bytes_survive_round_trip(self):

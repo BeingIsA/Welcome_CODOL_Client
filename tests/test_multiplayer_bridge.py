@@ -356,18 +356,26 @@ class MultiplayerBridgeTests(unittest.TestCase):
         adapter.pending = None
         memory.write(room+0xE3F8, bytes([1]))
         adapter.refresh_returned_room(data['roomId'], 'finished')
-        adapter._apply_room_members(dict(data, start={'startId': 'finished'}))
+        adapter.port.refresh_returned_room.assert_called_once_with(data['roomId'], 'finished')
+        adapter._apply_room_members(dict(data, start={'startId': 'finished'}), return_query=True)
+        adapter._apply_room_members(dict(data, start=None))
         self.assertEqual(memory.read(room+0xE3F8, 1), bytes([1]))
         self.assertFalse(adapter.return_snapshot_prepared)
-        adapter._apply_room_members(dict(data, start=None))
+        adapter._apply_room_members(dict(data, start=None, resetReadyPlayerIds=['pl_me', 'pl_owner']))
         self.assertTrue(adapter.return_snapshot_prepared)
         self.assertEqual(memory.read(room+0xE3F8, 1), bytes([0]))
         self.assertEqual(memory.read(adapter.return_sync_flag, 1), bytes([1]))
         adapter._finish_return_sync()
         self.assertEqual(memory.read(adapter.return_sync_flag, 1), bytes([0]))
+        with mock.patch.object(adapter, '_prepare_join_snapshot') as prepare:
+            adapter._apply_room_members(dict(data, start={'startId': 'finished'}))
+            prepare.assert_not_called()
+        adapter.refresh_returned_room(data['roomId'], 'next')
+        adapter._apply_room_members(dict(data, start=None), return_query=True)
+        self.assertTrue(adapter.return_snapshot_prepared)
 
-    def test_ready_echo_stages_changes_and_only_forces_requesting_member(self):
-        """初始化保留快照；后续回显交接收器，重复快照不能重复触发全员准备通知。"""
+    def test_members_update_changes_remote_slots_and_only_resets_listed_local_ready(self):
+        """WS 提供他人状态。继任或清局点名本人时，通过原生接收器取消本人准备。"""
         memory, adapter, data, room, session = self.join_fixture()
         adapter.ready_buffer = 0x29000000
         adapter.current_room_id = data['roomId']
@@ -378,25 +386,92 @@ class MultiplayerBridgeTests(unittest.TestCase):
         adapter.pending = ('join', room, session)
         adapter._publish_join_snapshot()
         self.assertEqual(bridge.u32(memory.read, adapter.ready_buffer+4), 0)
-        data['members'][1]['readyState'] = True
-        adapter._apply_room_members(data, ready_player_id='pl_me')
-        self.assertEqual(memory.read(room+0xE3F8, 1), b'\0')
+        memory.write(room+0xE3F8, bytes([1]))
+        memory.word(room+0xE3F0, 1)
+        data['members'][1].update(readyState=False, team='tf141')
+        data['members'][0].update(readyState=True, team='spectator')
+        adapter._apply_room_members(dict(data, resetReadyPlayerIds=['pl_owner']))
+        self.assertEqual(memory.read(room+0xE3F8, 1), bytes([1]))
+        self.assertEqual(bridge.u32(memory.read, room+0xE3F0), 1)
+        self.assertEqual(bridge.u32(memory.read, room+0xE3F0+0x1D0), 6)
         self.assertEqual(bridge.u32(memory.read, adapter.ready_buffer+4), 1)
-        self.assertEqual(memory.read(adapter.ready_buffer+8, 8), memory.read(room+0xE368, 8))
+        self.assertEqual(memory.read(adapter.ready_buffer+8, 8), memory.read(room+0xE368+0x1D0, 8))
         self.assertEqual(bridge.u32(memory.read, adapter.ready_buffer+16), 1)
         # 模拟接收器完成应用后，相同推送不生成任何准备消息。
-        memory.write(room+0xE3F8, b'\x01')
+        memory.write(room+0xE3F8+0x1D0, bytes([1]))
         adapter._apply_room_members(data)
         self.assertEqual(bridge.u32(memory.read, adapter.ready_buffer+4), 0)
-        adapter._apply_room_members(data, ready_player_id='pl_me')
-        self.assertEqual(bridge.u32(memory.read, adapter.ready_buffer+4), 1)
         # 一个快照同时取消本人、准备房主时，取消先交给接收器。
-        data['members'][0]['readyState'] = True
-        data['members'][1]['readyState'] = False
-        adapter._apply_room_members(data)
+        memory.write(room+0xE3F8+0x1D0, bytes([0]))
+        adapter._apply_room_members(dict(data, resetReadyPlayerIds=['pl_me']))
         self.assertEqual(bridge.u32(memory.read, adapter.ready_buffer+4), 2)
         self.assertEqual(bridge.u32(memory.read, adapter.ready_buffer+16), 0)
         self.assertEqual(bridge.u32(memory.read, adapter.ready_buffer+28), 1)
+
+    def test_ready_reply_only_stages_local_receive_or_unlocks_if_equal(self):
+        for previous_ready in (False, True):
+            with self.subTest(previous_ready=previous_ready):
+                memory, adapter, snapshot, room, session = self.join_fixture()
+                snapshot['members'][1]['readyState'] = True
+                snapshot['members'].insert(0, None)
+                adapter.current_room_id = snapshot['roomId']
+                adapter.pending = None
+                adapter.ready_buffer = 0x29000000
+                memory.word(room+0x1C, session)
+                memory.word(session+0x25C8, room)
+                memory.write(session, bytes([1]))
+                memory.write(room+0xE3F8, bytes([previous_ready]))
+                memory.write(room+0xE368, b'local-id')
+                adapter.ready_bridge = Mock()
+                adapter.ready_bridge.poll.return_value = Completion('change_ready', data=snapshot)
+                adapter._apply_room_members = Mock()
+                adapter._poll_realtime_event()
+                self.assertEqual(memory.read(room+0xE3F8, 1), bytes([previous_ready]))
+                self.assertEqual(bridge.u32(memory.read, adapter.state+56), int(previous_ready))
+                self.assertEqual(bridge.u32(memory.read, adapter.state+52),
+                                 0 if previous_ready else bridge.READY_RECEIVE_ONLY)
+                if not previous_ready:
+                    self.assertEqual(memory.read(adapter.ready_buffer, 20),
+                                     struct.pack('<II8sI', room, 1, b'local-id', 1))
+                adapter._apply_room_members.assert_not_called()
+                adapter.port.begin.assert_not_called()
+
+    def test_team_reply_only_corrects_local_team_and_publishes_when_needed(self):
+        for previous_team in (1, 2):
+            with self.subTest(previous_team=previous_team):
+                memory, adapter, snapshot, room, session = self.join_fixture()
+                snapshot['members'][1]['team'] = 'scar'
+                adapter.current_room_id = snapshot['roomId']
+                adapter.pending = None
+                memory.word(room+0x1C, session)
+                memory.word(session+0x25C8, room)
+                memory.write(session, bytes([1]))
+                memory.word(room+0xE3F0, previous_team)
+                adapter.members_buffer = 0x29000000
+                memory.write(adapter.members_buffer, struct.pack('<IIII', room, 0, 0, 0))
+                adapter.team_bridge = Mock()
+                adapter.team_bridge.poll.return_value = snapshot
+                adapter._apply_room_members = Mock()
+                adapter._poll_realtime_event()
+                self.assertEqual(bridge.u32(memory.read, room+0xE3F0), 1)
+                needs_refresh = int(previous_team != 1)
+                self.assertEqual(bridge.u32(memory.read, adapter.state+52), needs_refresh)
+                self.assertEqual(memory.read(adapter.members_buffer, 16),
+                                 struct.pack('<IIII', room, 0, needs_refresh, needs_refresh))
+                self.assertEqual(bridge.u32(memory.read, adapter.state+56), 0)
+                adapter._apply_room_members.assert_not_called()
+
+    def test_queued_ready_reply_waits_for_current_native_publication(self):
+        memory, adapter, snapshot, room, session = self.join_fixture()
+        adapter.pending = None
+        adapter.applying_members = True
+        adapter.ready_bridge = Mock()
+        adapter.ready_buffer = 0x29000000
+        previously_staged = struct.pack('<II8sI', room, 1, b'other-id', 0)
+        memory.write(adapter.ready_buffer, previously_staged)
+        adapter._poll_realtime_event()
+        adapter.ready_bridge.poll.assert_not_called()
+        self.assertEqual(memory.read(adapter.ready_buffer, len(previously_staged)), previously_staged)
 
     def test_spectator_profile_is_published_on_join_and_team_transitions(self):
         """首次遇到观众也发布模型资料，不依赖其曾加入参战阵营留下的缓存。"""

@@ -1,5 +1,6 @@
 """应用层事件分派组件：唯一读取传输队列，按显式注册关系交接消息。"""
 from collections import deque
+from collections.abc import Callable
 from codol_rebuild.application.realtime.contracts import EventSource
 
 
@@ -16,6 +17,10 @@ class EventInbox:
     def poll_event(self) -> dict | None:
         """按原始顺序消费本业务的一条事件。"""
         return self._messages.popleft() if self._messages else None
+
+    def discard_matching(self, predicate: Callable[[dict], bool]) -> None:
+        """移除已被新查询取代的排队消息，保留其余消息的交付顺序。"""
+        self._messages = deque(message for message in self._messages if not predicate(message))
 
 
 class RealtimeDispatcher:

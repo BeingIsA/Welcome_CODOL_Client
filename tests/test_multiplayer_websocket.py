@@ -35,6 +35,7 @@ class RealtimeTests(unittest.TestCase):
             for name, size in (('public', 32764), ('secure', 32764), ('tf141', 160), ('scar', 160))}}
         payload = {'roomId': '123', 'ownerPlayerId': 'pl_0', 'maxPlayers': 19,
                    'playerCount': 19, 'settings': {'map': 'mp_cross_fire', 'mode': 'war'},
+                   'resetReadyPlayerIds': ['pl_0'],
                    'members': [{'playerId': 'pl_' + str(member_number), 'displayName': '成员',
                                 'isOwner': member_number == 0, 'team': 'tf141',
                                 'readyState': False, 'profile': profile}
@@ -47,6 +48,8 @@ class RealtimeTests(unittest.TestCase):
         def handler(connection):
             try:
                 connection.send(json.dumps(invalid))
+                connection.send(json.dumps({'type': message['type'],
+                                           'payload': {**payload, 'resetReadyPlayerIds': 'pl_0'}}))
                 connection.send(encoded)
                 for ignored_message in connection:
                     pass
@@ -179,6 +182,7 @@ class RealtimeTests(unittest.TestCase):
             session.close()
 
     def test_idle_connection_delivers_settings_in_received_order(self):
+        from codol_rebuild.application.realtime.dispatch import EventInbox, RealtimeDispatcher
         from codol_rebuild.application.session.contracts import IdentityRecord
         messages = [{'type': 'room_settings_updated', 'payload': {
             'roomId': 'rm_test', 'revision': revision, 'settings': {'mode': mode}}}
@@ -195,12 +199,16 @@ class RealtimeTests(unittest.TestCase):
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
             client = WebSocketConnection('http://127.0.0.1:' + str(server.socket.getsockname()[1]))
-            session = RoomSession(Mock(), Mock(), 'http://localhost', client)
+            inbox = EventInbox()
+            dispatcher = RealtimeDispatcher(client)
+            dispatcher.register(('room_settings_updated',), inbox)
+            session = RoomSession(Mock(), Mock(), 'http://localhost', inbox)
             session._record = IdentityRecord('pl_test', room_id='rm_test')
             try:
                 client.start('pl_test', 'fp')
                 received = []
                 def done():
+                    dispatcher.poll()
                     event = session.poll_event()
                     if event is not None:
                         received.append(event.data)

@@ -1,6 +1,6 @@
 """1649370 公共前端帧调度：会话、事件分派及各原生业务发布顺序。"""
 import struct
-from codol_rebuild.adapters.game.v1649370.rooms.room import SETTINGS_READY_OFFSET
+from codol_rebuild.adapters.game.v1649370.rooms.room import READY_RECEIVE_ONLY, SETTINGS_READY_OFFSET
 from codol_rebuild.adapters.game.v1649370.native_state import (
     POLL, ACTION, ROOM, SESSION, LEAVE_ARG, UNDEFINED, MESSAGE,
 )
@@ -35,19 +35,23 @@ def build_tick(entry, state, ready, preview_entry, room_entries, list_publish=No
         if 'notifications' in room_entries:
             emit('83e4f0'); call(room_entries['notifications']); emit('8be5')
         if 'members_apply' in room_entries:
-            emit('833d'); word(state+52); emit('00')
+            emit('a1'); word(state+52); emit('85c0')
             branch('0f84', 'members_done')
             emit('c705'); word(state+52); word(0)
+            if 'ready_receive' in room_entries:
+                emit('83f8'); code.append(READY_RECEIVE_ONLY)
+                branch('0f84', 'receive_ready')
             emit('83e4f0'); call(room_entries['members_apply']); emit('8be5')
             if 'ready_receive' in room_entries:
+                label('receive_ready')
                 emit('83e4f0'); call(room_entries['ready_receive']); emit('8be5')
             trap('members_applied')
             label('members_done')
-        if 'ready_failed' in room_entries:
+        if 'local_ready_notification' in room_entries:
             emit('833d'); word(state+56); emit('00')
             branch('0f84', 'ready_done')
             emit('c705'); word(state+56); word(0)
-            emit('83e4f0'); call(room_entries['ready_failed']); emit('8be5')
+            emit('83e4f0'); call(room_entries['local_ready_notification']); emit('8be5')
             label('ready_done')
         emit('833d'); word(state+SETTINGS_READY_OFFSET); emit('00')
         branch('0f84', 'poll_command')

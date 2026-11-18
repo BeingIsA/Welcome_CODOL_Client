@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import Mock
 
 from codol_rebuild.adapters.game.v1649370.rooms.room import (
-    RoomReadyBridge, build_ready_failure_notification, build_ready_receive, build_match_evaluation,
+    RoomReadyBridge, build_local_ready_notification, build_ready_receive, build_match_evaluation,
 )
 from codol_rebuild.adapters.game.v1649370.session.session_tick import build_tick
 import struct
@@ -35,7 +35,7 @@ class ReadyNativeTests(unittest.TestCase):
                         instruction_bytes[address-entry] = 0x90
                 relocate_fixture_calls(instruction_bytes, entry)
                 (workspace/(phase+'.bin')).write_bytes(instruction_bytes)
-            notification_bytes = bytearray(build_ready_failure_notification(0x20002000, 0x21000000))
+            notification_bytes = bytearray(build_local_ready_notification(0x20002000, 0x21000000))
             relocate_fixture_calls(notification_bytes, 0x20002000)
             (workspace/'notify.bin').write_bytes(notification_bytes)
             (workspace/'return.bin').write_bytes(process.read(0x7CF895, 0x38))
@@ -50,7 +50,9 @@ class ReadyNativeTests(unittest.TestCase):
             (workspace/'evaluate.bin').write_bytes(evaluation_bytes)
             tick = build_tick(0x20006000, 0x21000C00, 0x21000D00, 0x28009010,
                               {'match_evaluate': 0x20005000, 'create_complete': 0x28009010,
-                               'leave_complete': 0x28009010, 'return_sync_flag': 0x21000d04})
+                               'leave_complete': 0x28009010, 'return_sync_flag': 0x21000d04,
+                               'settings_apply': 0x28009010, 'members_apply': 0x28009020,
+                               'ready_receive': 0x20004000})
             tick_bytes = bytearray(tick['code'])
             for address in tick['traps']:
                 tick_bytes[address-0x20006000] = 0x90

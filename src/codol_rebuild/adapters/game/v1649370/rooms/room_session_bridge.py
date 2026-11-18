@@ -8,7 +8,7 @@ import struct
 from codol_rebuild.application.room.contracts import RoomPort
 from codol_rebuild.adapters.game.v1649370.rooms.room import (
     JOIN_ERROR_OFFSET, JOIN_BLOCKED_ERROR, JOIN_ERROR_MESSAGE_OFFSET,
-    SETTINGS_READY_OFFSET, SETTINGS_ROOM_OFFSET,
+    READY_RECEIVE_ONLY, SETTINGS_READY_OFFSET, SETTINGS_ROOM_OFFSET,
 )
 from codol_rebuild.adapters.game.v1649370.rooms import member_profile
 from codol_rebuild.adapters.game.v1649370.native_state import POLL, ACTION, ROOM, SESSION, LEAVE_ARG, UNDEFINED, MESSAGE, u32, checked_write
@@ -18,6 +18,7 @@ from codol_rebuild.adapters.game.v1649370.accounts.player_name import username
 ROOM_POINTER = 0x82E13FC
 # 本项目仅支持完整资源客户端；终版 GetMaxDLCLevel（0x695190）的默认最高等级为 2。
 FULL_CLIENT_DLC_LEVEL = 2
+NATIVE_TEAM_VALUES = {'tf141': 2, 'scar': 1, 'spectator': 6}
 # UI 的地图/模式修改与规则修改调用边；公共配置应用方法不承担网络请求。
 SETTINGS_COMMAND_SITES = {
     0x7CFE34: bytes.fromhex('8d54243052ffd0'),
@@ -178,6 +179,7 @@ class RoomSessionBridge:
         self.ready_buffer = None
         self.applying_members = False
         self.returned_start_id = None
+        self.last_returned_start_id = None
         self.return_snapshot_prepared = False
         self.return_ready_notification = False
         self.member_profiles = {}
@@ -258,7 +260,7 @@ class RoomSessionBridge:
         self.team_bridge = RoomTeamBridge(self.process, self.port, self._team_room_state)
         team_traps = self.team_bridge.install()
         from codol_rebuild.adapters.game.v1649370.rooms.room import (
-            RoomReadyBridge, build_ready_failure_notification, build_ready_receive,
+            RoomReadyBridge, build_local_ready_notification, build_ready_receive,
             build_match_evaluation,
         )
         self.ready_bridge = RoomReadyBridge(self.process, self.port, self._team_room_state,
@@ -272,7 +274,7 @@ class RoomSessionBridge:
         checked_write(self.process, self.ready_buffer+1024, struct.pack('<IIII', 0xDC7624, 0x10, 0, 0))
         for name, builder, parameter in (
                 ('ready_receive', build_ready_receive, self.ready_buffer),
-                ('ready_failed', build_ready_failure_notification, self.members_buffer),
+                ('local_ready_notification', build_local_ready_notification, ROOM_POINTER),
                 ('match_evaluate', build_match_evaluation, self.ownership)):
             entry = self.process.allocate(4096)
             checked_write(self.process, entry, builder(entry, parameter))
@@ -382,10 +384,10 @@ class RoomSessionBridge:
                         self.applying_members or self.pending is not None or self.join_cleanup)
                     if profile_snapshot is not None:
                         if not self.port.begin_update_profile(profile_room_id, profile_snapshot):
-                            self.notifications.message('背包配置未同步，请重新进入房间后再试。')
+                            self.notifications.message('背包上传请求未提交')
                 except (ValueError, OSError) as error:
                     self.record({'multiplayer_profile': 'error', 'error': str(error)})
-                    self.notifications.message('背包配置未同步：' + str(error))
+                    self.notifications.message(str(error))
                 if phase == 'profile_captured':
                     struct.pack_into('<I', ctx, 184, address+1)
                 self.process.set_context(thread, ctx)
@@ -452,6 +454,7 @@ class RoomSessionBridge:
                             self.ready_bridge.discard_pending_result()
                         self._word(56, 0)
                         self._finish_return_sync()
+                        self.last_returned_start_id = None
                         self.current_room_id = None
                         if action == 7:
                             self.is_owner = False
@@ -571,14 +574,17 @@ class RoomSessionBridge:
             checked_write(self.process, room+0x105F0+offset, raw)
         checked_write(self.process, room+0x105FE, bytes([data['maxPlayers']])*2)
 
-    def _publish_join_snapshot(self, ready_player_id=None):
+    def _publish_join_snapshot(self):
         """只写原生已构造的值类型成员槽，保留本机角色数据与原生对象指针。"""
         data, members, ids, names, scalars = self.join_snapshot
         room, session = self.pending[1:]
         if not self._valid_room(room, session):
             raise ValueError('入房发布对象已失效')
         previous_ready = {}
-        if self.pending[0] == 'members':
+        updating_members = self.pending[0] == 'members'
+        keep_local_team = updating_members and self.returned_start_id is None
+        keep_local_ready = keep_local_team and self.player_id not in data.get('resetReadyPlayerIds', ())
+        if updating_members:
             for index in range(u32(self.process.read, room+0x105D8)):
                 address = room+0xE368+index*0x1D0
                 previous_ready[self.process.read(address, 8)] = self.process.read(address+0x90, 1)[0]
@@ -586,7 +592,7 @@ class RoomSessionBridge:
         owner_index = next(i for i, m in enumerate(members) if m['playerId'] == data['ownerPlayerId'])
         self.is_owner = data['ownerPlayerId'] == self.player_id
         # 原生 session 的成员摘要为 0x60 字节；房间 UI 的成员记录为 0x1D0 字节。
-        if self.pending[0] != 'members':
+        if not updating_members:
             checked_write(self.process, session+0x10, bytes(0x30+len(members)*0x60))
         checked_write(self.process, session+0x18, struct.pack('<I', len(members)))
         checked_write(self.process, session+0x20, ids[owner_index])
@@ -597,27 +603,31 @@ class RoomSessionBridge:
             checked_write(self.process, room+0xE368+index*0x1D0, identity+name)
             checked_write(self.process, session+0x40+index*0x60, identity+name)
             member = members[index]
-            native_team = {'tf141': 2, 'scar': 1, 'spectator': 6}[member.get('team', 'tf141')]
+            native_team = NATIVE_TEAM_VALUES[member.get('team', 'tf141')]
             address = room+0xE368+index*0x1D0
-            team_changed = u32(self.process.read, address+0x88) != native_team
+            local_member = member['playerId'] == self.player_id
+            team_changed = (not (local_member and keep_local_team)
+                            and u32(self.process.read, address+0x88) != native_team)
             changed_team = changed_team or team_changed
-            if member['playerId'] == self.player_id:
+            if local_member:
                 changed_local_team = team_changed
             profile = self.member_profiles.get(member['playerId'])
             if profile is not None:
                 for offset, raw in member_profile.member_summary(profile):
                     checked_write(self.process, address+offset, raw)
-            checked_write(self.process, address+0x88, struct.pack('<I', native_team))
+            if team_changed:
+                checked_write(self.process, address+0x88, struct.pack('<I', native_team))
             confirmed_ready = int(member.get('readyState', False))
-            if self.pending[0] == 'members':
+            if updating_members:
                 # 成员移动时按身份保留旧值；0x10 接收器负责应用准备变更。
                 old_ready = previous_ready.get(identity, 0)
                 # 返房先建立完整当前状态，避免列表通知或首个准备接收器看到半旧名单。
-                displayed_ready = confirmed_ready if self.returned_start_id is not None else old_ready
-                checked_write(self.process, address+0x90, bytes([displayed_ready]))
-                if (old_ready != confirmed_ready or identity not in previous_ready
-                        or member['playerId'] == ready_player_id):
-                    ready_changes.append((identity, confirmed_ready))
+                if not (local_member and keep_local_ready):
+                    displayed_ready = confirmed_ready if self.returned_start_id is not None else old_ready
+                    checked_write(self.process, address+0x90, bytes([displayed_ready]))
+                    if (old_ready != confirmed_ready or identity not in previous_ready
+                            or (local_member and self.return_ready_notification)):
+                        ready_changes.append((identity, confirmed_ready))
             else:
                 # 入房快照本身带成员状态；不把初始化解释成逐个准备命令。
                 checked_write(self.process, address+0x90, bytes([confirmed_ready]))
@@ -627,7 +637,7 @@ class RoomSessionBridge:
         checked_write(self.process, room+0x105D8,
                       struct.pack('<IIII', len(members), len(members), 0, data['maxPlayers']-len(members)))
         checked_write(self.process, room+0x278, bytes([int(self.is_owner)]))
-        if self.pending[0] != 'members':
+        if not updating_members:
             checked_write(self.process, room+0x279, bytes([1, 0]))
             checked_write(self.process, room+0x27C, bytes(4))
             # 服务端成员和身份已就绪后恢复原生房主判断；建房中间态仍不自动开局。
@@ -722,11 +732,13 @@ class RoomSessionBridge:
             self.record({'multiplayer_settings': 'error', 'error': str(error)})
 
     def refresh_returned_room(self, room_id, start_id):
-        if room_id != self.current_room_id or not self.port.refresh_returned_room(room_id):
+        if room_id != self.current_room_id or not self.port.refresh_returned_room(room_id, start_id):
             return
         self.returned_start_id = start_id
         self.return_snapshot_prepared = False
+        self.applying_members = False
         self._word(52, 0)
+        checked_write(self.process, self.ready_buffer + 4, bytes(4))
         checked_write(self.process, self.return_sync_flag, b'\x01' + bytes(3))
         self.return_ready_notification = self.ready_bridge.discard_pending_result()
         self.team_bridge.discard_pending_result()
@@ -734,6 +746,7 @@ class RoomSessionBridge:
 
     def _finish_return_sync(self):
         if self.returned_start_id is not None:
+            self.last_returned_start_id = self.returned_start_id
             self.returned_start_id = None
             self.return_snapshot_prepared = False
             self.return_ready_notification = False
@@ -744,48 +757,46 @@ class RoomSessionBridge:
         profile_result = self.port.poll_update_profile() if self.profile_update is not None else None
         if profile_result is not None:
             if profile_result.error is not None:
-                message = ('背包同步结果未知，请重新进入房间以确认配置。'
-                           if profile_result.error.uncertain else
-                           '背包配置未同步：' + display_message(profile_result.error))
-                self.notifications.message(message)
+                self.notifications.message(str(profile_result.error))
             else:
                 self.record({'multiplayer_profile': 'confirmed',
                              'roomId': profile_result.data['roomId']})
-        if self.pending is not None or self.join_cleanup:
+        # 入房完成可能已为本帧排好原生成员发布，先消费它，避免覆盖待发准备缓冲。
+        if self.pending is not None or self.join_cleanup or self.applying_members:
             return
         if self.ready_bridge is not None:
             result = self.ready_bridge.poll()
             if result is not None:
-                if result.error is None:
-                    self._apply_room_members(result.data, ready_player_id=self.player_id)
-                else:
+                if result.error is not None:
                     # 原生请求锁依赖完成通知解除；保留已确认状态，不重试写请求。
                     self.notifications.message(display_message(result.error))
                     self._word(56, 1)
+                else:
+                    self._confirm_local_ready(result.data)
                 return
         if self.team_bridge is not None:
             snapshot = self.team_bridge.poll()
             if snapshot is not None and snapshot['roomId'] == self.current_room_id:
-                self._apply_room_members(snapshot)
+                self._confirm_local_team(snapshot)
                 return
         if self.member_menu is not None:
             snapshot = self.member_menu.poll()
             if snapshot is not None and snapshot['roomId'] == self.current_room_id:
                 self._apply_room_members(snapshot)
+                return
         event = self.port.poll_event()
         if event is None:
             return
         if event.error is not None:
             self.record({'multiplayer_event': event.operation, 'error': str(event.error)})
             return
-        handlers = {'room_settings_updated': self._apply_room_settings,
-                    'room_members_updated': self._apply_room_members}
         if event.operation in ('room_kicked', 'room_closed'):
             self._apply_room_departure(event.operation, event.data)
             return
-        handler = handlers.get(event.operation)
-        if handler is not None:
-            handler(event.data)
+        if event.operation == 'room_settings_updated':
+            self._apply_room_settings(event.data)
+        elif event.operation in ('room_members_updated', 'returned_room_snapshot'):
+            self._apply_room_members(event.data, return_query=event.operation == 'returned_room_snapshot')
 
     def _apply_room_departure(self, event_type, payload):
         """在前端主线程复用离房清理和成功通知，不进入用户离房请求入口。"""
@@ -807,22 +818,63 @@ class RoomSessionBridge:
         self._word(ACTION, 7)
         self._word(POLL, 1)
 
-    def _apply_room_members(self, payload, ready_player_id=None):
+    def _confirmed_local_member(self, snapshot):
+        room_state = self._team_room_state()
+        if room_state is None or room_state[0] != snapshot['roomId']:
+            return None
+        local_member = next(member for member in snapshot['members']
+                            if isinstance(member, dict) and member.get('playerId') == self.player_id)
+        return room_state[1], local_member
+
+    def _confirm_local_ready(self, snapshot):
+        confirmed = self._confirmed_local_member(snapshot)
+        if confirmed is None:
+            return
+        room_pointer, local_member = confirmed
+        ready_address = room_pointer + 0xE368 + 0x90
+        ready_value = bytes([local_member['readyState']])
+        if self.process.read(ready_address, 1) == ready_value:
+            self._word(56, 1)
+            return
+        # 真实变化沿用原生 0x10 接收器完成写入、监听和开局判断，只提交本人的一条消息。
+        identity = self.process.read(room_pointer + 0xE368, 8)
+        checked_write(self.process, self.ready_buffer,
+                      struct.pack('<II8sI', room_pointer, 1, identity, local_member['readyState']))
+        self.applying_members = True
+        self._word(52, READY_RECEIVE_ONLY)
+
+    def _confirm_local_team(self, snapshot):
+        confirmed = self._confirmed_local_member(snapshot)
+        if confirmed is None:
+            return
+        room_pointer, local_member = confirmed
+        local_member_address = room_pointer + 0xE368
+        confirmed_team = NATIVE_TEAM_VALUES[local_member['team']]
+        if u32(self.process.read, local_member_address + 0x88) != confirmed_team:
+            checked_write(self.process, local_member_address + 0x88, struct.pack('<I', confirmed_team))
+            # 只重排原生阵营槽位和本机模型，其他成员的资料不重新发布。
+            checked_write(self.process, self.members_buffer, struct.pack('<IIII', room_pointer, 0, 1, 1))
+            self.applying_members = True
+            self._word(52, 1)
+
+    def _apply_room_members(self, payload, *, return_query=False):
         """应用层已取回完整快照；主线程只更新当前有效房间的展示副本。"""
-        if payload is None or payload['roomId'] != self.current_room_id:
+        if payload is None:
             return
-        room = u32(self.process.read, ROOM_POINTER)
-        session = u32(self.process.read, room+0x1C) if room >= 0x10000 else 0
-        if not self._valid_room(room, session):
+        room_state = self._team_room_state()
+        if room_state is None or room_state[0] != payload['roomId']:
             return
-        if self.returned_start_id is not None:
-            # 清局前的查询仍可能看到上一局；等待后续成员通知触发既有查询。
-            if (payload.get('start') or {}).get('startId') == self.returned_start_id:
-                return
+        _, room, session = room_state
+        snapshot_start_id = (payload.get('start') or {}).get('startId')
+        if snapshot_start_id and snapshot_start_id in (self.returned_start_id, self.last_returned_start_id):
+            return
+        if (self.returned_start_id is not None and not return_query
+                and self.player_id not in payload.get('resetReadyPlayerIds', ())):
+            return
         self.pending = ('members', room, session)
         try:
             self._prepare_join_snapshot(payload, joining=False)
-            self._publish_join_snapshot(self.player_id if self.return_ready_notification else ready_player_id)
+            self._publish_join_snapshot()
             self.return_snapshot_prepared = self.returned_start_id is not None
         finally:
             self.pending = None

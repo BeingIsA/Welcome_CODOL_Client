@@ -6,6 +6,7 @@ from unittest.mock import Mock
 
 from codol_rebuild.application.session.contracts import IdentityRecord
 from codol_rebuild.application.room.service import RoomSession
+from codol_rebuild.application.realtime.dispatch import EventInbox
 from codol_rebuild.adapters.transport.http import HttpGateway
 from codol_rebuild.adapters.game.v1649370.rooms.room import RoomReadyBridge
 from codol_rebuild.application.room.contracts import Completion
@@ -15,7 +16,7 @@ from test_refactor_equivalence import MemoryProcess
 class ReadySessionTests(unittest.TestCase):
     def test_ready_result_is_consumed_before_queued_member_push(self):
         realtime = Mock()
-        payload = {'roomId': 'rm_test', 'members': []}
+        payload = {'roomId': 'rm_test', 'ownerPlayerId': 'pl_a', 'members': [{'playerId': 'pl_a'}]}
         realtime.poll_event.return_value = {'type': 'room_members_updated', 'payload': payload}
         gateway = Mock()
         gateway.room_detail.return_value = payload
@@ -30,28 +31,69 @@ class ReadySessionTests(unittest.TestCase):
         self.assertIsNone(session.poll_event())
         session._members_pending.result(timeout=5)
         self.assertEqual(session.poll_event().data, payload)
-        gateway.room_detail.assert_called_once_with('pl_a', 'rm_test')
+        gateway.room_detail.assert_not_called()
+        gateway.member_profile.assert_not_called()
 
     def test_return_replaces_completed_member_query_before_delivery(self):
         room_id = 'rm_test'
-        member_event = {'type': 'room_members_updated', 'payload': {'roomId': room_id}}
-        inbox = Mock()
-        inbox.poll_event.side_effect = [member_event, None]
         gateway = Mock()
-        previous = {'roomId': room_id, 'members': [
+        previous = {'roomId': room_id, 'ownerPlayerId': '0', 'members': [
             {'playerId': str(index), 'readyState': True} for index in range(5)]}
-        current = {'roomId': room_id, 'members': [
+        current = {'roomId': room_id, 'ownerPlayerId': '0', 'members': [
             {'playerId': str(index), 'readyState': False} for index in range(6)]}
-        gateway.room_detail.side_effect = [previous, current]
+        gateway.room_detail.return_value = current
+        member_event = {'type': 'room_members_updated', 'payload': previous}
+        inbox = EventInbox()
+        inbox.receive(member_event)
         session = RoomSession(gateway, Mock(), 'http://server', inbox)
         self.addCleanup(session.close)
-        session._record = IdentityRecord('pl_owner', room_id)
+        session._record = IdentityRecord('0', room_id)
         self.assertIsNone(session.poll_event())
         session._members_pending.result(timeout=5)
-        self.assertTrue(session.refresh_returned_room(room_id))
+        # 返房之前另一份成员快照仍在排队，保留它前后的设置通知。
+        first_settings = {'roomId': room_id, 'settings': {'mode': 'dm'}}
+        second_settings = {'roomId': room_id, 'settings': {'mode': 'war'}}
+        inbox.receive({'type': 'room_settings_updated', 'payload': first_settings})
+        inbox.receive(member_event)
+        inbox.receive({'type': 'room_settings_updated', 'payload': second_settings})
+        self.assertTrue(session.refresh_returned_room(room_id, 'finished'))
         session._members_pending.result(timeout=5)
-        self.assertIs(session.poll_event().data, current)
+        result = session.poll_event()
+        self.assertEqual(result.operation, 'returned_room_snapshot')
+        self.assertIs(result.data, current)
+        self.assertIs(session.poll_event().data, first_settings)
+        self.assertIs(session.poll_event().data, second_settings)
         self.assertIsNone(session.poll_event())
+        gateway.room_detail.assert_called_once_with('0', room_id)
+        self.assertEqual(gateway.member_profile.call_count, len(current['members']))
+
+    def test_finished_match_snapshot_cannot_restore_previous_owner(self):
+        inbox = EventInbox()
+        gateway = Mock()
+        session = RoomSession(gateway, Mock(), 'http://server', inbox)
+        self.addCleanup(session.close)
+        session._record = IdentityRecord('pl_me', 'rm_test')
+        session._is_owner = True
+        previous = {'roomId': 'rm_test', 'ownerPlayerId': 'pl_other', 'start': {'startId': 'finished'},
+                    'members': [{'playerId': 'pl_me'}, {'playerId': 'pl_other'}]}
+        gateway.room_detail.return_value = previous
+        self.assertTrue(session.refresh_returned_room('rm_test', 'finished'))
+        session._members_pending.result(timeout=5)
+        self.assertIsNone(session.poll_event())
+        self.assertTrue(session._is_owner)
+        # 等待清局，普通更新不能充当全量恢复；本人重置名单到达后可完成。
+        ordinary = {**previous, 'start': None}
+        settled = {**ordinary, 'ownerPlayerId': 'pl_me', 'resetReadyPlayerIds': ['pl_me', 'pl_other']}
+        for payload, accepted in ((ordinary, False), (settled, True), (previous, False)):
+            inbox.receive({'type': 'room_members_updated', 'payload': payload})
+            self.assertIsNone(session.poll_event())
+            session._members_pending.result(timeout=5)
+            result = session.poll_event()
+            if accepted:
+                self.assertIs(result.data, payload)
+            else:
+                self.assertIsNone(result)
+            self.assertTrue(session._is_owner)
 
     def test_ready_cancel_deliver_confirmed_snapshot_once(self):
         gateway = Mock()
