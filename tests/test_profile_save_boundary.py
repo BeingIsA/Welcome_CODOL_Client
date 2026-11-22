@@ -13,6 +13,7 @@ from codol_rebuild.adapters.game.v1649370.layout import BUFFER_CAPACITY
 from codol_rebuild.adapters.game.profile_format.fields import Fields
 from codol_rebuild.application.accounts.online_profiles import OnlineProfiles
 from codol_rebuild.application.accounts.service import AccountSession
+from codol_rebuild.runtime.scheduler import PeriodicTask
 from test_profile_plaintext import public_schema, encode_profile
 
 
@@ -21,7 +22,15 @@ class ProfileSaveBoundaryTests(unittest.TestCase):
     def setUp(self):
         self.process = Mock()
         self.process.periodic.return_value.due.return_value = True
-        self.bridge = LocalProfileBridge(self.process, Mock(), {}, Mock())
+        self.prepare_bridge()
+        self.flags = {PUBLIC: [0, 0], SECURE: [0, 0]}
+        self.keys = {PUBLIC: [123, 123], SECURE: [456, 456]}
+        self.bodies = {PUBLIC: [bytes(BUFFER_CAPACITY)] * 2,
+                       SECURE: [bytes(BUFFER_CAPACITY)] * 2}
+        self.process.read.side_effect = self.read_memory
+
+    def prepare_bridge(self, inventory_session=None):
+        self.bridge = LocalProfileBridge(self.process, Mock(), {}, Mock(), inventory_session)
         self.bridge._ready = True
         self.bridge._service = Mock()
         self.bridge._service.account = {'profiles': {}, 'revision': 1}
@@ -29,11 +38,6 @@ class ProfileSaveBoundaryTests(unittest.TestCase):
         self.bridge._service.save.return_value = True
         self.bridge._inventory = {'pool': '0x20000'}
         self.bridge._schemas = {'public': public_schema()}
-        self.flags = {PUBLIC: [0, 0], SECURE: [0, 0]}
-        self.keys = {PUBLIC: [123, 123], SECURE: [456, 456]}
-        self.bodies = {PUBLIC: [bytes(BUFFER_CAPACITY)] * 2,
-                       SECURE: [bytes(BUFFER_CAPACITY)] * 2}
-        self.process.read.side_effect = self.read_memory
 
     def read_memory(self, address, length):
         for base in (PUBLIC, SECURE):
@@ -53,6 +57,37 @@ class ProfileSaveBoundaryTests(unittest.TestCase):
         self.save()
         self.bridge._service.save.assert_called_once()
         self.assertEqual(set(self.bridge._service.save.call_args.args[0]), {'public', 'secure'})
+
+    def test_sampling_interval_and_forced_save(self):
+        for inventory_session, interval in ((Mock(), 60), (None, 2)):
+            with self.subTest(interval=interval):
+                clock = Mock(return_value=100.0)
+                self.process.periodic.side_effect = lambda seconds: PeriodicTask(seconds, clock)
+                self.prepare_bridge(inventory_session)
+                with patch.object(self.bridge, '_sample_plaintext_profiles') as sample:
+                    sample.return_value = {'public': b'initial', 'secure': b'secure'}
+                    self.save()
+                    self.bridge._service.save.assert_called_once_with(sample.return_value)
+                    sample.reset_mock()
+                    self.bridge._service.save.reset_mock()
+                    self.process.read.reset_mock()
+
+                    sample.return_value = {'public': b'first edit', 'secure': b'secure'}
+                    clock.return_value += interval - 0.5
+                    self.save()
+                    sample.assert_not_called()
+                    self.process.read.assert_not_called()
+                    self.bridge._service.save.assert_not_called()
+
+                    sample.return_value = {'public': b'latest edit', 'secure': b'secure'}
+                    clock.return_value += 0.5
+                    self.save()
+                    sample.assert_called_once()
+                    self.bridge._service.save.assert_called_once_with(sample.return_value)
+
+                    sample.return_value = {'public': b'final edit', 'secure': b'secure'}
+                    self.save(force=True)
+                    self.bridge._service.save.assert_called_with(sample.return_value)
 
     def test_encoded_secure_profile_blocks_normal_and_forced_save(self):
         for force in (False, True):

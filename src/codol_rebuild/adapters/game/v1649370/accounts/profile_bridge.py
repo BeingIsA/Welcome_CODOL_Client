@@ -18,7 +18,9 @@ class LocalProfileBridge:
         self._catalog={}
         self._online_inventory = inventory_session
         self._confirmed_inventory = None
-        self._task=process.periodic(2); self._last_view=None
+        sample_interval_seconds = 60 if inventory_session is not None else 2
+        self._task = process.periodic(sample_interval_seconds)
+        self._last_view = None
 
     @property
     def _account(self):
