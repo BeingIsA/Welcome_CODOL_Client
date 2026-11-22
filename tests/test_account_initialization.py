@@ -1,16 +1,13 @@
 """验证新档授权、余额保存与旧档兼容，不接入游戏运行目录。"""
-import copy
 import csv
 import json
 import re
 from pathlib import Path
 import struct
-import tempfile
 import unittest
 
 from codol_rebuild.application.accounts.policy import new_account_policy
 from codol_rebuild.application.accounts.service import AccountSession
-from codol_rebuild.adapters.persistence.sqlite_accounts import AccountRepository, RevisionConflict
 from codol_rebuild.adapters.game.v1649370.accounts.profile import publish_currency, currency_snapshot, populate_inventory, CAPACITY, STRIDE
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -43,7 +40,7 @@ class InitializationTests(unittest.TestCase):
         preserved, _ = codec.initialize({'profiles': profiles, 'uid': 1}, policy)
         self.assertEqual(preserved['public'], profiles['public'])
 
-    def test_camo_grants_and_existing_archive_preserved(self):
+    def test_offline_default_camo_grants_and_loadouts(self):
         from codol_rebuild.adapters.game.v1649370.accounts.profile_codec import AccountCodec
         captured = json.loads((ROOT/'research/account-initialization/capture/market-memory.json').read_text(encoding='utf-8'))
         with (ROOT/'client/resources/迷彩表.csv').open(encoding='utf-8-sig', newline='') as resource_file:
@@ -53,74 +50,37 @@ class InitializationTests(unittest.TestCase):
         schemas = {kind: json.loads(Path(captured['schemas'][label]['schema']).read_text(encoding='utf-8'))
                    for kind, label in [('public', 'playerdata'), ('secure', 'playersecuredata')]}
         codec = AccountCodec(schemas, tables, captured['catalog'])
-        folder = ROOT/'verification/client/workspaces'
-        with tempfile.TemporaryDirectory(dir=folder) as tmp:
-            repo = AccountRepository(Path(tmp)/'honor.sqlite3')
-            session = AccountSession(repo, codec)
-            created = session.initialize()
-            self.assertTrue(created['new_account'])
-            self.assertEqual(created['initialization']['gp'], 2000000000)
-            self.assertEqual(created['initialization']['cp'], 100000)
-            selected_policy = new_account_policy(codec.initialization_data())
-            self.assertTrue(selected_policy['fill_unlock_flags'])
-            self.assertEqual(selected_policy['unlock_threshold'], 32767)
-            self.assertEqual(created['progression'], selected_policy['progression'])
-            inventory_memory = bytearray(CAPACITY * STRIDE)
-            for inventory_index in range(CAPACITY):
-                struct.pack_into('<I', inventory_memory, inventory_index * STRIDE, 0xD59C78)
-            def read_inventory(address, size):
-                return bytes(inventory_memory[address:address + size])
-            def write_inventory(address, content):
-                inventory_memory[address:address + len(content)] = content
-            inventory_report = populate_inventory(read_inventory, write_inventory, 0,
-                captured['catalog'], 0, created['initialization']['owned_ids'])
-            self.assertEqual(inventory_report['items'], len(expected_ids))
-            inventory_items = [struct.unpack_from('<II', inventory_memory, inventory_index * STRIDE + 0x40)
-                               for inventory_index in range(len(expected_ids))]
-            self.assertEqual(sorted(inventory_items), [(item_id, 1) for item_id in expected_ids])
+        session = AccountSession(codec)
+        created = session.initialize()
+        self.assertTrue(created['new_account'])
+        self.assertEqual(created['initialization']['gp'], 2000000000)
+        self.assertEqual(created['initialization']['cp'], 100000)
+        selected_policy = new_account_policy(codec.initialization_data())
+        self.assertTrue(selected_policy['fill_unlock_flags'])
+        self.assertEqual(selected_policy['unlock_threshold'], 32767)
+        self.assertEqual(created['progression'], selected_policy['progression'])
+        inventory_memory = bytearray(CAPACITY * STRIDE)
+        for inventory_index in range(CAPACITY):
+            struct.pack_into('<I', inventory_memory, inventory_index * STRIDE, 0xD59C78)
+        def read_inventory(address, size):
+            return bytes(inventory_memory[address:address + size])
+        def write_inventory(address, content):
+            inventory_memory[address:address + len(content)] = content
+        inventory_report = populate_inventory(read_inventory, write_inventory, 0,
+            captured['catalog'], 0, created['initialization']['owned_ids'])
+        self.assertEqual(inventory_report['items'], len(expected_ids))
+        inventory_items = [struct.unpack_from('<II', inventory_memory, inventory_index * STRIDE + 0x40)
+                           for inventory_index in range(len(expected_ids))]
+        self.assertEqual(sorted(inventory_items), [(item_id, 1) for item_id in expected_ids])
 
-            self.assertEqual(created['initialization']['owned_ids'], expected_ids)
-            self.assertEqual(codec.validate_snapshot(created['profiles']), 545)
-            # 现有档案启动不重新执行新档授权策略；即使新策略不同也不得迁移。
-            def forbidden(*args):
-                raise AssertionError('Existing archive must not regenerate entitlements')
-            codec.initialization_data = forbidden
-            reopened = AccountSession(repo, codec).initialize()
-            self.assertFalse(reopened['new_account'])
-            self.assertEqual(reopened['initialization'], created['initialization'])
-            self.assertEqual(reopened['profiles'], created['profiles'])
-            from codol_rebuild.adapters.game.profile_format.fields import Fields
-            fields = Fields(schemas['public'])
-            for field, value in (('cardIcon', 30000), ('cardBackground', 30060),
-                                 ('cardTitle', 30061), ('cardNameplate', 0), ('cardFrame', 0)):
-                self.assertEqual(fields.read(created['profiles']['public'], field), value)
-            self.assertEqual(fields.read(created['profiles']['public'], 'loadoutVersion'), 3)
-            old = bytearray(created['profiles']['public'])
-            fields.write(old, 'loadoutVersion', 0)
-            old_profiles = {**created['profiles'], 'public': bytes(old)}
-            revision = repo.save('local', reopened['revision'], old_profiles, codec.identities,
-                                 initialization=created['initialization'])
-            migrated = AccountSession(repo, codec).initialize()
-            self.assertEqual(migrated['revision'], revision+1)
-            self.assertEqual(migrated['profiles'], created['profiles'])
-            self.assertEqual(migrated['initialization'], created['initialization'])
-            self.assertEqual(AccountSession(repo, codec).initialize()['revision'], migrated['revision'])
-            # 老账号既保留未选择的零值，也保留非默认选择，启动不补写装扮。
-            existing = bytearray(migrated['profiles']['public'])
-            fields.write(existing, 'cardIcon', 0)
-            fields.write(existing, 'cardBackground', 0)
-            fields.write(existing, 'cardTitle', 12345)
-            existing_profiles = {**migrated['profiles'], 'public': bytes(existing)}
-            revision = repo.save('local', migrated['revision'], existing_profiles, codec.identities,
-                                 initialization=created['initialization'])
-            reopened = AccountSession(repo, codec).initialize()
-            self.assertEqual(reopened['profiles'], existing_profiles)
-            self.assertEqual(reopened['revision'], revision)
-            # 无初始化标记的历史档案同样不能因 initialize 调用而补写默认装扮。
-            legacy, _ = codec.initialize({'profiles': existing_profiles, 'uid': 1},
-                {'progression': {'rank': 70, 'rank_version': 0, 'prestige': 4, 'experience': 0},
-                 'fill_unlock_flags': True, 'unlock_threshold': 32767})
-            self.assertEqual(legacy['public'], existing_profiles['public'])
+        self.assertEqual(created['initialization']['owned_ids'], expected_ids)
+        self.assertEqual(codec.validate_snapshot(created['profiles']), 545)
+
+        from codol_rebuild.adapters.game.profile_format.fields import Fields
+        fields = Fields(schemas['public'])
+        for field, value in (('cardIcon', 30000), ('cardBackground', 30060), ('cardTitle', 30061),
+                             ('cardNameplate', 0), ('cardFrame', 0), ('loadoutVersion', 3)):
+            self.assertEqual(fields.read(created['profiles']['public'], field), value)
 
     def test_native_contract_matches_image_and_rejects_mismatch(self):
         import pefile
@@ -187,37 +147,6 @@ class InitializationTests(unittest.TestCase):
         self.assertEqual(result['items'], 1)
         self.assertEqual(struct.unpack_from('<III', memory, 64), (2, 1, 100))
         self.assertEqual(struct.unpack_from('<I', memory, STRIDE+64)[0], 0)
-
-    def test_atomic_state_reload_balance_only_save_and_legacy(self):
-        folder = ROOT/'verification/client/workspaces'
-        folder.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(dir=folder) as tmp:
-            repo = AccountRepository(Path(tmp)/'test.sqlite3')
-            identities = {'public': {}, 'secure': {}}
-            blobs = {'public': b'pub', 'secure': b'sec'}
-            state = {'version': 1, 'owned_ids': [570], 'gp': 2000000000, 'cp': 100000}
-            repo.identity('new')
-            repo.save('new', 0, blobs, identities, initialization=state)
-            with self.assertRaises(RevisionConflict):
-                repo.save('new', 0, blobs, identities, initialization={**state, 'gp': 0})
-            self.assertEqual(repo.load('new', identities)['initialization'], state)
-            class Codec:
-                def migrate(self, profiles):
-                    return dict(profiles)
-                def validate_snapshot(self, value):
-                    pass
-            codec = Codec()
-            codec.identities = identities
-            session = AccountSession(repo, codec, 'new')
-            session.account = repo.load('new', identities)
-            self.assertTrue(session.save(blobs, balances={'gp': 123, 'cp': 456}))
-            reopened = AccountSession(AccountRepository(Path(tmp)/'test.sqlite3'), codec, 'new')
-            self.assertEqual(reopened.initialize()['initialization'], {**state, 'gp': 123, 'cp': 456})
-            self.assertFalse(reopened.save(blobs, balances={'gp': 123, 'cp': 456}))
-            repo.identity('old')
-            repo.save('old', 0, blobs, identities)
-            self.assertNotIn('initialization', repo.load('old', identities))
-
 
 if __name__ == '__main__':
     unittest.main()

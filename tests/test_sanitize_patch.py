@@ -61,7 +61,7 @@ class SanitizePatchTests(unittest.TestCase):
     def test_rules_cover_combined_methods_without_overlap(self):
         rules = ui_movie.replacements()
         # 当前组合包含房间、聊天等已接入规则；仍严格检查数量与区间重叠。
-        self.assertEqual(len(rules),34)
+        self.assertEqual(len(rules),36)
         spans = sorted((offset,offset+len(before)) for offset,before,_ in rules)
         for (_,end),(next_start,_) in zip(spans,spans[1:]):
             self.assertLessEqual(end,next_start,'替换区间重叠')

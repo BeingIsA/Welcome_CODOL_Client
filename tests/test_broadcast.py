@@ -53,10 +53,13 @@ class BroadcastTests(unittest.TestCase):
 
     def test_http_uses_existing_endpoint_and_authenticated_identity(self):
         gateway = HttpGateway('http://127.0.0.1:8000')
-        gateway._request = Mock(return_value={'messageId': 'broadcast_one'})
-        self.assertEqual(gateway.send_broadcast('pl_sender', '一起玩吗？', 'large'), {'messageId': 'broadcast_one'})
+        result = {'messageId': 'broadcast_one', 'inventory': {'revision': 2, 'gp': 100, 'cp': 100, 'items': []}}
+        gateway._request = Mock(return_value=result)
+        self.assertEqual(gateway.send_broadcast('pl_sender', '一起玩吗？', 'large'), result)
+        operation_id = gateway._request.call_args.args[2]['operationId']
+        self.assertTrue(operation_id)
         gateway._request.assert_called_once_with('POST', '/api/v1/broadcasts',
-            {'speakerType': 'large', 'text': '一起玩吗？'}, 'pl_sender')
+            {'speakerType': 'large', 'text': '一起玩吗？', 'operationId': operation_id}, 'pl_sender')
 
     def test_push_before_http_completion_displays_once_and_does_not_complete_send(self):
         inbox = EventInbox()
@@ -173,6 +176,8 @@ class BroadcastTests(unittest.TestCase):
                 bridge.player_id = player_id
                 bridge.traps = {0x2000: 'send'}
                 bridge.plan = {'return': 0x3000}
+                bridge.state = 0x4000
+                process.read.return_value = struct.pack('<I', broadcast.NATIVE_SPEAKER_TYPES[request[1]]) if request else bytes(4)
                 with patch.object(broadcast, 'read_request', return_value=request) as read_request:
                     bridge.handle(Mock(tid=1), 0x2000)
                 if player_id is not None and request is not None:
@@ -186,17 +191,19 @@ class BroadcastTests(unittest.TestCase):
 
     def test_small_speaker_uses_shared_http_confirmation_and_push_path(self):
         gateway = HttpGateway('http://127.0.0.1:8000')
-        gateway._request = Mock(return_value={'messageId': 'small_one'})
+        confirmed = {'messageId': 'small_one', 'inventory': {'revision': 2, 'gp': 100, 'cp': 100, 'items': []}}
+        gateway._request = Mock(return_value=confirmed)
         inbox = EventInbox()
         session = BroadcastSession(gateway, inbox, lambda: True)
         session.connected('pl_sender', '中文玩家')
         session.begin('一起玩吗？', 'small')
         session.close()
-        self.assertEqual(session.poll_sent(), {'messageId': 'small_one', 'speakerType': 'small'})
+        self.assertEqual(session.poll_sent(), {**confirmed, 'speakerType': 'small'})
         self.assertIsNone(session.poll_sent())
         self.assertIsNone(session.poll_message())
         gateway._request.assert_called_once_with('POST', '/api/v1/broadcasts',
-            {'speakerType': 'small', 'text': '一起玩吗？'}, 'pl_sender')
+            {'speakerType': 'small', 'text': '一起玩吗？', 'operationId': gateway._request.call_args.args[2]['operationId']},
+            'pl_sender')
         inbox.receive(server_message('small'))
         self.assertEqual(session.poll_message(), server_message('small')['payload'])
         self.assertIsNone(session.poll_message())

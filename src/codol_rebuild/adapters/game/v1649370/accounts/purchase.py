@@ -1,7 +1,7 @@
-"""1649370 商品购买桥；复用原生报价、条件和任务完成接口。"""
+"""1649370 商品购买桥，复用原生购买条件和商城任务完成接口。"""
 import math
 import struct
-from codol_rebuild.adapters.game.v1649370.accounts.profile import CAPACITY, STRIDE, currency_snapshot, publish_currency
+from codol_rebuild.application.errors import OnlineError
 
 HANDLER_SLOT = 0xDDD428
 HANDLER = 0x7CD430
@@ -9,6 +9,8 @@ REFRESH_SLOT = 0xDDD464
 REFRESH_HANDLER = 0x7CD630
 INFO = 32
 MESSAGE = 128
+# 位于请求缓冲（前 512 字节）之外，0 空闲、1 等待服务器、2 等待原生完成通知。
+ONLINE_TASK_STATE = 512
 
 
 def u32(read, address):
@@ -18,7 +20,7 @@ def u32(read, address):
 def checked_write(read, write, address, value):
     write(address, value)
     if read(address, len(value)) != value:
-        raise ValueError('本地购买数据回读失败')
+        raise ValueError('原生购买数据回读失败')
 
 
 def request(read, frame):
@@ -44,7 +46,7 @@ def request(read, frame):
         values.append(value)
     sku, quantity = values
     if not 0 < sku < 65536 or quantity != 1:
-        raise ValueError('本地购买每次仅支持一份商品')
+        raise ValueError('每次购买仅支持一份商品')
     return sku, quantity
 
 
@@ -55,95 +57,36 @@ def set_failure(read, write, state, message):
     checked_write(read, write, state + MESSAGE, raw)
 
 
-def quote(read, state, catalog):
-    if any(u32(read, state + offset) != 1 for offset in (20, 24, 28)):
-        raise ValueError('商品已下架或未满足购买条件')
-    info = read(state + INFO, 60)
-    product, sku, currency, price = (struct.unpack_from('<I', info, o)[0] for o in (0, 16, 20, 24))
-    if sku != u32(read, state + 4) or currency not in (1, 2):
-        raise ValueError('本地购买仅支持 GP/CP 商品')
-    discount, rate, original = struct.unpack_from('<iii', info, 48)
-    # 5DF7C1：仅三个字段均为正时，UI 才使用折扣价格。
-    if min(discount, rate, original) > 0:
-        price = discount
-    if not 0 < product < u32(read, 0x7797FFC):
-        raise ValueError('商品索引无效')
-    index = struct.unpack('<H', read(u32(read, 0x7797FF8) + product * 2, 2))[0]
-    if not 0 < index < u32(read, 0x7797FEC):
-        raise ValueError('商品记录无效')
-    record = read(u32(read, 0x7797FE8) + index * 28, 28)
-    if not record[14]:
-        raise ValueError('商品内容为空')
-    item_pointer = struct.unpack_from('<I', record, 16)[0]
-    contents = []
-    for index in range(record[14]):
-        entry = read(item_pointer + index * 4, 4)
-        item_id = struct.unpack_from('<H', entry)[0]
-        item = catalog.get(item_id)
-        if item is None:
-            raise ValueError('商品物品不存在')
-        raw = bytes.fromhex(item['raw'])
-        stackable = bool(raw[32] & 2)
-        # 原生报价 80D27B 使用产品条目的 +2 字节作为堆叠数量。
-        contents.append({'item_id': item_id, 'stackable': stackable,
-                         'count': entry[2] if stackable else 1})
-    return {'item_id': contents[0]['item_id'], 'contents': contents,
-            'sku_id': sku, 'currency': 'gp' if currency == 1 else 'cp',
-            'price': price, 'equipment': not contents[0]['stackable'], 'available': True,
-            'selected_duration': struct.unpack_from('<I', info, 36)[0]}
-
-
-def publish_transaction(read, write, inventory, items, next_state, commit):
-    """预检全部物品后暂存原生库存；任一提交失败恢复整笔交易。"""
-    if isinstance(items, dict):
-        items = [items]
-    pool = int(inventory['pool'], 16)
-    count = inventory['items']
-    if not 0 < count <= CAPACITY or u32(read, 0x82C4A8C) != count:
-        raise ValueError('本地库存数量不一致')
-    if read(pool - 16, 16) != b'LOCAL-INVENTORY!' or read(pool + CAPACITY * STRIDE, 16) != b'LOCAL-INVENTORY!':
-        raise ValueError('本地库存边界损坏')
-    slots = {u32(read, pool + i * STRIDE + 0x40): pool + i * STRIDE for i in range(count)}
-    empty = [pool + i * STRIDE for i in range(count)
-             if not any(read(pool + i * STRIDE + 0x40, 12))]
-    changes = []
-    new_count = count
-    for item in {item['id']: item for item in items}.values():
-        address = slots.get(item['id'])
-        if address is None:
-            if empty:
-                address = empty.pop()
-            else:
-                if new_count >= CAPACITY:
-                    raise ValueError('本地库存已满')
-                address = pool + new_count * STRIDE
-                new_count += 1
-            if any(read(address + 0x40, 12)):
-                raise ValueError('新库存槽不是空的原生对象')
-            if read(address + 0x90, 4) != b'\xff' * 4 or read(address + 0x98, 4) != b'\xff' * 4:
-                raise ValueError('库存槽默认永久期限不符')
-        if u32(read, address) != 0xD59C78:
-            raise ValueError('库存槽原生对象类型不符')
-        before = read(address + 0x40, 12)
-        xp = (struct.unpack_from('<I', before, 8)[0] if item['id'] in slots
-              else inventory['weapon_experience'] if item['type_bytes'][1] == 0 else 0)
-        amount = next_state.get('quantities', {}).get(str(item['id']), 1)
-        changes.append((address + 0x40, before, struct.pack('<III', item['id'], amount, xp)))
-    balances = currency_snapshot(read)
+def handle_phase(process, phase, state, frame, profiles, inventory_session, storage_errors):
+    """主线程只提交一次 SKU，按确认的库存快照完成购买，后续刷新只读。"""
     try:
-        for address, before, after in changes:
-            checked_write(read, write, address, after)
-        checked_write(read, write, 0x82C4A8C, struct.pack('<I', new_count))
-        publish_currency(read, write, next_state)
-        committed = commit()
-    except Exception:
-        for address, before, after in reversed(changes):
-            checked_write(read, write, address, before)
-        checked_write(read, write, 0x82C4A8C, struct.pack('<I', count))
-        publish_currency(read, write, balances)
-        raise
-    inventory['items'] = inventory['native_count'] = new_count
-    return committed
+        if phase == 'request':
+            payload = bytearray(512)
+            struct.pack_into('<IIII', payload, 96, 0xffffffff, 0xffffffff, 0, 1)
+            checked_write(process.read, process.write, state, bytes(payload))
+            if inventory_session is None:
+                raise ValueError('离线模式无法购买商品')
+            sku_id, quantity = request(process.read, frame)
+            checked_write(process.read, process.write, state, struct.pack('<III', 1, sku_id, quantity))
+        elif phase == 'eligible':
+            if any(u32(process.read, state + offset) != 1 for offset in (20, 24, 28)):
+                raise ValueError('商品已下架或未满足购买条件')
+            inventory_session.begin_purchase(u32(process.read, state + 4))
+            checked_write(process.read, process.write, state + ONLINE_TASK_STATE, struct.pack('<I', 1))
+        elif phase == 'poll':
+            completion = inventory_session.poll('purchase')
+            if completion is not None:
+                profiles.apply_inventory(completion['inventory'])
+                checked_write(process.read, process.write, state + 16, struct.pack('<I', 1))
+                checked_write(process.read, process.write, state + ONLINE_TASK_STATE, struct.pack('<I', 2))
+        elif phase in ('refreshed', 'inventory_updated'):
+            return {'purchase_inventory_refreshed': profiles.inventory_count}
+    except (*storage_errors, OnlineError) as error:
+        set_failure(process.read, process.write, state, error)
+        if inventory_session is not None:
+            checked_write(process.read, process.write, state + ONLINE_TASK_STATE, struct.pack('<I', 2))
+        return {'purchase_error': str(error)}
+    return {}
 
 
 def validate_contract(read):
@@ -164,11 +107,11 @@ def validate_contract(read):
     }
     for address, expected in checks.items():
         if read(address, len(expected)) != expected:
-            raise ValueError(f'本地购买 ABI 不匹配：{address:#x}')
+            raise ValueError(f'原生购买 ABI 不匹配：{address:#x}')
 
 
-def build_adapter(entry, state, ready):
-    """GFx 回调→请求陷阱→原生报价→事务陷阱→刷新库存→原生任务完成。"""
+def build_adapter(entry, state, ready, *, deferred=False):
+    """保留原生购买条件和双任务通知，线上等待结果期间返回前端帧。"""
     code, labels, refs, traps = bytearray(), {}, [], {}
     def emit(value): code.extend(bytes.fromhex(value))
     def word(value): code.extend(struct.pack('<I', value))
@@ -181,8 +124,11 @@ def build_adapter(entry, state, ready):
     emit('9c60 8bec 833d'); word(ready); emit('01'); branch('0f85', 'original')
     emit('a1'); word(0x849B874); emit('85c0'); branch('0f84', 'original')
     emit('83780c00'); branch('0f85', 'original')
+    if deferred:
+        # 同一类型的原生任务只能挂起一次，重复 GFx 调用不能覆盖其请求缓冲。
+        emit('833d'); word(state + ONLINE_TASK_STATE); emit('00'); branch('0f85', 'request_return')
     trap('request')
-    emit('833d'); word(state); emit('01'); branch('0f85', 'complete')
+    emit('833d'); word(state); emit('01'); branch('0f85', 'request_return' if deferred else 'complete')
     emit('83e4f0 a1'); word(state+4); call(0x80D770)
     emit('0fb6c0 a3'); word(state+20)
     emit('a1'); word(state+4); emit('be'); word(state+INFO); call(0x80D180)
@@ -196,10 +142,19 @@ def build_adapter(entry, state, ready):
     labels['eligible'] = len(code)
     emit('c705'); word(state+28); word(1)
     labels['quoted'] = len(code)
-    trap('quoted')
+    trap('eligible')
+    if deferred:
+        labels['request_return'] = len(code)
+        emit('8be5 619d c20400')
+        labels['poll'] = len(code)
+        emit('9c60 8bec 833d'); word(state + ONLINE_TASK_STATE); emit('00'); branch('0f84', 'poll_done')
+        emit('833d'); word(state + ONLINE_TASK_STATE); emit('01'); branch('0f85', 'publish_result')
+        trap('poll')
+        emit('833d'); word(state + ONLINE_TASK_STATE); emit('01'); branch('0f84', 'poll_done')
+        labels['publish_result'] = len(code)
     emit('833d'); word(state+16); emit('01'); branch('0f85', 'complete')
     emit('83e4f0'); call(0x5E9720)
-    call(0x5E9250)  # 向 MY_ACCOUNT 发布已提交的本地余额，触发余额组件重绑。
+    call(0x5E9250)  # 向 MY_ACCOUNT 发布服务端已确认的余额，触发余额组件重绑。
     call(0x5E72B0)  # 原生预览列表立即重新生成并通知当前商品界面。
     trap('refreshed')
     labels['complete'] = len(code)
@@ -208,7 +163,12 @@ def build_adapter(entry, state, ready):
     emit('68'); word(state+MESSAGE)
     emit('ff35'); word(state+16)
     emit('6865040000'); call(0x730280)
-    emit('8be5 619d c20400')
+    if deferred:
+        emit('c705'); word(state + ONLINE_TASK_STATE); word(0)
+        labels['poll_done'] = len(code)
+        emit('8be5 619d c3')
+    else:
+        emit('8be5 619d c20400')
     labels['original'] = len(code)
     emit('8be5 619d e9'); word((HANDLER-entry-len(code)-4) & 0xffffffff)
     refresh_entry = entry + len(code)
@@ -227,7 +187,8 @@ def build_adapter(entry, state, ready):
         struct.pack_into('<i', code, pos, labels[name]-pos-4)
     return {'code': bytes(code), 'state': state, 'traps': traps,
             'patch_va': HANDLER_SLOT, 'after': struct.pack('<I', entry),
-            'refresh_after': struct.pack('<I', refresh_entry)}
+            'refresh_after': struct.pack('<I', refresh_entry),
+            'poll': entry + labels['poll'] if deferred else None}
 
 
 def replacements():

@@ -1,6 +1,6 @@
 """单份档案归档：JSON 校验、原子替换与备份回退；不负责生成解锁策略。
 
-历史分析工具使用此格式，正式账号的双档案事务使用 sqlite_accounts。
+历史分析工具使用此格式。联机玩家的配装与成长由账号服务保存。
 """
 from __future__ import annotations
 import base64

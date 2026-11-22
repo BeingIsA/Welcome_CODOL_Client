@@ -1,9 +1,4 @@
-"""玩家昵称的固定版本本地桥：原生setter、宿主提交握手及UI资源替换。
-
-仅接管独立local-profile会话的GFx回调；不改共享在线服务或登录状态。
-宿主处理Unicode校验与持久化，本模块处理GFx/原生字符串和机器码ABI。
-先应用昵称并回读，再由宿主提交；失败调用原生setter恢复旧名后回调失败。
-"""
+"""终版昵称适配。联机时将服务端已确认的昵称交给原生 setter 和任务完成回调。"""
 from __future__ import annotations
 import struct
 
@@ -20,43 +15,12 @@ DW = 0x849B874
 ROOM = 0x82E13FC
 LANGUAGE = 0x7ACE410
 DIRECT_STRING_MODE = 0x331C5C0
-ERROR_STRING = 0xDCC254
+OFFLINE_RENAME_ERROR = '改名需要联网，请连接服务器后重试。'
 EMPTY_STRING = 0xDAE091
 STATE_SIZE = 136  # apply, committed, new[64], old[64]
 NAME_CARD = 50001
 REFRESH_INVENTORY = 0x5E9720
 REFRESH_PREVIEW = 0x5E72B0
-
-
-def consume_card(read, write, inventory, next_state, commit):
-    """按应用层计算的剩余数量发布消费；归零才清空槽位，提交失败恢复原槽。"""
-    from codol_rebuild.adapters.game.v1649370.accounts.profile import CAPACITY, STRIDE
-    pool, count = int(inventory['pool'], 16), inventory['items']
-    if not 0 < count <= CAPACITY or _u32(read, 0x82C4A8C) != count:
-        raise ValueError('改名库存数量不一致')
-    if read(pool-16, 16) != b'LOCAL-INVENTORY!' or read(pool+CAPACITY*STRIDE, 16) != b'LOCAL-INVENTORY!':
-        raise ValueError('改名库存边界损坏')
-    slots = [pool+i*STRIDE for i in range(count) if _u32(read, pool+i*STRIDE+0x40) == NAME_CARD]
-    if len(slots) != 1 or _u32(read, slots[0]) != 0xD59C78:
-        raise ValueError('改名卡库存记录不一致')
-    remaining = (next_state.get('quantities', {}).get(str(NAME_CARD), 1)
-                 if NAME_CARD in next_state['owned_ids'] else 0)
-    address = slots[0]+0x40
-    previous = read(address, 12)
-    if _u32(read, slots[0]+0x44) != remaining+1:
-        raise ValueError('改名卡数量与应用状态不一致')
-    after = (struct.pack('<III', NAME_CARD, remaining, struct.unpack_from('<I', previous, 8)[0])
-             if remaining else bytes(12))
-    try:
-        write(address, after)
-        if read(address, 12) != after:
-            raise ValueError('改名卡消费回读失败')
-        return commit()
-    except Exception:
-        write(address, previous)
-        if read(address, 12) != previous:
-            raise ValueError('改名卡回滚回读失败')
-        raise
 
 
 def _u32(read, address):
@@ -102,7 +66,7 @@ def read_request(read, frame, ready):
     """解析原GFx参数；所有线程在宿主陷阱暂停，不读取可变后台快照。"""
     dw = _u32(read, DW)
     if _u32(read, ready) != 1 or dw < 0x10000 or _u32(read, dw+12) != 0:
-        raise ValueError('本地改名仅支持已就绪的离线档案')
+        raise ValueError('改名需要原生档案就绪')
     room = _u32(read, ROOM)
     # 62FDC6是cmp byte ptr [ecx+38710],0，邻接字节不是该标志的一部分。
     if room < 0x10000 or _u32(read, room+0x1c) or read(room+0x38710, 1) != b'\0':
@@ -162,7 +126,6 @@ def validate_contract(read):
         0x6BBDE0: bytes.fromhex('a15498260885c0'),
         0x72FB48: bytes.fromhex('8b0d10e4ac07'),
         0x62FDC0: bytes.fromhex('83791c00750c80b91087030000'),
-        ERROR_STRING: b'@SF_UI_REDEEM_NAME_CHANGE_UNKNOW_ERROR\0',
         REFRESH_INVENTORY: bytes.fromhex('558bec83ec3c535657'),
         # 原生缓存构建跳过 ID 为 0 的空槽。
         0x5E9741: bytes.fromhex('8b4ff46685c90f84cd000000'),
@@ -174,7 +137,7 @@ def validate_contract(read):
 
 
 def build_adapter(entry, state, ready, initializer, *, deferred=False):
-    """GFx独立回调和启动初始化包装；陷阱只交接数据，不调用在线改名。"""
+    """安装原生改名任务与昵称恢复入口；联机等待服务端回执，独立离线立即完成失败任务。"""
     for address in (entry, state, ready, initializer):
         if type(address) is not int or not 0x10000 <= address <= 0xffffe000:
             raise ValueError('昵称适配地址必须为有效32位地址')
@@ -196,29 +159,30 @@ def build_adapter(entry, state, ready, initializer, *, deferred=False):
     emit('9c60 8bec 833d'); word(ready); emit('01'); branch('0f85', 'original')
     emit('a1'); word(DW); emit('85c0'); branch('0f84', 'original')
     emit('83780c00'); branch('0f85', 'original')
-    for offset in (0, 4):
-        emit('c705'); word(state+offset); word(0)
-    trap('request')
     if deferred:
-        # HTTP 等待期间直接返回；后续前端帧消费结果，不能暂停游戏等网络。
+        # 完成回调可能触发嵌套 GFx 请求，当前通知消费前保留通信区。
+        emit('833d'); word(state+136); emit('00'); branch('0f85', 'request_return')
+        trap('request')
+        label('request_return')
         emit('8be5 619d c20400')
         label('poll')
-        emit('9c60 8bec')
+        emit('9c60 8bec 833d'); word(state+136); emit('00'); branch('0f85', 'received')
         trap('poll')
         emit('833d'); word(state+136); emit('00'); branch('0f84', 'poll_done')
+        label('received')
         emit('833d'); word(state+136); emit('02'); branch('0f84', 'failure')
-    emit('833d'); word(state); emit('01'); branch('0f85', 'failure')
-    setter(8); setter(GAME_NAME_NEW, GAME_NAME); trap('applied')
-    emit('833d'); word(state+4); emit('01'); branch('0f84', 'success')
-    setter(72); setter(GAME_NAME_OLD, GAME_NAME); trap('rolled_back')
+        emit('833d'); word(state); emit('01'); branch('0f85', 'failure')
+        setter(8); setter(GAME_NAME_NEW, GAME_NAME); trap('applied')
+        emit('833d'); word(state+4); emit('01'); branch('0f84', 'success')
+        setter(72); setter(GAME_NAME_OLD, GAME_NAME); trap('rolled_back')
     label('failure')
-    emit('83e4f0 83ec04 6a00 68'); word(state+144 if deferred else ERROR_STRING); emit('6a00')
-    branch('e9', 'complete')
-    label('success')
-    emit('83e4f0'); native('e8', REFRESH_INVENTORY); native('e8', REFRESH_PREVIEW)
-    emit('83e4f0 83ec04 6a00 68'); word(EMPTY_STRING); emit('6a01')
-    label('complete')
+    emit('83e4f0 83ec04 6a00 68'); word(state+144); emit('6a00')
     if deferred:
+        branch('e9', 'complete')
+        label('success')
+        emit('83e4f0'); native('e8', REFRESH_INVENTORY); native('e8', REFRESH_PREVIEW)
+        emit('83e4f0 83ec04 6a00 68'); word(EMPTY_STRING); emit('6a01')
+        label('complete')
         emit('833d'); word(state+140); emit('00'); branch('0f84', 'poll_completed')
     native('e8', COMPLETE)
     if deferred:
@@ -272,6 +236,8 @@ class ServerNameBridge:
         """处理请求、逐帧轮询、原生应用及回滚，不同步执行网络调用。"""
         state = self.adapter['state']
         if phase == 'request':
+            if self.waiting_ui:
+                return
             try:
                 value = read_request(self.process.read, frame, self.adapter['ready'])
                 # 继续使用原有客户端规则及原生编码容量检查；服务端不复验格式。
@@ -295,6 +261,8 @@ class ServerNameBridge:
                 row['server_rename_error'] = str(completion.error)
                 return
             try:
+                if completion.notify:
+                    self.profiles.apply_inventory(completion.inventory)
                 stage_name(self.process.read, self.process.write, state, completion.display_name)
                 self._write(136, struct.pack('<II', 1, int(notify)))
                 # setter 或本地提交失败时的默认反馈。
@@ -305,10 +273,7 @@ class ServerNameBridge:
         elif phase == 'applied':
             try:
                 verify_applied(self.process.read, state)
-                if not self.completion.notify:
-                    self.profiles.synchronize_name(self.completion.display_name)
-                else:
-                    self.profiles.rename(self.completion.display_name)
+                self.profiles.synchronize_name(self.completion.display_name)
                 self._write(4, struct.pack('<I', 1))
                 self.session.complete()
                 row['server_rename_saved'] = self.profiles.name_snapshot

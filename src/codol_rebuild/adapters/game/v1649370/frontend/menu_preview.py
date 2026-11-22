@@ -134,15 +134,24 @@ def build_menu_preview_helper(helper_va: int, *, initializer_va: int | None = No
         jump(b'\x0f\x85', 'finish')
         cmp_dword(FIELDS['weapon_definition_count'])
         jump(b'\x0f\x8e', 'finish')
-    if activation_ready_va is not None and initializer_va is not None:
-        cmp_dword(initializer_ready_va, 1)
-        jump(b'\x0f\x84', 'login_gate')
-        code.extend(bytes.fromhex('83e4f0'))
-        call(initializer_va)
-        labels['login_gate'] = len(code)
-        code.extend(bytes.fromhex('8be5'))
+    login_poll = None
+    if activation_ready_va is not None:
+        # 目录、角色和电影都就绪时才读取登录昵称。网络未返回则回到正常帧循环。
+        cmp_dword(activation_ready_va, 1)
+        jump(b'\x0f\x84', 'profile_gate')
+        login_poll = len(code)
+        code.append(0xcc)
         cmp_dword(activation_ready_va, 1)
         jump(b'\x0f\x85', 'finish')
+        labels['profile_gate'] = len(code)
+        # 原有 before 暂停点供预览验收；其消费者期望此时档案已完成。
+        if initializer_va is not None:
+            cmp_dword(initializer_ready_va, 1)
+            jump(b'\x0f\x84', 'profile_initialized')
+            code.extend(bytes.fromhex('83e4f0'))
+            call(initializer_va)
+            code.extend(bytes.fromhex('8be5'))
+            labels['profile_initialized'] = len(code)
     before = len(code)
     code.append(0xcc)
     code.extend(bytes.fromhex('83e4f0'))  # 按标准 x86 ABI 在 CALL 前16字节对齐。
@@ -153,7 +162,7 @@ def build_menu_preview_helper(helper_va: int, *, initializer_va: int | None = No
         call(initializer_va)
     labels['activate'] = len(code)
     if activation_ready_va is not None:
-        # 联机模式先初始化本地资料，身份登录成功后才激活大厅，避免缓存临时身份。
+        # 只允许已确认身份及仓库的联机会话激活大厅。
         cmp_dword(activation_ready_va, 1)
         jump(b'\x0f\x85', 'finish')
     call(ACTIVATE_VA)
@@ -173,7 +182,7 @@ def build_menu_preview_helper(helper_va: int, *, initializer_va: int | None = No
         raise ValueError('调用桩与固定原生代码或状态字段重叠')
     patch_after = b'\xe8' + struct.pack('<I', (helper_va-RETURN_VA) & 0xffffffff)
     return {'entry_bytes': bytes(code), 'entry_va': helper_va,
-            'before_trap_offset': before, 'after_trap_offset': after,
+            'before_trap_offset': before, 'after_trap_offset': after, 'login_trap_offset': login_poll,
             'finish_offset': labels['finish'], 'patch_va': PATCH_VA,
             'patch_before': PATCH_BEFORE, 'patch_after': patch_after,
             'metadata': {'image_sha256': IMAGE_SHA256, 'getter_va': GETTER_VA,

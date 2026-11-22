@@ -29,7 +29,10 @@ extern "C" __attribute__((naked)) void native_setter() {
 extern "C" void completed(DWORD success, const char* error, DWORD interrupted) {
     ++completion_count;
     if (success != DWORD(scenario == 0) || interrupted) ++error_count;
-    if (scenario == 0 ? *error != 0 : strcmp(error, "failure") != 0) ++error_count;
+    if (scenario == 7) {
+        if (error != reinterpret_cast<const char*>(0x21000090) ||
+            strcmp(error, "offline rename requires a server")) ++error_count;
+    } else if (scenario == 0 ? *error != 0 : strcmp(error, "failure") != 0) ++error_count;
 }
 extern "C" void __stdcall original(DWORD) { ++error_count; }
 extern "C" void refresh() {}
@@ -109,6 +112,7 @@ int main() {
         0x47640000,0x48490000,0x48260000,0x40690000,0x40770000,0x40dc0000,0x40da0000,0x405e0000};
     for (DWORD address : pages) allocate_page(address);
     memcpy(reinterpret_cast<void*>(0x20000000), helper_code, sizeof helper_code);
+    memcpy(reinterpret_cast<void*>(0x20001000), offline_code, sizeof offline_code);
     redirect(N_SETTER,reinterpret_cast<void*>(&native_setter));
     redirect(N_COMPLETE,reinterpret_cast<void*>(&completed));
     redirect(N_HANDLER,reinterpret_cast<void*>(&original));
@@ -138,6 +142,18 @@ int main() {
         if (error_count) {
             printf("{\"passed\":false,\"scenario\":%lu,\"padding\":%lu,\"errors\":%lu}\n",
                 scenario,stack_padding,error_count);return 1;
+        }
+        ++case_count;
+    }
+    scenario = 7;
+    for (stack_padding = 0; stack_padding < 16; stack_padding += 4) {
+        completion_count = setter_count = request_count = applied_count = rollback_count = error_count = 0;
+        strcpy(current_name, "OfflineName");
+        strcpy(reinterpret_cast<char*>(0x21000090), "offline rename requires a server");
+        invoke(0x20001000, true);
+        if (completion_count != 1 || setter_count || request_count || applied_count || rollback_count ||
+            error_count || strcmp(current_name, "OfflineName")) {
+            printf("offline case failed: %lu\n", stack_padding); return 1;
         }
         ++case_count;
     }

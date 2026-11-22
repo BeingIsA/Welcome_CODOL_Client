@@ -1,14 +1,14 @@
 """离线运行组合入口：创建依赖、注入版本桥并启动运行会话。"""
-import json, sqlite3, time, traceback
+import json, traceback
 import socket
 from urllib.parse import urlsplit
-from codol_rebuild.core.paths import REBUILD_ROOT as ROOT, accounts_dir
+from codol_rebuild.core.paths import REBUILD_ROOT as ROOT
 from codol_rebuild.bootstrap.config import parse_args
 from codol_rebuild.bootstrap.logging_setup import session_logging
 from codol_rebuild.bootstrap.resource_setup import prepare, FORBIDDEN
-from codol_rebuild.adapters.persistence.sqlite_accounts import AccountRepository
 from codol_rebuild.adapters.game.v1649370.accounts.profile_codec import AccountCodec
 from codol_rebuild.application.accounts.service import AccountSession
+from codol_rebuild.application.errors import OnlineError
 from codol_rebuild.adapters.game.v1649370.session.session_bridge import GameSessionBridge
 from codol_rebuild.runtime.session import ProcessSession, SessionLog
 from codol_rebuild.runtime.debug_loop import DebugLoop
@@ -40,14 +40,15 @@ def run_session(args, reporter):
     """在已配置日志的会话中装配并清理客户端依赖。"""
     run_dir,stage,log=reporter.run_dir,reporter.stage,reporter.data
     record,phase_done=reporter.record,reporter.phase_done
-    accounts = accounts_dir()
-    def account_factory(schemas,tables,catalog):
-        return AccountSession(AccountRepository(accounts/'local.sqlite3'),
-                              AccountCodec(schemas,tables,catalog))
+    online_profiles = None
+    def account_factory(schemas, tables, catalog):
+        return AccountSession(AccountCodec(schemas, tables, catalog), online_profiles)
+
     process=ProcessSession(args,run_dir,stage,log,record,phase_done,ROOT/'bin/offline_guard.exe')
     bridge=None
     multiplayer=None
     online_session = None
+    inventory_session = None
     match_session = None
     rename_session=None
     chat_session = None
@@ -71,6 +72,10 @@ def run_session(args, reporter):
             from codol_rebuild.adapters.persistence.server_identity import JsonIdentityStore
             from codol_rebuild.platform.machine_identity import fingerprint
             gateway = HttpGateway(args.server_url, args.server_timeout)
+            from codol_rebuild.application.accounts.online_inventory import OnlineInventory
+            from codol_rebuild.application.accounts.online_profiles import OnlineProfiles
+            inventory_session = OnlineInventory(gateway)
+            online_profiles = OnlineProfiles(gateway)
             from codol_rebuild.application.accounts.rename import RenameSession
             rename_session = RenameSession(
                 HttpGateway(args.server_url, min(args.server_timeout, 5.0)))
@@ -94,14 +99,14 @@ def run_session(args, reporter):
             realtime_dispatcher.register(('room_start_updated', 'room_countdown_updated'), match_inbox)
             match_session = MatchSession(multiplayer.confirmed_room_id, match_inbox, gateway)
             online_session = OnlineSession(gateway, identity_store, gateway.server, fingerprint(),
-                                           multiplayer, realtime_connection)
+                                           multiplayer, realtime_connection, inventory_session, online_profiles)
             chat_session = ChatSession(realtime_connection, chat_inbox, multiplayer.confirmed_room_id)
             record({'multiplayer_server': gateway.server})
         bridge=GameSessionBridge(args,run_dir,prepared['image'],prepared['pe'],log,record,phase_done,
-                                 process,account_factory,(OSError,ValueError,sqlite3.Error), multiplayer=multiplayer,
+                                 process,account_factory,(OSError,ValueError,OnlineError), multiplayer=multiplayer,
                                  rename_session=rename_session, broadcast_session=broadcast_session,
                                  realtime_dispatcher=realtime_dispatcher, chat_session=chat_session, online_session=online_session,
-                                 match_session=match_session)
+                                 match_session=match_session, inventory_session=inventory_session)
         debugger=DebugLoop(process,bridge,prepared['pe'],FORBIDDEN)
         process.start(prepared['exe'],prepared['players_directory'])
         debugger.run()
@@ -111,7 +116,8 @@ def run_session(args, reporter):
         try:
             if bridge and process.is_running() and not log.get('error') and log.get('stop_reason') not in ('fatal_dialog','unhandled_exception'):
                 try:bridge.checkpoint(force=True)
-                except (OSError,ValueError) as error:log['local_profile_save_error']=str(error)
+                except (OSError, ValueError, OnlineError) as error:
+                    log['profile_save_error'] = str(error)
         finally:
             try:process.close()
             finally:
@@ -119,10 +125,17 @@ def run_session(args, reporter):
                     try:online_session.close()
                     except Exception as error:
                         log['multiplayer_cleanup_error']=str(error)
+                if online_profiles is not None:
+                    try:
+                        online_profiles.close()
+                    except (OnlineError, OSError, ValueError) as error:
+                        log['profile_save_error'] = str(error)
                 if match_session:
                     try:match_session.close()
                     except Exception as error:
                         log['match_cleanup_error'] = str(error)
+                if inventory_session:
+                    inventory_session.close()
                 if rename_session:
                     try:rename_session.close()
                     except Exception as error:
@@ -141,7 +154,7 @@ def main(argv=None):
     result=run(parse_args(argv))
     print(json.dumps({k:v for k,v in result.items() if k not in ('events','modules','traceback','patches')},ensure_ascii=False,indent=2))
     cleanup=result.get('guard_cleanup',{})
-    failed=(result.get('error') or result.get('stop_reason') in ('unhandled_exception','forbidden_module_before_initialization','fatal_dialog')
+    failed=(result.get('error') or result.get('profile_save_error') or result.get('stop_reason') in ('unhandled_exception','forbidden_module_before_initialization','fatal_dialog')
             or result.get('exit_code',0)!=0 or result.get('child_terminated') is False
             or result.get('guard_cleanup_timeout') or cleanup.get('error') or cleanup.get('engine_close_status',0)!=0)
     return 1 if failed else 0

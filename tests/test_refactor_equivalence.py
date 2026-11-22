@@ -89,8 +89,10 @@ class RefactorEquivalenceTests(unittest.TestCase):
         """
         # 已变更部分由对应功能回归约束；未列出的历史函数和常量仍逐项比较。
         changed_symbols = {
+            'menu_preview.py': {'build_menu_preview_helper'},  # 联机大厅等待仓库再初始化
             'movie_identity.py': {'build_resource_patch', 'find_resource_patch'},  # 资源重载与幂等
-            'player_name.py': {'consume_card', 'build_adapter'},  # 服务端改名与道具消耗
+            'player_name.py': {'build_adapter', 'validate_contract'},  # 服务端改名与道具消耗
+            'purchase.py': {'build_adapter'},  # 原生购买任务交接给联机仓库
             'room.py': {'build_room_adapter', 'JOIN_CONTRACT', 'build_join_adapter'},  # 正式房间接入
             'ui_movie.py': {'replacements'},  # 房间、聊天等组合补丁
             'ui_theme.py': {'METHOD_OFFSET', 'ORIGINAL_METHOD', 'replacements'},  # 局部主题补丁
@@ -98,13 +100,27 @@ class RefactorEquivalenceTests(unittest.TestCase):
                           'COMMAND_BUFFER', 'COMMAND_LOCK'},  # 删除宿主菜单命令注入
         }
         changed_methods = {
-            'profile_bridge.py': {'LocalProfileBridge.prepare_native', 'LocalProfileBridge.complete_native',
-                'LocalProfileBridge.quote', 'LocalProfileBridge.rename', 'LocalProfileBridge.purchase',
+            'profile_bridge.py': {'LocalProfileBridge.__init__', 'LocalProfileBridge.prepare_native',
+                'LocalProfileBridge.complete_native',
                 'LocalProfileBridge.save'},  # 账号同步、购买解耦和编码存档保护
             'profile_codec.py': {'AccountCodec.initialize'},  # 配装版本迁移
             'session_bridge.py': {'GameSessionBridge.__init__', 'GameSessionBridge.module_loaded',
                 'GameSessionBridge.install_menu_preview', 'GameSessionBridge.install_navigation_resource',
-                'GameSessionBridge.handle_exception', 'GameSessionBridge.breakpoint'},  # 正式入口与资源生命周期
+                'GameSessionBridge.handle_exception', 'GameSessionBridge.breakpoint',
+                'GameSessionBridge.idle'},  # 联机档案改在公共主线程帧采样
+        }
+        removed_declarations = {
+            'player_name.py': {'consume_card', 'ERROR_STRING'},
+            'profile_bridge.py': {'LocalProfileBridge.quote', 'LocalProfileBridge.purchase',
+                                  'LocalProfileBridge.credit_state', 'LocalProfileBridge.commit_balances',
+                                  'LocalProfileBridge.rename'},
+            'purchase.py': {'quote', 'publish_transaction'},
+        }
+        # 只更新“本地购买”文案，参数校验、回读检查及 ABI 指纹仍逐项比较。
+        purchase_error_wording = {
+            'request': ('本地购买每次仅支持一份商品', '每次购买仅支持一份商品'),
+            'checked_write': ('本地购买数据回读失败', '原生购买数据回读失败'),
+            'validate_contract': ('本地购买 ABI 不匹配', '原生购买 ABI 不匹配'),
         }
         def declarations(statements, prefix=''):
             result = {}
@@ -124,7 +140,7 @@ class RefactorEquivalenceTests(unittest.TestCase):
         for old in files:
             if old.name == 'image.py':
                 continue
-            if old.name in ('menu_queue.py', 'multiplayer_bridge.py'):
+            if old.name in ('menu_queue.py', 'multiplayer_bridge.py', 'ui_recharge.py'):
                 self.assertFalse(list((PKG/'adapters/game/v1649370').rglob(old.name)))
                 if old.name == 'multiplayer_bridge.py':
                     self.assertTrue((PKG/'adapters/game/v1649370/rooms/room_session_bridge.py').is_file())
@@ -140,10 +156,18 @@ class RefactorEquivalenceTests(unittest.TestCase):
             baseline = declarations(ast.parse(old.read_text(encoding='utf-8')).body)
             current = declarations(ast.parse(current_path.read_text(encoding='utf-8')).body)
             approved = changed_symbols.get(old.name, set()) | changed_methods.get(old.name, set())
-            self.assertTrue(approved <= baseline.keys(), old.name)
+            removed = removed_declarations.get(old.name, set())
+            self.assertTrue((approved | removed) <= baseline.keys(), old.name)
             for name, declaration in baseline.items():
-                if name not in approved:
-                    self.assertEqual(declaration, current.get(name), old.name + ':' + name)
+                with self.subTest(module=old.name, declaration=name):
+                    if old.name == 'purchase.py' and name in purchase_error_wording:
+                        declaration = declaration.replace(*purchase_error_wording[name])
+                    if old.name == 'player_name.py' and name == 'read_request':
+                        declaration = declaration.replace('本地改名仅支持已就绪的离线档案', '改名需要原生档案就绪')
+                    if name in removed:
+                        self.assertNotIn(name, current)
+                    elif name not in approved:
+                        self.assertEqual(declaration, current.get(name), old.name + ':' + name)
         # 格式模块迁入的版本身份保持显式断言。
         from codol_rebuild.adapters.game.v1649370 import layout
         self.assertEqual(layout.BUFFER_CAPACITY,0x7ffc)
@@ -178,12 +202,16 @@ class RefactorEquivalenceTests(unittest.TestCase):
                 self.assertEqual(expected,actual,f'local_profile={local}')
 
     def test_real_profile_bootstrap_equivalent(self):
-        from codol_rebuild.application.accounts.service import bootstrap
         from codol_rebuild.adapters.game.v1649370.accounts.profile_codec import AccountCodec
         captured=json.loads((CAPTURE/'capture.json').read_text(encoding='utf-8'))
         schemas={kind:json.loads((CAPTURE/label/'playerdata-schema.json').read_text(encoding='utf-8'))
                  for kind,label in [('public','playerdata'),('secure','playersecuredata')]}
-        ns={};exec(old_source('accounts/bootstrap_service.py'),ns)
+        source = old_source('accounts/bootstrap_service.py')
+        # 旧存储端口仅供类型注释，历史算法引入的运行依赖维持原样。
+        source = source.replace('from codol_rebuild.application.accounts.contracts import AccountStore',
+                                'from typing import Protocol as AccountStore')
+        ns = {}
+        exec(source, ns)
         class Store:
             def __init__(self):self.state={'uid':0x8765432198765432,'profiles':{},'revision':0};self.calls=[]
             def identity(self,name):return self.state
@@ -193,39 +221,18 @@ class RefactorEquivalenceTests(unittest.TestCase):
                 assert revision==self.state['revision']
                 self.state={**self.state,'profiles':profiles,'revision':revision+1}
                 return revision+1
-        before=Store();after=Store();codec=AccountCodec(schemas,captured['tables'],captured['catalog'])
-        # 旧档保留全解锁行为；新档授权策略另有验证。
-        ns['bootstrap'](before,schemas,captured['tables'],captured['catalog'])
-        after.state=copy.deepcopy(before.state)
-        before.calls.clear()
-        for cycle in range(2):
-            old=ns['bootstrap'](before,schemas,captured['tables'],captured['catalog'])
-            new=bootstrap(after,codec)
-            # 仅放行已批准的 loadoutVersion 0→3 迁移，其他档案字节仍严格比较。
-            from codol_rebuild.adapters.game.profile_format.fields import Fields
-            fields = Fields(schemas['public'])
-            self.assertEqual(fields.read(old['profiles']['public'], 'loadoutVersion'), 0)
-            expected_public = bytearray(old['profiles']['public'])
-            fields.write(expected_public, 'loadoutVersion', 3)
-            expected_profiles = {**old['profiles'], 'public': bytes(expected_public)}
-            self.assertEqual(new, {**old, 'profiles': expected_profiles, 'revision': old['revision'] + 1},
-                             f'cycle {cycle}')
-            self.assertEqual(before.calls, [])
-            self.assertEqual(after.calls, [('local', old['revision'], expected_profiles, codec.identities)])
-
-    def test_account_failed_save_keeps_revision(self):
-        from codol_rebuild.application.accounts.service import AccountSession
-        from codol_rebuild.application.accounts.contracts import RevisionConflict
-        class Codec:
-            identities={}
-            def validate_snapshot(self,blobs):return 545
-        class Store:
-            def save(self,*args):raise RevisionConflict('stale')
-        service=AccountSession(Store(),Codec())
-        service.account={'profiles':{'public':b'old','secure':b'old'},'revision':8}
-        previous=copy.deepcopy(service.account)
-        with self.assertRaises(RevisionConflict):service.save({'public':b'new','secure':b'new'})
-        self.assertEqual(previous,service.account)
+        before = Store()
+        codec = AccountCodec(schemas, captured['tables'], captured['catalog'])
+        captured_profile = ns['bootstrap'](before, schemas, captured['tables'], captured['catalog'])['profiles']
+        # 服务端已存的双档仍沿用既有格式迁移，仅补齐历史 loadoutVersion。
+        from codol_rebuild.adapters.game.profile_format.fields import Fields
+        fields = Fields(schemas['public'])
+        self.assertEqual(fields.read(captured_profile['public'], 'loadoutVersion'), 0)
+        expected_public = bytearray(captured_profile['public'])
+        fields.write(expected_public, 'loadoutVersion', 3)
+        expected_profiles = {**captured_profile, 'public': bytes(expected_public)}
+        self.assertEqual(codec.migrate(captured_profile), expected_profiles)
+        self.assertEqual(codec.migrate(expected_profiles), expected_profiles)
 
 if __name__=='__main__':unittest.main()
 

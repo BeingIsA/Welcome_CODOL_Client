@@ -1,23 +1,16 @@
-"""本地购买的事务、失败回滚、期限策略及原生契约验证。"""
-import copy
-from contextlib import closing
-from pathlib import Path
-import sqlite3
+"""购买入口、服务端确认和原生双任务回显回归。"""
 import struct
-import tempfile
 import unittest
-from unittest.mock import Mock, patch
+from pathlib import Path
+from unittest.mock import Mock
+
 import pefile
 import capstone
-
-from codol_rebuild.application.accounts.purchase import permanent_purchase
-from codol_rebuild.application.accounts.service import AccountSession
-from codol_rebuild.adapters.persistence.sqlite_accounts import AccountRepository
+from codol_rebuild.application.errors import OnlineError
 from codol_rebuild.adapters.game.v1649370.accounts import purchase
 
 ROOT = Path(__file__).resolve().parents[2]
-STATE = {'version': 1, 'owned_ids': [545], 'gp': 1000, 'cp': 100}
-OFFER = {'item_id': 123, 'currency': 'gp', 'price': 50, 'equipment': True, 'available': True}
+STATE = {"version": 1, "owned_ids": [545], "gp": 1000, "cp": 100}
 
 
 class Codec:
@@ -39,191 +32,6 @@ class Memory:
 
 
 class PurchaseTests(unittest.TestCase):
-    def test_purchase_does_not_write_profiles_and_later_save_preserves_purchase(self):
-        """数据库禁止档案写入时购买仍成功，后续配装保存不回滚余额和物品。"""
-        with tempfile.TemporaryDirectory() as folder:
-            path = Path(folder) / 'account.db'
-            session, profiles = self.session(path)
-            with closing(sqlite3.connect(path)) as database, database:
-                database.execute("CREATE TRIGGER reject_profile_insert BEFORE INSERT ON profiles BEGIN SELECT RAISE(ABORT, 'purchase touched profiles'); END")
-                database.execute("CREATE TRIGGER reject_profile_update BEFORE UPDATE ON profiles BEGIN SELECT RAISE(ABORT, 'purchase touched profiles'); END")
-            session.commit_purchase(OFFER)
-            restored = session.repository.load('local', session.codec.identities)
-            self.assertEqual(restored['profiles'], profiles)
-            self.assertEqual(restored['initialization']['gp'], 950)
-            self.assertIn(123, restored['initialization']['owned_ids'])
-            with closing(sqlite3.connect(path)) as database, database:
-                database.execute('DROP TRIGGER reject_profile_insert')
-                database.execute('DROP TRIGGER reject_profile_update')
-            session.codec = Mock(identities=Codec.identities)
-            changed_profiles = {**profiles, 'public': b'changed loadout'}
-            session.save(changed_profiles)
-            saved = session.repository.load('local', Codec.identities)
-            self.assertEqual(saved['profiles'], changed_profiles)
-            self.assertEqual(saved['initialization'], restored['initialization'])
-
-    def test_bridge_purchase_never_reads_or_saves_native_profiles(self):
-        """编码态与未保存配装均不应成为购买的前置条件。"""
-        from codol_rebuild.adapters.game.v1649370.accounts.profile_bridge import LocalProfileBridge
-        with tempfile.TemporaryDirectory() as folder:
-            session, profiles = self.session(Path(folder) / 'account.db')
-            process = Mock()
-            process.read.side_effect = AssertionError('purchase read native profile')
-            bridge = LocalProfileBridge(process, Mock(), {}, Mock())
-            bridge._service = session
-            bridge._ready = True
-            bridge._inventory = {'pool': '0x100000'}
-            bridge._catalog = {123: {'id': 123}}
-            bridge.save = Mock(side_effect=AssertionError('purchase saved unrelated profile'))
-            # 原生库存/余额发布与回滚由现有publish_transaction测试独立覆盖。
-            def publish(read, write, inventory, items, next_state, commit):
-                return commit()
-            with patch.object(purchase, 'publish_transaction', side_effect=publish):
-                bridge.purchase(OFFER)
-            bridge.save.assert_not_called()
-            process.read.assert_not_called()
-            self.assertEqual(session.account['profiles'], profiles)
-            self.assertEqual(session.account['initialization']['gp'], 950)
-
-    def test_bundle_accumulates_and_deduplicates_atomically(self):
-        bundle = {**OFFER, 'contents': [
-            {'item_id': 545, 'stackable': False, 'count': 1},
-            {'item_id': 123, 'stackable': False, 'count': 1},
-            {'item_id': 456, 'stackable': True, 'count': 5},
-            {'item_id': 456, 'stackable': True, 'count': 2},
-        ]}
-        first = permanent_purchase(STATE, bundle)
-        second = permanent_purchase(first, bundle)
-        self.assertEqual(second['owned_ids'], [123, 456, 545])
-        self.assertEqual(second['quantities'], {'456': 14})
-        self.assertEqual(second['gp'], 900)
-        self.assertNotIn('quantities', STATE)
-        old = {**STATE, 'owned_ids': [456, 545]}
-        self.assertEqual(permanent_purchase(old, bundle)['quantities']['456'], 8)
-        for content in ({'item_id': 20000, 'stackable': True, 'count': 1},
-                        {'item_id': 456, 'stackable': True, 'count': 0}):
-            with self.assertRaises(ValueError):
-                permanent_purchase(first, {**bundle, 'contents': [*bundle['contents'], content]})
-        with self.assertRaises(ValueError):
-            permanent_purchase({**first, 'quantities': {'456': 2147483647}}, bundle)
-        with self.assertRaises(ValueError):
-            permanent_purchase(first, {**bundle, 'contents': bundle['contents'][:2]})
-
-    def test_bundle_persistence_and_native_rollback(self):
-        bundle = {**OFFER, 'contents': [
-            {'item_id': 545, 'stackable': True, 'count': 4},
-            {'item_id': 123, 'stackable': False, 'count': 1}]}
-        with tempfile.TemporaryDirectory() as folder:
-            session, blobs = self.session(Path(folder)/'account.db')
-            session.commit_purchase(bundle)
-            session.commit_purchase(bundle)
-            saved = session.repository.load('local', session.codec.identities)['initialization']
-            self.assertEqual(saved['quantities'], {'545': 9})
-            mem, pool = Memory(), 0x100000
-            mem.write(pool-16, b'LOCAL-INVENTORY!')
-            mem.write(pool+purchase.CAPACITY*purchase.STRIDE, b'LOCAL-INVENTORY!')
-            for slot in (pool, pool+purchase.STRIDE):
-                mem.word(slot, 0xD59C78)
-                mem.word(slot+0x90, 0xffffffff)
-                mem.word(slot+0x98, 0xffffffff)
-            mem.write(pool+0x40, struct.pack('<III', 545, 1, 17))
-            mem.word(0x82C4A8C, 1)
-            purchase.publish_currency(mem.read, mem.write, STATE)
-            inventory = {'pool': hex(pool), 'items': 1, 'weapon_experience': 99}
-            items = [{'id': 545, 'type_bytes': [0, 8]}, {'id': 123, 'type_bytes': [0, 0]}]
-            before = mem.read(pool, purchase.STRIDE*2)
-            def reject(): raise ValueError('database failed')
-            with self.assertRaises(ValueError):
-                purchase.publish_transaction(mem.read, mem.write, inventory, items, saved, reject)
-            self.assertEqual(mem.read(pool, purchase.STRIDE*2), before)
-            self.assertEqual(purchase.currency_snapshot(mem.read), {'gp': 1000, 'cp': 100})
-            purchase.publish_transaction(mem.read, mem.write, inventory, items, saved, lambda: True)
-            self.assertEqual(purchase.u32(mem.read, pool+0x44), 9)
-            self.assertEqual(purchase.u32(mem.read, pool+0x48), 17)
-            self.assertEqual(inventory['items'], 2)
-
-    def test_every_duration_grants_permanent_without_mutation(self):
-        for duration in (0, 1, 7, 30, 65535, 4294967295):
-            before = copy.deepcopy(STATE)
-            after = permanent_purchase(before, {**OFFER, 'selected_duration': duration})
-            self.assertEqual(after, {**STATE, 'gp': 950, 'owned_ids': [123, 545]})
-            self.assertEqual(before, STATE)
-
-    def test_rejections(self):
-        for offer, quantity in [
-            ({**OFFER, 'item_id': 545}, 1), ({**OFFER, 'price': 1001}, 1),
-            ({**OFFER, 'price': -5}, 1), ({**OFFER, 'currency': 'honor'}, 1),
-            ({**OFFER, 'equipment': False}, 1), ({**OFFER, 'available': False}, 1),
-            (OFFER, 2), (OFFER, True), ({**OFFER, 'price': True}, 1),
-        ]:
-            with self.assertRaises(ValueError):
-                permanent_purchase(STATE, offer, quantity)
-
-    def session(self, path):
-        repo, codec = AccountRepository(path), Codec()
-        repo.identity()
-        blobs = {'public': b'public', 'secure': b'secure'}
-        repo.save('local', 0, blobs, codec.identities, initialization=STATE)
-        session = AccountSession(repo, codec)
-        session.account = repo.load('local', codec.identities)
-        return session, blobs
-
-    def test_sqlite_restart_duplicate_and_conflict(self):
-        with tempfile.TemporaryDirectory() as folder:
-            session, blobs = self.session(Path(folder)/'account.db')
-            stale = AccountSession(session.repository, session.codec)
-            stale.account = copy.deepcopy(session.account)
-            session.commit_purchase({**OFFER, 'currency': 'cp'})
-            restored = session.repository.load('local', session.codec.identities)
-            self.assertEqual(restored['initialization']['cp'], 50)
-            self.assertIn(123, restored['initialization']['owned_ids'])
-            with self.assertRaises(ValueError):
-                session.commit_purchase(OFFER)
-            with self.assertRaises(ValueError):
-                stale.commit_purchase(OFFER)
-            self.assertEqual(session.repository.load('local', session.codec.identities), restored)
-
-    def test_sqlite_failure_rolls_back_currency_and_ownership(self):
-        with tempfile.TemporaryDirectory() as folder:
-            path = Path(folder)/'account.db'
-            session, blobs = self.session(path)
-            before = copy.deepcopy(session.account)
-            with sqlite3.connect(path) as db:
-                db.execute("CREATE TRIGGER reject_purchase BEFORE UPDATE ON account_initialization BEGIN SELECT RAISE(ABORT, 'injected failure'); END")
-            db.close()
-            with self.assertRaises(sqlite3.Error):
-                session.commit_purchase(OFFER)
-            self.assertEqual(session.account, before)
-            self.assertEqual(session.repository.load('local', session.codec.identities), before)
-
-    def test_native_publish_rollback_and_success(self):
-        mem, pool = Memory(), 0x100000
-        mem.write(pool-16, b'LOCAL-INVENTORY!')
-        mem.write(pool+purchase.CAPACITY*purchase.STRIDE, b'LOCAL-INVENTORY!')
-        mem.word(pool+0x40, 545)
-        slot = pool+purchase.STRIDE
-        mem.word(slot, 0xD59C78)
-        mem.word(slot+0x90, 0xffffffff)
-        mem.word(slot+0x98, 0xffffffff)
-        mem.word(0x82C4A8C, 1)
-        purchase.publish_currency(mem.read, mem.write, STATE)
-        inventory = {'pool': hex(pool), 'items': 1, 'weapon_experience': 99}
-        item = {'id': 123, 'type_bytes': [0, 0]}
-        before = mem.read(slot, purchase.STRIDE)
-        def reject():
-            raise ValueError('database failed')
-        with self.assertRaises(ValueError):
-            purchase.publish_transaction(mem.read, mem.write, inventory, item,
-                                         permanent_purchase(STATE, OFFER), reject)
-        self.assertEqual(mem.read(slot, purchase.STRIDE), before)
-        self.assertEqual(purchase.currency_snapshot(mem.read), {'gp': 1000, 'cp': 100})
-        self.assertEqual(inventory['items'], 1)
-        purchase.publish_transaction(mem.read, mem.write, inventory, item,
-                                     permanent_purchase(STATE, OFFER), lambda: True)
-        self.assertEqual(inventory['items'], 2)
-        self.assertEqual(purchase.currency_snapshot(mem.read)['gp'], 950)
-        self.assertEqual(mem.read(slot+0x90, 4), b'\xff'*4)
-
     def test_gfx_request_rejects_fraction_and_bulk(self):
         mem = Memory()
         mem.word(0x100028, 0x200000)
@@ -237,45 +45,49 @@ class PurchaseTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 purchase.request(mem.read, 0x100000)
 
-    def test_quote_uses_native_discount_and_classifies_contents(self):
-        mem, state = Memory(), 0x100000
-        mem.word(state+4, 55)
-        for offset in (20,24,28): mem.word(state+offset,1)
-        for offset,value in ((0,9),(16,55),(20,2),(24,100),(36,7),(48,60),(52,60),(56,100)):
-            mem.word(state+purchase.INFO+offset,value)
-        mem.word(0x7797FFC,10);mem.word(0x7797FF8,0x200000)
-        mem.write(0x200012,struct.pack('<H',1))
-        mem.word(0x7797FEC,2);mem.word(0x7797FE8,0x300000)
-        mem.write(0x300000+28+14,b'\x01');mem.word(0x300000+28+16,0x400000)
-        mem.write(0x400000,struct.pack('<HH',123,1))
-        item={'id':123,'type_bytes':[0,0], 'raw':bytes(40).hex()}
-        offer=purchase.quote(mem.read,state,{123:item})
-        self.assertEqual((offer['currency'],offer['price'],offer['selected_duration']),('cp',60,7))
-        mem.word(state+purchase.INFO+52,0)
-        self.assertEqual(purchase.quote(mem.read,state,{123:item})['price'],100)
-        for offset in (20,24,28):
-            mem.word(state+offset,0)
-            with self.assertRaises(ValueError): purchase.quote(mem.read,state,{123:item})
-            mem.word(state+offset,1)
-        mem.write(0x300000+28+14,b'\x02')
-        with self.assertRaises(ValueError): purchase.quote(mem.read,state,{123:item})
-        mem.write(0x300000+28+14,b'\x01')
-        self.assertTrue(purchase.quote(mem.read,state,{123:{**item,'type_bytes':[0,8,3]}})['equipment'])
-        raw=bytearray(40);raw[32]=2
-        self.assertFalse(purchase.quote(mem.read,state,{123:{**item,'raw':raw.hex()}})['equipment'])
-        mem.write(0x300000+28+14,b'\x02')
-        mem.write(0x400004,struct.pack('<HBB',456,7,0))
-        offer=purchase.quote(mem.read,state,{123:item,456:{**item,'id':456,'raw':raw.hex()}})
-        self.assertEqual(offer['contents'], [
-            {'item_id':123,'count':1,'stackable':False},
-            {'item_id':456,'count':7,'stackable':True}])
-
     def test_quantity_state_rejects_corruption(self):
         from codol_rebuild.application.accounts.policy import validate_initialization
         for amounts in ([], {'545':0}, {'545':True}, {'545':2147483648},
                         {'999':2}, {'0545':2}, {545:2}):
             with self.assertRaises(ValueError):
                 validate_initialization({**STATE, 'quantities':amounts})
+
+    def test_purchase_waits_for_server_before_publishing_and_completing(self):
+        memory = Memory()
+        process = Mock(read=memory.read, write=memory.write)
+        session = Mock()
+        profiles = Mock()
+        state = 0x13000000
+        for offset in (20, 24, 28):
+            memory.word(state + offset, 1)
+        memory.word(state + 4, 91)
+        inventory = {'revision': 3, 'items': [], 'cp': 5, 'gp': 10}
+        session.poll.side_effect = [None, {'inventory': inventory}]
+        for phase in ('eligible', 'poll'):
+            purchase.handle_phase(process, phase, state, 0, profiles, session, (ValueError,))
+        session.begin_purchase.assert_called_once_with(91)
+        profiles.apply_inventory.assert_not_called()
+        self.assertEqual(purchase.u32(memory.read, state + 16), 0)
+        purchase.handle_phase(process, 'poll', state, 0, profiles, session, (ValueError,))
+        profiles.apply_inventory.assert_called_once_with(inventory)
+        self.assertEqual(purchase.u32(memory.read, state + 16), 1)
+        purchase.handle_phase(process, 'inventory_updated', state, 0, profiles, session, (ValueError,))
+        session.begin_purchase.assert_called_once_with(91)
+
+    def test_offline_and_rejected_requests_end_in_failure(self):
+        memory = Memory()
+        process = Mock(read=memory.read, write=memory.write)
+        profiles = Mock()
+        state = 0x13000000
+        result = purchase.handle_phase(process, 'request', state, 0, profiles, None, (ValueError,))
+        self.assertIn('离线', result['purchase_error'])
+        session = Mock()
+        session.poll.side_effect = OnlineError('REJECTED', '余额不足')
+        result = purchase.handle_phase(process, 'poll', state, 0, profiles, session, (ValueError,))
+        self.assertEqual(result['purchase_error'], '余额不足')
+        self.assertEqual(purchase.u32(memory.read, state + purchase.ONLINE_TASK_STATE), 2)
+        self.assertEqual(purchase.u32(memory.read, state + 16), 0)
+        profiles.apply_inventory.assert_not_called()
 
     def test_success_popup_calls_existing_parent_method(self):
         import sys
@@ -318,7 +130,7 @@ class PurchaseTests(unittest.TestCase):
         pe = pefile.PE(str(ROOT/'client/bin/v1649370/codol1649370-offline.exe'))
         purchase.validate_contract(lambda a,n: pe.get_data(a-pe.OPTIONAL_HEADER.ImageBase,n))
         entry = 0x10000000
-        plan = purchase.build_adapter(entry, entry+4096, entry+8192)
+        plan = purchase.build_adapter(entry, entry+4096, entry+8192, deferred=True)
         md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
         instructions = list(md.disasm(plan['code'], entry))
         self.assertEqual(sum(i.size for i in instructions), len(plan['code']))
@@ -326,7 +138,7 @@ class PurchaseTests(unittest.TestCase):
         for i in instructions:
             if i.mnemonic.startswith('j') and i.op_str.startswith('0x'):
                 self.assertIn(int(i.op_str,16), starts | {purchase.HANDLER, purchase.REFRESH_HANDLER})
-        self.assertEqual(set(plan['traps'].values()), {'request','quoted','refreshed','inventory_updated'})
+        self.assertEqual(set(plan['traps'].values()), {'request', 'eligible', 'poll', 'refreshed', 'inventory_updated'})
         for address in plan['traps']:
             self.assertEqual(plan['code'][address-entry], 0xcc)
 

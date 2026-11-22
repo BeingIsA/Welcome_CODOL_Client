@@ -14,7 +14,7 @@ from pathlib import Path
 V1649370 = Path(__file__).resolve().parents[1] / 'src' / 'codol_rebuild' / 'adapters' / 'game' / 'v1649370'
 # 规则跟随所属功能，不得反向依赖会话目录的聚合编排。
 RULE_PROVIDERS = ['frontend.ui_navigation', 'frontend.sanitize', 'accounts.player_name',
-                  'frontend.ui_theme', 'frontend.ui_weekly_rewards', 'accounts.ui_recharge',
+                  'frontend.ui_theme', 'frontend.ui_weekly_rewards',
                   'accounts.purchase', 'rooms.room_member_menu', 'chat.ui_chat']
 
 

@@ -12,8 +12,11 @@ from codol_rebuild.adapters.game.v1649370.accounts import player_name
 
 class NativeRenameTests(unittest.TestCase):
     def test_deferred_completion_stack_registers_and_rollback(self):
-        compiler = Path('D:/Games/CODOL/GameServer/.toolchain/msys64/mingw32/bin/g++.exe')
-        if not compiler.exists():
+        compiler = next((path for path in (
+            Path('C:/msys64/mingw32/bin/g++.exe'),
+            Path('D:/Games/CODOL/GameServer/.toolchain/msys64/mingw32/bin/g++.exe'),
+        ) if path.is_file()), None)
+        if compiler is None:
             self.skipTest('需要本机 MinGW32 编译器与 Windows x86 执行环境')
         project = Path(__file__).resolve().parents[2]
         workspace_root = project/'verification/client/workspaces/test-temp'
@@ -21,12 +24,14 @@ class NativeRenameTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=workspace_root) as directory:
             workspace = Path(directory)
             addresses = {name: getattr(player_name, name)+0x40000000 for name in (
-                'HANDLER', 'SETTER', 'COMPLETE', 'USERNAME', 'GAME_NAME', 'DW', 'ERROR_STRING',
+                'HANDLER', 'SETTER', 'COMPLETE', 'USERNAME', 'GAME_NAME', 'DW',
                 'EMPTY_STRING', 'REFRESH_INVENTORY', 'REFRESH_PREVIEW')}
             with patch.multiple(player_name, **addresses):
                 plan = player_name.build_adapter(0x20000000, 0x21000000, 0x22000000,
                                                   0x23000000, deferred=True)
+                offline = player_name.build_adapter(0x20001000, 0x21000000, 0x22000000, 0x23000000)
             header = 'static const unsigned char helper_code[] = {'+','.join(map(str, plan['code']))+'};\n'
+            header += 'static const unsigned char offline_code[] = {'+','.join(map(str, offline['code']))+'};\n'
             header += ''.join(f'#define TRAP_{phase.upper()} {address:#x}u\n'
                               for address, phase in plan['traps'].items())
             header += f'#define POLL_ENTRY {plan["poll"]:#x}u\n'
@@ -45,4 +50,4 @@ class NativeRenameTests(unittest.TestCase):
                 if result.returncode != 2 or not result.stdout.startswith('allocation failed:'):
                     break
             self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
-            self.assertEqual(json.loads(result.stdout), {'passed': True, 'cases': 28})
+            self.assertEqual(json.loads(result.stdout), {'passed': True, 'cases': 32})

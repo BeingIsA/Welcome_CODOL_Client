@@ -47,6 +47,36 @@ class MenuPreviewTests(unittest.TestCase):
         self.assertGreater(rows[index].address, base+result['before_trap_offset'])
         self.assertEqual(sum(r.size for r in rows), len(result['entry_bytes']))
 
+    def test_online_login_trap_guards_profile_initializer_and_activation(self):
+        base, initializer = 0x20000000, 0x21000000
+        profile_ready, login_ready = 0x22000048, 0x23000014
+        result = build_menu_preview_helper(base, initializer_va=initializer,
+                                           initializer_ready_va=profile_ready, activation_ready_va=login_ready)
+        rows = list(Cs(CS_ARCH_X86, CS_MODE_32).disasm(result['entry_bytes'], base))
+        instructions = [(row.mnemonic, row.op_str) for row in rows]
+        login_index = next(index for index, row in enumerate(rows)
+                           if row.address == base + result['login_trap_offset'])
+        finish = hex(base + result['finish_offset'])
+        before_preview = hex(base + result['before_trap_offset'])
+        login_check = ('cmp', f'dword ptr [{login_ready:#x}], 1')
+        profile_check = ('cmp', f'dword ptr [{profile_ready:#x}], 1')
+        # 未登录先通知宿主，网络仍未返回就结束本帧；已登录可直接去读初始化标记。
+        self.assertEqual(instructions[login_index - 2:login_index + 5], [
+            login_check, ('je', hex(rows[login_index + 3].address)), ('int3', ''),
+            login_check, ('jne', finish), profile_check, ('je', before_preview)])
+        self.assertEqual([row.op_str for row in rows[:login_index] if row.mnemonic == 'call'], [hex(GETTER_VA)])
+        before_index = next(index for index, row in enumerate(rows) if hex(row.address) == before_preview)
+        self.assertEqual([row.op_str for row in rows[login_index:before_index] if row.mnemonic == 'call'],
+                         [hex(initializer)])
+        activation_index = instructions.index(('call', hex(ACTIVATE_VA)))
+        self.assertLess(before_index, activation_index)
+        self.assertEqual(instructions[activation_index - 2:activation_index], [login_check, ('jne', finish)])
+        # 后续帧已有档案时，两处初始化调用都应能够跳过。
+        profile_checks = [index for index, instruction in enumerate(instructions) if instruction == profile_check]
+        self.assertEqual(len(profile_checks), 2)
+        self.assertEqual(instructions[profile_checks[1] + 1:profile_checks[1] + 3],
+                         [('je', hex(rows[activation_index - 2].address)), ('call', hex(initializer))])
+
     def test_local_activation_waits_for_real_weapon_data_before_initializer(self):
         address=0x20000000
         result=build_menu_preview_helper(address,initializer_va=0x21000000)
@@ -62,6 +92,18 @@ class MenuPreviewTests(unittest.TestCase):
         self.assertEqual([int(r.op_str,16) for r in rows if r.mnemonic=='call'],
                          [GETTER_VA,0x21000000,ACTIVATE_VA])
         self.assertEqual(sum(r.size for r in rows),len(result['entry_bytes']))
+
+    def test_standalone_profile_initializes_and_activates_without_a_login_trap(self):
+        base, initializer, profile_ready = 0x20000000, 0x21000000, 0x22000048
+        result = build_menu_preview_helper(base, initializer_va=initializer, initializer_ready_va=profile_ready)
+        rows = list(Cs(CS_ARCH_X86, CS_MODE_32).disasm(result['entry_bytes'], base))
+        self.assertIsNone(result['login_trap_offset'])
+        self.assertEqual([row.address - base for row in rows if row.mnemonic == 'int3'],
+                         [result['before_trap_offset'], result['after_trap_offset']])
+        initializer_index = next(index for index, row in enumerate(rows)
+                                 if row.mnemonic == 'call' and row.op_str == hex(initializer))
+        self.assertEqual((rows[initializer_index + 1].mnemonic, rows[initializer_index + 1].op_str),
+                         ('call', hex(ACTIVATE_VA)))
 
     def decode(self, address=0x20000000):
         result = build_menu_preview_helper(address)

@@ -15,61 +15,55 @@ class RenameGateway(Protocol):
 
 @dataclass(frozen=True)
 class RenameCompletion:
-    """交给游戏适配执行的结果；notify 区分用户改名和登录同步。"""
+    """交给游戏适配执行的改名结果。"""
 
     display_name: str
     error: Exception | None = None
     notify: bool = False
+    inventory: dict | None = None
 
 
 class RenameSession:
-    """调用线程管理状态，工作线程只执行一次 HTTP 请求。"""
+    """调用线程管理改名状态，工作线程提交服务端事务。"""
 
     def __init__(self, gateway: RenameGateway):
         self.gateway = gateway
         self.player_id = None
         self.ready = False
         self._future = None
-        self._result = None
-        self._display_name = None
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='codol-rename')
 
-    def connected(self, player_id, display_name):
-        """登录后交接服务端昵称用于本地同步。"""
+    def connected(self, player_id):
+        """绑定登录身份，等待原生初始化应用服务端昵称。"""
         self.player_id = player_id
         self.ready = False
-        self._result = RenameCompletion(display_name)
 
     def begin(self, display_name):
         """提交一次改名，等待结果期间禁止再次提交。"""
-        if not self.ready or self.player_id is None or self._future is not None or self._result is not None:
+        if not self.ready or self.player_id is None or self._future is not None:
             raise ValueError('登录或改名尚未完成')
         self.ready = False
-        self._display_name = display_name
         self._future = self._executor.submit(self._request, self.player_id, display_name)
 
     def _request(self, player_id, display_name):
         try:
-            self.gateway.rename(player_id, display_name)
+            result = self.gateway.rename(player_id, display_name)
         except OnlineError as error:
-            return error
-        return None
+            return RenameCompletion(display_name, error, True)
+        return RenameCompletion(result['displayName'], notify=True, inventory=result['inventory'])
 
     def poll(self):
         """取出网络结果；失败直接反馈，不自动重试或保存恢复记录。"""
-        if self._result is not None:
-            result, self._result = self._result, None
-            return result
         if self._future is None or not self._future.done():
             return None
         completed_future, self._future = self._future, None
-        error = completed_future.result()
-        if error is not None:
-            self.ready = not error.uncertain
-        return RenameCompletion(self._display_name, error, True)
+        completion = completed_future.result()
+        if completion.error is not None:
+            self.ready = not completion.error.uncertain
+        return completion
 
     def complete(self):
-        """原生及本地事务均成功后，允许后续房间操作和改名。"""
+        """原生昵称已完成初始化或改名回显，允许后续房间操作和改名。"""
         self.ready = True
 
     def close(self):

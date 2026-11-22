@@ -6,7 +6,7 @@ from codol_rebuild.adapters.game.v1649370.native_state import (
 )
 
 
-def build_tick(entry, state, ready, preview_entry, room_entries, list_publish=None, name_poll=None, broadcast_poll=None, chat_poll=None):
+def build_tick(entry, state, ready, preview_entry, room_entries, list_publish=None, name_poll=None, broadcast_poll=None, chat_poll=None, inventory_polls=()):
     """包装既有前端帧；网络等待时立即返回，仅就绪结果进入原生回调。"""
     code, labels, refs, traps = bytearray(), {}, [], {}
     def emit(value): code.extend(bytes.fromhex(value))
@@ -25,6 +25,9 @@ def build_tick(entry, state, ready, preview_entry, room_entries, list_publish=No
     emit('833d'); word(state+36); emit('06'); branch('0f82', 'done')
     emit('c705'); word(state+36); word(0)
     trap('session_poll')
+    for inventory_poll in inventory_polls:
+        if inventory_poll is not None:
+            emit('83e4f0'); call(inventory_poll); emit('8be5')
     if broadcast_poll is not None:
         # 独立于房间请求锁轮询；原生操作仍由游戏主线程执行。
         emit('83e4f0'); call(broadcast_poll); emit('8be5')

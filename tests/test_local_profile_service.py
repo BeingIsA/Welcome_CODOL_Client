@@ -1,9 +1,7 @@
 """回归验证：检查 local_profile_service 的行为与边界，不作为客户端实测结果。"""
 import json
 from pathlib import Path
-import tempfile
 import unittest
-from codol_rebuild.adapters.persistence.sqlite_accounts import AccountRepository, RevisionConflict
 from codol_rebuild.adapters.game.profile_format.fields import Fields
 from codol_rebuild.adapters.game.v1649370.accounts.profile_codec import progression
 
@@ -32,25 +30,6 @@ class FieldsTests(unittest.TestCase):
         self.fields.write(b,'uiNotificationFlags.87',True)
         self.assertTrue(self.fields.read(b,'uiNotificationFlags.87'))
         self.assertFalse(self.fields.read(b,'uiNotificationFlags.86'))
-
-
-class RepositoryTests(unittest.TestCase):
-    def test_atomic_pair_reload_and_stale_save(self):
-        temp_root=ROOT/'verification/workspaces/test-temp'
-        temp_root.mkdir(parents=True,exist_ok=True)
-        with tempfile.TemporaryDirectory(dir=temp_root) as tmp:
-            path=Path(tmp)/'accounts.sqlite3'
-            repo=AccountRepository(path);account=repo.identity()
-            identities={'public':{'version':1},'secure':{'version':2}}
-            self.assertEqual(repo.load('local',identities)['profiles'],{})
-            self.assertEqual(repo.save('local',0,{'public':b'a','secure':b'b'},identities),1)
-            reopened=AccountRepository(path)
-            self.assertEqual(reopened.identity()['uid'],account['uid'])
-            with self.assertRaises(RevisionConflict):
-                repo.save('local',0,{'public':b'bad','secure':b'bad'},identities)
-            self.assertEqual(reopened.load('local',identities)['profiles'],{'public':b'a','secure':b'b'})
-            with self.assertRaises(ValueError):repo.save('local',1,{'public':b'only'},identities)
-            with self.assertRaises(ValueError):repo.load('local',{'public':{'version':99},'secure':{'version':2}})
 
 
 class ProgressionTests(unittest.TestCase):

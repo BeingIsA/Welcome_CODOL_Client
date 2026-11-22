@@ -10,7 +10,7 @@ from test_room_list_native import relocate_fixture_calls
 
 
 class BroadcastNativeTests(unittest.TestCase):
-    def test_completion_and_push_execute_independently_with_native_stack_contract(self):
+    def test_success_failure_and_push_execute_with_native_stack_contract(self):
         compiler = Path(os.environ.get('WINDIR', 'C:/Windows'))/'Microsoft.NET/Framework/v4.0.30319/csc.exe'
         if not compiler.exists():
             self.skipTest('需要 Windows .NET Framework x86 编译器')
@@ -25,7 +25,6 @@ class BroadcastNativeTests(unittest.TestCase):
                 instructions[address - 0x20000000] = 0x90
             relocate_fixture_calls(instructions, 0x20000000)
             (workspace/'code.bin').write_bytes(instructions)
-            (workspace/'message.bin').write_bytes(encode_message(server_message()['payload'], '12345', 0x21000000))
             executable = workspace/'fixture.exe'
             build = subprocess.run([str(compiler), '/nologo', '/platform:x86', '/out:' + str(executable),
                                     str(project/'client/tests/native/broadcast_fixture.cs')], capture_output=True, timeout=30)

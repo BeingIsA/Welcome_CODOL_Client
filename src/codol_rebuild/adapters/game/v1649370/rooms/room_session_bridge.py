@@ -415,6 +415,20 @@ class RoomSessionBridge:
                 if self.pending and self.pending[0] == 'create' and self.join_snapshot:
                     self._publish_join_snapshot()
             elif phase == 'members_applied':
+                try:
+                    room = u32(self.process.read, ROOM_POINTER)
+                    count = u32(self.process.read, room + 0x105D8)
+                    if not 0 <= count <= 24:
+                        raise ValueError('原生成员数超出采集范围')
+                    self.record({'room_return': 'members_applied',
+                                 'roomId': self.current_room_id,
+                                 'returningStartId': self.returned_start_id,
+                                 'nativeMembers': [
+                                     {'nativeId': self.process.read(room + 0xE368 + index * 0x1D0, 8).hex(),
+                                      'ready': self.process.read(room + 0xE3F8 + index * 0x1D0, 1)[0]}
+                                     for index in range(count)]})
+                except (OSError, ValueError) as error:
+                    self.record({'room_return': 'read_failed', 'error': str(error)})
                 self.applying_members = False
                 if self.return_snapshot_prepared:
                     self._finish_return_sync()
@@ -733,7 +747,10 @@ class RoomSessionBridge:
 
     def refresh_returned_room(self, room_id, start_id):
         if room_id != self.current_room_id or not self.port.refresh_returned_room(room_id, start_id):
+            self.record({'room_return': 'query_not_started', 'roomId': room_id,
+                         'currentRoomId': self.current_room_id, 'startId': start_id})
             return
+        self.record({'room_return': 'query_started', 'roomId': room_id, 'startId': start_id})
         self.returned_start_id = start_id
         self.return_snapshot_prepared = False
         self.applying_members = False
@@ -746,6 +763,9 @@ class RoomSessionBridge:
 
     def _finish_return_sync(self):
         if self.returned_start_id is not None:
+            self.record({'room_return': 'sync_released', 'roomId': self.current_room_id,
+                         'startId': self.returned_start_id,
+                         'snapshot_applied': self.return_snapshot_prepared})
             self.last_returned_start_id = self.returned_start_id
             self.returned_start_id = None
             self.return_snapshot_prepared = False
@@ -871,6 +891,12 @@ class RoomSessionBridge:
         if (self.returned_start_id is not None and not return_query
                 and self.player_id not in payload.get('resetReadyPlayerIds', ())):
             return
+        self.record({'room_return': 'members_delivery', 'roomId': payload['roomId'],
+                     'snapshotStartId': snapshot_start_id,
+                     'returningStartId': self.returned_start_id, 'returnQuery': return_query,
+                     'members': [{'playerId': member['playerId'],
+                                  'ready': member.get('readyState', False)}
+                                 for member in payload['members']]})
         self.pending = ('members', room, session)
         try:
             self._prepare_join_snapshot(payload, joining=False)

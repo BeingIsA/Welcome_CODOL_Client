@@ -18,7 +18,9 @@ def initialization_policy(data):
 def new_account_policy(data):
     """新档使用适配层提供的初始授权；保留满级进度和初始余额。"""
     policy = initialization_policy(data)
-    policy['initialization'] = {'version': 1, 'owned_ids': sorted(data['initial_item_ids']), 'gp': 2000000000, 'cp': 100000}
+    policy['initialization'] = validate_initialization({
+        'version': 1, 'owned_ids': sorted(data['initial_item_ids']), 'gp': 2000000000, 'cp': 100000,
+    })
     return policy
 
 

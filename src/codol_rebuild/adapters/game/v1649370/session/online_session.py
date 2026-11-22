@@ -37,7 +37,7 @@ class OnlineSessionBridge:
             message = display_message(result.error)
             self.notify(LOGIN_FAILURE_MESSAGES.get(result.error.code, message))
             self.record({'multiplayer': 'login', 'success': False, 'error': message})
-            return
+            return message
         identity = hashlib.sha256(result.data['playerId'].encode('utf-8')).digest()[:8]
         if identity == bytes(8):
             identity = b'\x01' + bytes(7)

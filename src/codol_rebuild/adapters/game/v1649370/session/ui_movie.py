@@ -25,7 +25,7 @@ from codol_rebuild.adapters.game.v1649370.movie_identity import (  # noqa: F401 
 
 def replacements() -> list:
     """汇总各适配模块的替换规则；规则提供者不反向依赖本模块，无循环依赖。"""
-    from codol_rebuild.adapters.game.v1649370.accounts import player_name, ui_recharge, purchase
+    from codol_rebuild.adapters.game.v1649370.accounts import player_name, purchase
     from codol_rebuild.adapters.game.v1649370.frontend import sanitize, ui_navigation, ui_theme, ui_weekly_rewards
     from codol_rebuild.adapters.game.v1649370.rooms import room, room_member_menu
     from codol_rebuild.adapters.game.v1649370.chat import ui_chat
@@ -33,7 +33,7 @@ def replacements() -> list:
 
     return (list(ui_navigation.replacements()) + list(sanitize.replacements())
             + list(player_name.replacements()) + list(ui_theme.replacements())
-            + list(ui_weekly_rewards.replacements()) + list(ui_recharge.replacements())
+            + list(ui_weekly_rewards.replacements())
             + list(purchase.replacements()) + list(room_member_menu.replacements())
             + list(ui_chat.replacements()) + list(room.replacements())
             + list(session_bridge.replacements()) + list(training_ui.replacements()))

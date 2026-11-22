@@ -2,7 +2,6 @@
 from pathlib import Path
 import sys
 import struct
-import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
@@ -12,7 +11,7 @@ from codol_rebuild.adapters.game.v1649370.accounts.profile import PUBLIC, SECURE
 from codol_rebuild.adapters.game.v1649370.accounts.profile_codec import AccountCodec, IDENTITIES
 from codol_rebuild.adapters.game.v1649370.layout import BUFFER_CAPACITY
 from codol_rebuild.adapters.game.profile_format.fields import Fields
-from codol_rebuild.adapters.persistence.sqlite_accounts import AccountRepository
+from codol_rebuild.application.accounts.online_profiles import OnlineProfiles
 from codol_rebuild.application.accounts.service import AccountSession
 from test_profile_plaintext import public_schema, encode_profile
 
@@ -109,28 +108,29 @@ class ProfileSaveBoundaryTests(unittest.TestCase):
         fields.write(plaintext, 'characterClasses.0.slots.0', 570)
         secure = bytearray(BUFFER_CAPACITY)
         struct.pack_into('<II', secure, 0, IDENTITIES['secure']['version'], IDENTITIES['secure']['checksum'])
+        fields.write(plaintext, 'loadoutVersion', 3)
         profiles = {'public': bytes(plaintext), 'secure': bytes(secure)}
-        temporary_root = Path(__file__).resolve().parents[2] / 'verification/client/workspaces/test-temp'
-        temporary_root.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(dir=temporary_root) as directory:
-            database_path = Path(directory) / 'accounts.sqlite3'
-            repository = AccountRepository(database_path)
-            repository.identity()
-            repository.save('local', 0, profiles, IDENTITIES)
-            service = AccountSession(repository, AccountCodec({'public': schema}, {}, []))
-            service.account = repository.load('local', IDENTITIES)
-            self.bridge._service = service
-            fields.write(plaintext, 'weaponClasses.59.primaryBase', 3456)
-            fields.write(plaintext, 'weaponClasses.59.name', 'After game')
-            fields.write(plaintext, 'weaponClasses.59.lethalDoubleAmmo', True)
-            encoded = encode_profile(plaintext, schema, 123)
-            self.flags[PUBLIC] = [1, 1]
-            self.bodies = {PUBLIC: [encoded, encoded], SECURE: [bytes(secure)] * 2}
-            self.save()
-            restored = AccountRepository(database_path).load('local', IDENTITIES)
-            self.assertEqual(restored['profiles'], {'public': bytes(plaintext), 'secure': bytes(secure)})
-            self.assertEqual(restored['revision'], 2)
-            self.process.write.assert_not_called()
+        gateway = Mock()
+        gateway.load_player_profile.return_value = (4, profiles)
+        gateway.save_player_profile.return_value = 5
+        online = OnlineProfiles(gateway)
+        online.load_for_login('pl_owner', '原生玩家')
+        self.addCleanup(online.close)
+        service = AccountSession(AccountCodec({'public': schema}, {}, []), online)
+        service.initialize()
+        self.bridge._service = service
+        fields.write(plaintext, 'weaponClasses.59.primaryBase', 3456)
+        fields.write(plaintext, 'weaponClasses.59.name', 'After game')
+        fields.write(plaintext, 'weaponClasses.59.lethalDoubleAmmo', True)
+        encoded = encode_profile(plaintext, schema, 123)
+        self.flags[PUBLIC] = [1, 1]
+        self.bodies = {PUBLIC: [encoded, encoded], SECURE: [bytes(secure)] * 2}
+        self.save()
+        online.close()
+        gateway.save_player_profile.assert_called_once_with('pl_owner', 4, {
+            'public': bytes(plaintext), 'secure': bytes(secure)})
+        self.assertEqual(online.confirmed_revision, 5)
+        self.process.write.assert_not_called()
 
 
 if __name__ == '__main__':

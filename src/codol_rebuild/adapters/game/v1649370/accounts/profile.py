@@ -41,28 +41,6 @@ def install_upload_checksum_order(read, write):
         raise ValueError('Native profile upload order readback mismatch')
 
 
-def publish_consumption(read, write, inventory, item_id, next_state, commit):
-    """发布已规划的单件消耗，沿既有库存槽约定保存数量，提交失败恢复原槽。"""
-    pool_address = int(inventory['pool'], 16)
-    for item_index in range(inventory['items']):
-        record_address = pool_address + item_index * STRIDE + 0x40
-        if struct.unpack('<I', read(record_address, 4))[0] == item_id:
-            break
-    else:
-        raise ValueError('库存中找不到消耗物品')
-    remaining_count = (next_state.get('quantities', {}).get(str(item_id), 1)
-                       if item_id in next_state['owned_ids'] else 0)
-    previous_record = read(record_address, 12)
-    next_record = (struct.pack('<II', item_id, remaining_count) + previous_record[8:]
-                   if remaining_count else bytes(12))
-    try:
-        write(record_address, next_record)
-        return commit()
-    except Exception:
-        write(record_address, previous_record)
-        raise
-
-
 def validate_account_native_contract(read):
     """核对商城 filter=1 分派与 GP/CP 类型、步长、金额偏移，版本不符时拒绝启动。"""
     for address, expected in (
@@ -305,6 +283,67 @@ def currency_snapshot(read):
     if set(result) != {'gp', 'cp'} or any(v < 0 for v in result.values()):
         raise ValueError('Invalid native currency records')
     return result
+
+
+def publish_inventory_snapshot(read, write, inventory, catalog, snapshot):
+    """在主线程更新已构造的库存槽，保留已有物品的位置以及原生对象的其他字段。"""
+    quantities = {item['itemId']: item['quantity'] for item in snapshot['items']}
+    if len(quantities) > CAPACITY or not quantities.keys() <= catalog.keys():
+        raise ValueError('服务端仓库超出终版物品目录或容量')
+    pool = int(inventory['pool'], 16)
+    count = inventory['items']
+    if (struct.unpack('<I', read(layout.INVENTORY_COUNT, 4))[0] != count
+            or read(pool - 16, 16) != b'LOCAL-INVENTORY!'
+            or read(pool + CAPACITY * STRIDE, 16) != b'LOCAL-INVENTORY!'):
+        raise ValueError('原生库存边界或件数不符')
+    records = read(pool, max(count, len(quantities)) * STRIDE)
+    free_indices = []
+    changes = {}
+    for index in range(count):
+        record_offset = index * STRIDE + 0x40
+        item_id, quantity, experience = struct.unpack_from('<III', records, record_offset)
+        if item_id in quantities:
+            confirmed_quantity = quantities.pop(item_id)
+            if quantity != confirmed_quantity:
+                changes[index] = struct.pack('<III', item_id, confirmed_quantity, experience)
+        else:
+            free_indices.append(index)
+            if item_id:
+                changes[index] = bytes(12)
+    free_indices.reverse()
+    new_count = count
+    for item_id, quantity in quantities.items():
+        if free_indices:
+            index = free_indices.pop()
+        else:
+            index = new_count
+            new_count += 1
+        if struct.unpack_from('<I', records, index * STRIDE)[0] != 0xD59C78:
+            raise ValueError('原生库存槽尚未构造')
+        experience = inventory['weapon_experience'] if catalog[item_id]['type_bytes'][1] == 0 else 0
+        changes[index] = struct.pack('<III', item_id, quantity, experience)
+
+    previous_balances = currency_snapshot(read)
+    written = []
+    try:
+        for index, next_record in changes.items():
+            record_offset = index * STRIDE + 0x40
+            written.append((pool + record_offset, records[record_offset:record_offset + 12]))
+            write(pool + record_offset, next_record)
+            if read(pool + record_offset, 12) != next_record:
+                raise ValueError('线上物品数量回读失败')
+        write(layout.INVENTORY_COUNT, struct.pack('<I', new_count))
+        if struct.unpack('<I', read(layout.INVENTORY_COUNT, 4))[0] != new_count:
+            raise ValueError('线上库存件数回读失败')
+        if publish_currency(read, write, snapshot) != {key: snapshot[key] for key in ('gp', 'cp')}:
+            raise ValueError('线上余额回读失败')
+    except Exception:
+        for address, previous_record in reversed(written):
+            write(address, previous_record)
+        write(layout.INVENTORY_COUNT, struct.pack('<I', count))
+        publish_currency(read, write, previous_balances)
+        raise
+    inventory.update(items=new_count, native_count=new_count)
 
 
 def publish_currency(read, write, balances):

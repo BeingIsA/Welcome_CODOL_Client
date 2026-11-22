@@ -1,7 +1,11 @@
-"""本地账号应用服务：策略编排、校验与版本化保存，不解释原生字节。"""
-from codol_rebuild.application.accounts.contracts import AccountStore, ProfileCodec
-from codol_rebuild.application.accounts.policy import initialization_policy, new_account_policy, validate_initialization
+"""账号会话负责原生档案初始化、稳定快照交接及当前昵称，纯离线状态仅存于内存。"""
 import re
+import secrets
+
+from codol_rebuild.application.accounts.contracts import ProfileCodec
+from codol_rebuild.application.accounts.online_profiles import OnlineProfiles
+from codol_rebuild.application.accounts.policy import initialization_policy, new_account_policy
+
 
 def validate_display_name(value: str) -> str:
     """遵循原版输入框：字母、数字、下划线、汉字，折算英文长度4～16。"""
@@ -12,171 +16,62 @@ def validate_display_name(value: str) -> str:
     return value
 
 
-def load_display_name(repository: AccountStore, name='local') -> dict:
-    """读取并复核保存的昵称；空记录保留客户端原有默认名。"""
-    saved = repository.display_name(name)
-    if saved['value'] is not None:
-        validate_display_name(saved['value'])
-    return saved
-
-
-def change_display_name(repository: AccountStore, revision: int, value: str, name='local') -> dict:
-    """独立昵称存储工具；游戏内改名由 AccountSession 同时提交道具消耗。"""
-    value = validate_display_name(value)
-    revision = repository.save_display_name(name, revision, value)
-    return {'value': value, 'revision': revision}
-
-
-
-def bootstrap(repository: AccountStore, codec: ProfileCodec, name='local'):
-    """在格式端口与存储端口之间编排原子初始化。"""
-    repository.identity(name)
-    saved = repository.load(name, codec.identities)
-    state = saved.get('initialization')
-    if state is not None:
-        validate_initialization(state)
-        if not saved['profiles']:
-            raise ValueError('Account initialization exists without profiles')
-        codec.validate_snapshot(saved['profiles'])
-        profiles = codec.migrate(saved['profiles'])
-        if profiles != saved['profiles']:
-            revision = repository.save(name, saved['revision'], profiles, codec.identities,
-                                       initialization=state)
-            saved = {**saved, 'profiles': profiles, 'revision': revision}
-        return {**saved, 'new_account': False, 'unlock_report': {'preserved': True}}
-    new_account = not bool(saved['profiles'])
-    data = codec.initialization_data(new_account)
-    policy = new_account_policy(data) if new_account else initialization_policy(data)
-    blobs, report = codec.initialize(saved, policy)
-    revision = saved['revision']
-    if blobs != saved['profiles']:
-        state = policy.get('initialization')
-        if state is not None:
-            validate_initialization(state)
-            revision = repository.save(name, revision, blobs, codec.identities, initialization=state)
-        else:
-            revision = repository.save(name, revision, blobs, codec.identities)
-    result = {'profiles': blobs, 'revision': revision, 'uid': saved['uid'],
-            'progression': policy['progression'], 'unlock_report': report,
-            'new_account': not bool(saved['profiles'])}
-    if state is not None:
-        result['initialization'] = state
-    return result
-
-
 class AccountSession:
-    """账号会话拥有已提交快照和版本；失败不推进保存状态。"""
-    def __init__(self, repository: AccountStore, codec: ProfileCodec, name='local'):
-        self.repository = repository
+    """联机从本人的服务端双档案初始化，独立启动时使用一次性默认档案。"""
+
+    def __init__(self, codec: ProfileCodec, online_profiles: OnlineProfiles | None = None):
         self.codec = codec
-        self.name = name
+        self._online_profiles = online_profiles
         self.account = None
-        self.name_snapshot = None
+        self.name_snapshot = {'value': None}
 
     def initialize(self):
-        self.account = bootstrap(self.repository, self.codec, self.name)
-        self.name_snapshot = load_display_name(self.repository, self.name)
+        """使用既有原生规则创建或读取配装，只将新建或迁移后的双档案提交服务器。"""
+        if self._online_profiles is None:
+            saved = {'uid': secrets.randbelow(2**62-1) + 1, 'revision': 0, 'profiles': {}}
+        else:
+            saved = self._online_profiles.snapshot()
+            self.synchronize_name(self._online_profiles.display_name)
+        self.account = {**saved, 'new_account': not bool(saved['profiles'])}
+        if saved['profiles']:
+            profiles = self.codec.migrate(saved['profiles'])
+            self.account['unlock_report'] = {'preserved': True}
+        else:
+            data = self.codec.initialization_data(True)
+            policy = initialization_policy(data) if self._online_profiles is not None else new_account_policy(data)
+            profiles, report = self.codec.initialize(saved, policy)
+            self.account.update(progression=policy['progression'], unlock_report=report)
+            if 'initialization' in policy:
+                self.account['initialization'] = policy['initialization']
+        self.save(profiles)
         return self.account
 
-    def inspect_snapshot(self, blobs):
-        """验证外部快照并返回当前角色，无持久化副作用。"""
-        return self.codec.validate_snapshot(blobs)
+    def inspect_snapshot(self, profiles):
+        """检查原生双档案并返回当前角色。"""
+        return self.codec.validate_snapshot(profiles)
 
-    def save(self, blobs, balances=None):
-        self.codec.validate_snapshot(blobs)
-        state = self.account.get('initialization')
-        if state is not None and balances is not None:
-            state = validate_initialization({**state, 'gp': balances['gp'], 'cp': balances['cp']})
-        if blobs == self.account['profiles'] and state == self.account.get('initialization'):
+    @property
+    def initial_profile_ready(self) -> bool:
+        """联机首份建档已获确认后就绪，纯离线初始化只使用本次会话。"""
+        return self._online_profiles is None or self._online_profiles.confirmed_revision > 0
+
+    def save(self, profiles):
+        """接收当前帧的稳定快照；联机修订号只取服务端确认值。"""
+        self.codec.validate_snapshot(profiles)
+        if self._online_profiles is not None:
+            self.account['revision'] = self._online_profiles.confirmed_revision
+        if profiles == self.account['profiles']:
             return False
-        if state is not None:
-            revision = self.repository.save(self.name, self.account['revision'], blobs, self.codec.identities, initialization=state)
-        else:
-            revision = self.repository.save(self.name, self.account['revision'], blobs, self.codec.identities)
-        self.account = {**self.account, 'revision': revision, 'profiles': dict(blobs)}
-        if state is not None:
-            self.account['initialization'] = state
+        if self._online_profiles is not None:
+            self._online_profiles.submit(profiles)
+        self.account['profiles'] = dict(profiles)
         return True
 
     @staticmethod
     def validate_name(value):
         return validate_display_name(value)
 
-    def purchase_state(self, offer, quantity=1):
-        from codol_rebuild.application.accounts.purchase import permanent_purchase
-        state = self.account.get('initialization')
-        if state is None:
-            raise ValueError('旧版全解锁档案无需购买装备')
-        return permanent_purchase(state, offer, quantity)
-
-    def commit_purchase(self, offer, quantity=1):
-        """原子提交扣款与物品授权，不接收或覆盖配装、角色和进度档案。"""
-        state = self.purchase_state(offer, quantity)
-        revision = self.repository.save_inventory(self.name, self.account['revision'], state)
-        self.account = {**self.account, 'revision': revision,
-                        'initialization': state}
-        return state
-
-    def consume_state(self, item):
-        """返回消耗一件授权后的规划状态；不写存储，供原生适配发布结果。"""
-        from codol_rebuild.application.accounts.purchase import consume_entitlement
-        state = self.account.get('initialization')
-        if state is None:
-            raise ValueError('旧版全解锁档案没有可消耗物品')
-        return consume_entitlement(state, item)
-
-    def prepare_supply_drop(self, reward_pool, crate_item_id):
-        """只抽样一次，返回带账号版本的开箱计划，提交阶段不得重新抽奖。"""
-        from codol_rebuild.application.accounts.supply_drop import draw_reward
-        state = self.account.get('initialization')
-        if state is None:
-            raise ValueError('旧版全解锁档案不支持开箱')
-        next_state, reward = draw_reward(state, reward_pool, crate_item_id)
-        return {'revision': self.account['revision'], 'state': next_state, 'reward': reward}
-
-    def commit_supply_drop(self, plan):
-        """原子提交已抽取结果与扣箱；失败时保留已确认账号状态。"""
-        from codol_rebuild.application.accounts.contracts import RevisionConflict
-        if plan['revision'] != self.account['revision']:
-            raise RevisionConflict('开箱期间账号已变化')
-        revision = self.repository.save_inventory(self.name, plan['revision'], plan['state'])
-        self.account = {**self.account, 'revision': revision, 'initialization': plan['state']}
-        return plan['state']
-
-    def commit_consumption(self, item_id):
-        """通过既有账号事务保存一次道具消耗；提交失败不推进已确认快照。"""
-        next_state = self.consume_state(item_id)
-        revision = self.repository.save(
-            self.name, self.account['revision'], self.account['profiles'],
-            self.codec.identities, initialization=next_state)
-        self.account = {**self.account, 'revision': revision, 'initialization': next_state}
-        return next_state
-
-    def credit_state(self, currency, amount, current_balance):
-        """返回充值后的规划状态；不写存储，供原生适配发布结果。"""
-        from codol_rebuild.application.accounts.purchase import credit_currency
-        state = self.account.get('initialization')
-        if state is None:
-            raise ValueError('旧版全解锁档案没有可充值余额')
-        return credit_currency(state, currency, amount, current_balance)
-
-    def rename(self, value, consumed_item):
-        """按剩余数量消耗一张改名卡，与昵称一起提交；失败不推进任一快照。"""
-        value = validate_display_name(value)
-        state = self.consume_state(consumed_item)
-        revision = self.repository.save_display_name(
-            self.name, self.name_snapshot['revision'], value,
-            account_revision=self.account['revision'], initialization=state)
-        snapshot = {'value': value, 'revision': revision}
-        self.account = {**self.account, 'revision': self.account['revision'] + 1, 'initialization': state}
-        self.name_snapshot = snapshot
-        return snapshot
-
     def synchronize_name(self, value):
-        """保存登录确认的昵称副本，不消耗改名卡。"""
-        if self.name_snapshot['value'] != value:
-            revision = self.repository.save_display_name(
-                self.name, self.name_snapshot['revision'], value)
-            self.name_snapshot = {'value': value, 'revision': revision}
+        """保存本次会话中服务端确认的显示名。"""
+        self.name_snapshot = {'value': value}
         return self.name_snapshot
-

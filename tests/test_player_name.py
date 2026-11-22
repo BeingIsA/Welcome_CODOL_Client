@@ -1,78 +1,23 @@
-"""本地昵称回归：持久化隔离、GFx输入、编码、回滚及固定资源身份。"""
-import json
-from contextlib import closing
+"""昵称缓存、原生 GFx 输入、编码、回滚及固定资源身份的回归。"""
 from pathlib import Path
-import sqlite3
 import struct
-import tempfile
 import unittest
 
 import pefile
-from codol_rebuild.application.accounts.service import validate_display_name,load_display_name,change_display_name
-from codol_rebuild.application.accounts.contracts import RevisionConflict
-from codol_rebuild.adapters.persistence.sqlite_accounts import AccountRepository
+from codol_rebuild.application.accounts.service import validate_display_name
 from codol_rebuild.adapters.game.v1649370.accounts import player_name as n
 from codol_rebuild.adapters.game.v1649370.session import ui_movie
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
-class NameStorageTests(unittest.TestCase):
-    def setUp(self):
-        folder = ROOT/'verification/workspaces/test-temp'
-        folder.mkdir(parents=True,exist_ok=True)
-        self.temp = tempfile.TemporaryDirectory(dir=folder)
-        self.addCleanup(self.temp.cleanup)
-        self.path = Path(self.temp.name)/'accounts.sqlite3'
-        self.repo = AccountRepository(self.path)
-        self.identity = self.repo.identity()
-
-    def test_restart_chinese_and_profile_isolation(self):
-        identities={'public':{},'secure':{}}
-        self.repo.save('local',0,{'public':b'public','secure':b'secure'},identities)
-        before=self.repo.load('local',identities)
-        self.assertEqual(load_display_name(self.repo),{'value':None,'revision':0})
-        change_display_name(self.repo,0,'本地玩家')
-        other=AccountRepository(self.path)
-        self.assertEqual(load_display_name(other),{'value':'本地玩家','revision':1})
-        self.assertEqual(other.load('local',identities),before)
-        change_display_name(other,1,'Player_2')
-        self.assertEqual(load_display_name(self.repo)['value'],'Player_2')
-        self.assertEqual(other.identity()['uid'],self.identity['uid'])
-
-    def test_stale_session_cannot_overwrite_name(self):
-        other=AccountRepository(self.path)
-        snapshot=load_display_name(other)
-        change_display_name(self.repo,0,'First')
-        with self.assertRaises(RevisionConflict):
-            change_display_name(other,snapshot['revision'],'Stale')
-        self.assertEqual(load_display_name(other)['value'],'First')
-
-    def test_sql_failure_does_not_change_previous_name(self):
-        change_display_name(self.repo,0,'First')
-        with closing(sqlite3.connect(self.path)) as db, db:
-            db.execute("CREATE TRIGGER fail_name BEFORE UPDATE ON display_names BEGIN SELECT RAISE(ABORT,'fixture failure'); END")
-        with self.assertRaises(sqlite3.IntegrityError):
-            change_display_name(self.repo,1,'Second')
-        self.assertEqual(load_display_name(self.repo),{'value':'First','revision':1})
-
-    def test_legacy_schema_migrates_without_touching_profiles(self):
-        legacy=Path(self.temp.name)/'legacy.sqlite3'
-        with closing(sqlite3.connect(legacy)) as db, db:
-            db.execute('CREATE TABLE accounts (name TEXT PRIMARY KEY,uid INTEGER UNIQUE NOT NULL,revision INTEGER NOT NULL,updated REAL NOT NULL)')
-            db.execute("INSERT INTO accounts VALUES ('local',123,7,0)")
-        old=AccountRepository(legacy)
-        self.assertEqual(load_display_name(old)['value'],None)
-        change_display_name(old,0,'Migrated')
-        self.assertEqual(old.identity(),{'name':'local','uid':123,'revision':7})
-
+class NameValidationTests(unittest.TestCase):
     def test_validation_matches_original_input_limits(self):
         for value in ('Ab_1','中文','中'*8,'a'*16,'A中文1'):
             self.assertEqual(validate_display_name(value),value)
         for value in ('','abc','中','a'*17,'中'*9,'a bcd','abc\n','abc\0','abc^','abc😀',None):
             with self.subTest(value=value),self.assertRaises(ValueError):
-                change_display_name(self.repo,0,value)
-        self.assertEqual(load_display_name(self.repo)['revision'],0)
+                validate_display_name(value)
 
 
 class NameBridgeTests(unittest.TestCase):
@@ -154,7 +99,10 @@ class NameBridgeTests(unittest.TestCase):
         for deferred in (False,True):
             plan=n.build_adapter(0x20000000,self.state,self.ready,0x23000000,deferred=deferred)
             instructions=list(capstone.Cs(capstone.CS_ARCH_X86,capstone.CS_MODE_32).disasm(plan['code'],0x20000000))
-            for phase in ('applied','rolled_back','restored'):
+            phases = ('applied', 'rolled_back', 'restored') if deferred else ('restored',)
+            if not deferred:
+                self.assertEqual(list(plan['traps'].values()), ['restored'])
+            for phase in phases:
                 trap_address=next(address for address,name in plan['traps'].items() if name==phase)
                 preceding=[instruction for instruction in instructions if instruction.address<trap_address]
                 setters=[instruction for instruction in preceding if instruction.mnemonic=='call' and instruction.op_str==hex(n.SETTER)]

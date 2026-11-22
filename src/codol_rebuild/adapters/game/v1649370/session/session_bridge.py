@@ -1,5 +1,6 @@
 """1649370 会话桥：版本补丁安装、原生事件解释和 UI 完成时序。"""
 import hashlib, struct
+from codol_rebuild.application.errors import OnlineError
 from codol_rebuild.runtime.contracts import ProcessAccess, DebugControl
 from codol_rebuild.adapters.game.v1649370 import layout
 from codol_rebuild.adapters.game.v1649370.frontend.menu_preview import PreviewActivationCycles
@@ -11,20 +12,22 @@ class GameSessionBridge:
                  process: ProcessAccess, account_factory, account_errors,
                  multiplayer=None, rename_session=None, broadcast_session=None,
                  realtime_dispatcher=None, chat_session=None, online_session=None,
-                 match_session=None):
+                 match_session=None, inventory_session=None):
         self.args=args; self.run_dir=run_dir; self.image=image; self.pe=pe
         self.log=log; self.record=record; self.phase_done=phase_done; self.process=process
         self.account_factory=account_factory; self.account_errors=account_errors
         self.preview_traps={}; self.preview_metadata={}; self.preview_cycles=PreviewActivationCycles()
-        self.profile_traps={}; self.name_adapter=None; self.pending_name=None
-        self.recharge_adapter=None
+        self.preview_finish_address = None
+        self.profile_traps={}; self.name_adapter=None
         self.purchase_adapter=None
         from codol_rebuild.adapters.game.v1649370.accounts.supply_drop import SupplyDropBridge
-        self.profiles=LocalProfileBridge(process, account_factory, log, record)
-        self.supply_drop_bridge = SupplyDropBridge(process, self.profiles, record, account_errors)
+        self.inventory_session = inventory_session
+        self.profiles=LocalProfileBridge(process, account_factory, log, record, inventory_session=inventory_session)
+        self.supply_drop_bridge = SupplyDropBridge(process, self.profiles, record, account_errors, inventory_session)
         self.debug=None
         self.schema_captured=False
         self.preview_caller_return = 0x5EBFF8
+        self.login_trap = None
         self.session_traps = {}
         self.online_session = online_session
         self.online_bridge = None
@@ -45,7 +48,7 @@ class GameSessionBridge:
         if broadcast_session is not None:
             from codol_rebuild.adapters.game.v1649370.chat.broadcast import BroadcastBridge
             self.broadcast_bridge = BroadcastBridge(
-                process, broadcast_session, self.profiles.consume_item)
+                process, broadcast_session, self.profiles.apply_inventory)
         if multiplayer is not None:
             from codol_rebuild.adapters.game.v1649370.rooms.room_session_bridge import RoomSessionBridge
             self.multiplayer = RoomSessionBridge(
@@ -64,7 +67,7 @@ class GameSessionBridge:
         if self.match_session is not None:
             self.match_session.connected(player_id)
         if self.rename_session is not None:
-            self.rename_session.connected(player_id, display_name)
+            self.rename_session.connected(player_id)
         if self.broadcast_bridge is not None:
             self.broadcast_bridge.connected(player_id, display_name)
         if self.chat_bridge is not None:
@@ -74,7 +77,7 @@ class GameSessionBridge:
         self.profiles.save(force=force)
 
     def idle(self):
-        if self.args.local_profile:
+        if self.args.local_profile and self.online_session is None:
             try:self.checkpoint()
             except (OSError,ValueError) as error:self.log['local_profile_save_error']=str(error)
 
@@ -105,7 +108,6 @@ class GameSessionBridge:
             room_plan = self._install_room_adapter(profile_data_address)
             self._register_profile_initializer(initializer_address, profile_data_address, inventory_pool_address, initialization_plan)
             initializer_address = self._install_player_name_adapter(profile_data_address, initializer_address)
-            self._install_recharge_adapter()
             self._install_purchase_adapter(profile_data_address)
             self.supply_drop_bridge.install(profile_data_address + 72)
         self._install_lobby_entry(lobby_entry, initializer_address, profile_data_address, room_plan)
@@ -257,7 +259,7 @@ class GameSessionBridge:
 
     def _install_player_name_adapter(self, profile_data_address, initializer_address):
         """安装昵称适配，返回包裹档案初始化的昵称恢复入口。"""
-        # 先恢复已保存昵称，再继续原档案初始化；大厅入口使用返回的新入口。
+        # 原生档案初始化结束后恢复已保存昵称，大厅入口使用返回的新入口。
         # 联机改名另接主线程轮询，HTTP 仍由注入的应用会话执行。
         from codol_rebuild.adapters.game.v1649370.accounts import player_name
         player_name.validate_contract(self.process.read)
@@ -270,6 +272,9 @@ class GameSessionBridge:
             self.server_name_bridge = player_name.ServerNameBridge(
                 self.process, self.profiles, self.rename_session, self.name_adapter,
                 self.account_errors, lambda message: self.multiplayer.notifications.message(message))
+        else:
+            from codol_rebuild.adapters.game.v1649370.native_state import checked_write
+            checked_write(self.process, name_state+144, player_name.OFFLINE_RENAME_ERROR.encode('utf-8') + b'\0')
         if len(self.name_adapter['code']) > 4096:
             raise ValueError('昵称适配超出代码页')
         self.process.write(name_entry, self.name_adapter['code'])
@@ -280,24 +285,8 @@ class GameSessionBridge:
         if self.process.read(self.name_adapter['patch_va'], 4) != self.name_adapter['after']:
             raise ValueError('昵称GFx回调安装回读失败')
         initializer_address = self.name_adapter['initializer']
-        self.record({'local_player_name_adapter': {'entry': hex(name_entry), 'state': hex(name_state), 'policy': 'local offline only; consume name card atomically; durable commit before success; restore on startup'}})
+        self.record({'local_player_name_adapter': {'entry': hex(name_entry), 'state': hex(name_state), 'policy': 'server-confirmed rename; offline request completes with connection error; restore cached name on startup'}})
         return initializer_address
-
-    def _install_recharge_adapter(self):
-        """安装充值专用 GFx 回调。"""
-        from codol_rebuild.adapters.game.v1649370.accounts import ui_recharge
-        ui_recharge.validate_contract(self.process.read)
-        recharge_entry = self.process.allocate(4096)
-        self.recharge_adapter = ui_recharge.build_adapter(recharge_entry)
-        self.process.write(recharge_entry, self.recharge_adapter['code'])
-        if self.process.read(recharge_entry, len(self.recharge_adapter['code'])) != self.recharge_adapter['code']:
-            raise ValueError('本地充值适配代码回读失败')
-        self.process.executable(recharge_entry, 4096)
-        self.process.write(self.recharge_adapter['patch_va'], self.recharge_adapter['after'])
-        if self.process.read(self.recharge_adapter['patch_va'], 4) != self.recharge_adapter['after']:
-            raise ValueError('本地充值 GFx 回调安装失败')
-        from codol_rebuild.application.accounts.purchase import RECHARGE_AMOUNT
-        self.record({'local_recharge_adapter': {'entry': hex(recharge_entry), 'amount': RECHARGE_AMOUNT}})
 
     def _install_purchase_adapter(self, profile_data_address):
         """安装购买和库存刷新回调，初始化首次刷新所需的通信状态。"""
@@ -305,7 +294,8 @@ class GameSessionBridge:
         purchase.validate_contract(self.process.read)
         purchase_entry = self.process.allocate(4096)
         purchase_state = self.process.allocate(4096)
-        self.purchase_adapter = purchase.build_adapter(purchase_entry, purchase_state, profile_data_address + 72)
+        self.purchase_adapter = purchase.build_adapter(
+            purchase_entry, purchase_state, profile_data_address + 72, deferred=self.inventory_session is not None)
         # 首次购买之前也可能请求刷新，因此安装时即初始化刷新状态。
         purchase.checked_write(self.process.read, self.process.write, purchase_state+96,
                                struct.pack('<IIII', 0xffffffff, 0xffffffff, 0, 1)+bytes(16))
@@ -313,8 +303,8 @@ class GameSessionBridge:
         self.process.executable(purchase_entry, 4096)
         purchase.checked_write(self.process.read, self.process.write, purchase.HANDLER_SLOT, self.purchase_adapter['after'])
         purchase.checked_write(self.process.read, self.process.write, purchase.REFRESH_SLOT, self.purchase_adapter['refresh_after'])
-        self.record({'local_purchase_adapter': {'entry': hex(purchase_entry),
-                     'policy': 'GP/CP products and bundles; permanent equipment; cumulative consumables'}})
+        self.record({'purchase_adapter': {'entry': hex(purchase_entry),
+                                          'online': self.inventory_session is not None}})
 
     def _install_lobby_entry(self, lobby_entry, initializer_address, profile_data_address, room_plan):
         """连接大厅预览入口与联机帧轮询，最后发布原生调用边。"""
@@ -343,10 +333,12 @@ class GameSessionBridge:
             self.online_bridge = OnlineSessionBridge(
                 self.process, self.online_session, room_publication['state'], self._online_connected, self.record,
                 self.multiplayer.notifications.message)
+            self.login_trap = lobby_entry + plan['login_trap_offset']
             tick = self.process.allocate(4096)
             tick_plan = build_tick(tick, room_publication['state'], profile_data_address + 72,
                                    lobby_entry, room_publication['entries'], room_publication['list_publish'],
-                                   self.name_adapter.get('poll'), broadcast_poll=broadcast_poll, chat_poll=chat_poll)
+                                   self.name_adapter.get('poll'), broadcast_poll=broadcast_poll, chat_poll=chat_poll,
+                                   inventory_polls=(self.purchase_adapter['poll'], self.supply_drop_bridge.poll_entry))
             if len(tick_plan['code']) > 4096:
                 raise ValueError('会话帧桥超出代码页')
             checked_write(self.process, tick, tick_plan['code'])
@@ -365,6 +357,7 @@ class GameSessionBridge:
             raise ValueError('离线UI试验补丁回读失败')
         for phase in ('before', 'after'):
             self.preview_traps[lobby_entry + plan[phase + '_trap_offset']] = phase
+        self.preview_finish_address = lobby_entry + plan['finish_offset']
         self.preview_metadata.update(plan.get('metadata', {}))
         self.record({'offline_menu_preview_installed': True, 'helper': hex(lobby_entry), 'helper_sha256': hashlib.sha256(code).hexdigest(), 'call_va': hex(plan['patch_va']), 'call_before': plan['patch_before'].hex(), 'call_after': plan['patch_after'].hex(), 'connecting_branch': {'va': '0x60c6f7', 'before': '7404', 'after': 'eb04'}, 'metadata': self.preview_metadata})
         (self.run_dir / 'offline-menu-preview-helper.bin').write_bytes(code)
@@ -430,6 +423,19 @@ class GameSessionBridge:
         return result
 
     def handle_exception(self, event, code, address, row):
+        if code in (2147483651, 1073741855) and address == self.login_trap:
+            if event.tid != self.process.main_thread_id:
+                raise ValueError('仓库登录必须从大厅主线程发起')
+            failure = self.online_bridge.poll()
+            if failure:
+                raise ValueError(f'联机仓库未能就绪：{failure}')
+            thread, context = self.process.context(event.tid)
+            try:
+                struct.pack_into('<I', context, 184, address + 1)
+                self.process.set_context(thread, context)
+            finally:
+                self.process.close_thread(thread)
+            return True
         if code in (2147483651, 1073741855) and address in self.supply_drop_bridge.traps:
             self.supply_drop_bridge.handle(event, address)
             return True
@@ -441,7 +447,14 @@ class GameSessionBridge:
                 raise ValueError('公共会话调度必须在主线程执行')
             thread, context = self.process.context(event.tid)
             try:
-                self.online_bridge.poll()
+                if 'profile_save_error' not in self.log:
+                    try:
+                        self.checkpoint()
+                    except OnlineError as error:
+                        self.log['profile_save_error'] = str(error)
+                        self.multiplayer.notifications.message(f'账号档案保存失败：{error}')
+                    except (OSError, ValueError) as error:
+                        self.log['profile_sample_error'] = str(error)
                 self.realtime_dispatcher.poll()
                 resume_address = self.match_bridge.poll(address+1) if self.match_bridge else address+1
                 struct.pack_into('<I', context, 184, resume_address)
@@ -469,55 +482,8 @@ class GameSessionBridge:
                 frame = struct.unpack_from('<I', ctx, 180)[0]
                 if frame != struct.unpack_from('<I', ctx, 196)[0]:
                     raise ValueError('购买桥保存帧不匹配')
-                try:
-                    if phase == 'request':
-                        payload = bytearray(512)
-                        struct.pack_into('<IIII', payload, 96, 0xffffffff, 0xffffffff, 0, 1)
-                        purchase.checked_write(self.process.read, self.process.write, state, bytes(payload))
-                        sku, quantity = purchase.request(self.process.read, frame)
-                        if not self.profiles.ready:
-                            raise ValueError('本地档案尚未就绪')
-                        purchase.checked_write(self.process.read, self.process.write, state, struct.pack('<III', 1, sku, quantity))
-                    elif phase == 'quoted':
-                        offer = self.profiles.quote(state)
-                        self.profiles.purchase(offer, purchase.u32(self.process.read, state+8))
-                        purchase.checked_write(self.process.read, self.process.write, state+16, struct.pack('<I', 1))
-                        row['local_purchase_committed'] = offer
-                    else:
-                        row['local_purchase_refreshed'] = self.profiles.inventory_count
-                except self.account_errors as error:
-                    purchase.set_failure(self.process.read, self.process.write, state, error)
-                    row['local_purchase_error'] = str(error)
-                struct.pack_into('<I', ctx, 184, address+1)
-                self.process.set_context(thread, ctx)
-            finally:
-                self.process.close_thread(thread)
-            self.record(row)
-        elif code in (2147483651, 1073741855) and self.recharge_adapter and address == self.recharge_adapter['trap']:
-            from codol_rebuild.adapters.game.v1649370.accounts import ui_recharge
-            if event.tid != self.process.main_thread_id or self.observe_state()['dw_enabled'] != 0:
-                raise ValueError('本地充值必须在离线主线程执行')
-            thread, ctx = self.process.context(event.tid)
-            try:
-                frame = struct.unpack_from('<I', ctx, 180)[0]
-                if frame != struct.unpack_from('<I', ctx, 196)[0]:
-                    raise ValueError('充值桥保存帧不匹配')
-                result = ui_recharge.result_slot(self.process.read, frame)
-                ui_recharge.reply(self.process.read, self.process.write, result, -1)
-                try:
-                    if not self.profiles.ready:
-                        raise ValueError('本地档案尚未就绪')
-                    from codol_rebuild.application.accounts.purchase import RECHARGE_AMOUNT
-                    balances = ui_recharge.credit(
-                        self.process.read, self.process.write,
-                        lambda before: {**before, 'cp': self.profiles.credit_state(
-                            'cp', RECHARGE_AMOUNT, before['cp'])['cp']},
-                        self.profiles.commit_balances)
-                except self.account_errors as error:
-                    row['local_recharge_error'] = str(error)
-                else:
-                    ui_recharge.reply(self.process.read, self.process.write, result, balances['cp'])
-                    row['local_recharge_saved'] = balances
+                row.update(purchase.handle_phase(
+                    self.process, phase, state, frame, self.profiles, self.inventory_session, self.account_errors))
                 struct.pack_into('<I', ctx, 184, address+1)
                 self.process.set_context(thread, ctx)
             finally:
@@ -526,7 +492,7 @@ class GameSessionBridge:
         elif code in (2147483651, 1073741855) and self.name_adapter and (address in self.name_adapter['traps']):
             from codol_rebuild.adapters.game.v1649370.accounts import player_name
             if event.tid != self.process.main_thread_id or self.observe_state()['dw_enabled'] != 0:
-                raise ValueError('本地改名必须在离线主线程执行')
+                raise ValueError('昵称适配需要原生档案所在的游戏主线程')
             phase = self.name_adapter['traps'][address]
             state = self.name_adapter['state']
             thread, ctx = self.process.context(event.tid)
@@ -535,43 +501,14 @@ class GameSessionBridge:
                 if frame != struct.unpack_from('<I', ctx, 196)[0]:
                     raise ValueError('昵称桥保存帧不匹配')
                 row['local_player_name_phase'] = phase
-                if self.server_name_bridge is not None and phase != 'restored':
-                    self.server_name_bridge.handle(phase, frame, row)
-                elif phase == 'request':
-                    self.pending_name = None
-                    try:
-                        value = player_name.read_request(self.process.read, frame, self.name_adapter['ready'])
-                        self.profiles.validate_name(value)
-                        player_name.stage_name(self.process.read, self.process.write, state, value)
-                        self.pending_name = value
-                    except (OSError, ValueError) as error:
-                        self.process.write(state, bytes(8))
-                        row['local_player_name_error'] = str(error)
-                elif phase == 'applied':
-                    try:
-                        if self.pending_name is None or self.profiles.name_snapshot is None:
-                            raise ValueError('昵称请求没有对应宿主状态')
-                        player_name.verify_applied(self.process.read, state)
-                        self.profiles.rename(self.pending_name)
-                    except self.account_errors as error:
-                        row['local_player_name_error'] = str(error)
-                        self.process.write(state + 4, bytes(4))
-                    else:
-                        self.process.write(state + 4, struct.pack('<I', 1))
-                        if self.process.read(state + 4, 4) != struct.pack('<I', 1):
-                            raise ValueError('昵称提交确认回读失败')
-                        row['local_player_name_saved'] = self.profiles.name_snapshot.copy()
-                        self.pending_name = None
-                elif phase == 'rolled_back':
-                    player_name.verify_applied(self.process.read, state, rollback=True)
-                    self.pending_name = None
-                    row['local_player_name_rolled_back'] = True
-                elif phase == 'restored':
+                if phase == 'restored':
                     player_name.verify_applied(self.process.read, state)
                     self.process.write(state, bytes(8))
+                    if self.rename_session is not None:
+                        self.rename_session.complete()
                     row['local_player_name_restored'] = self.profiles.name_snapshot.copy()
                 else:
-                    raise ValueError('未知昵称桥阶段')
+                    self.server_name_bridge.handle(phase, frame, row)
                 struct.pack_into('<I', ctx, 184, address + 1)
                 self.process.set_context(thread, ctx)
             finally:
@@ -584,7 +521,7 @@ class GameSessionBridge:
             if phase == 'prepare':
                 self.profiles.prepare_native(profile_data, pool, self.run_dir / 'local-profile', self.name_adapter['state'])
             else:
-                self.profiles.complete_native(profile_data, pool, self.purchase_adapter is not None)
+                self.profiles.complete_native(profile_data, pool, self.inventory_session is not None)
             thread, ctx = self.process.context(event.tid)
             try:
                 struct.pack_into('<I', ctx, 184, address + 1)
@@ -596,6 +533,14 @@ class GameSessionBridge:
             phase = self.preview_traps[address]
             thread, ctx = self.process.context(event.tid)
             try:
+                if phase == 'before' and self.online_session is not None:
+                    if event.tid != self.process.main_thread_id:
+                        raise ValueError('档案确认必须在游戏主线程检查')
+                    if not self.profiles.initial_profile_ready:
+                        # 从现有 helper 的收尾恢复寄存器。下帧跳过已就绪的原生初始化器。
+                        struct.pack_into('<I', ctx, 184, self.preview_finish_address)
+                        self.process.set_context(thread, ctx)
+                        return True
                 eax = struct.unpack_from('<I', ctx, 176)[0]
                 esp = struct.unpack_from('<I', ctx, 196)[0]
                 row['offline_menu_preview_phase'] = phase
@@ -621,6 +566,9 @@ class GameSessionBridge:
                     row['activation_cycle'] = self.preview_cycles.begin(row['native_cpp_activate_called'])
                     if self.preview_cycles.count > 1 and self.match_bridge is not None:
                         returned_match = self.match_bridge.consume_returned_match()
+                        self.record({'room_return': 'activation',
+                                     'cycle': self.preview_cycles.count,
+                                     'returned_match': returned_match})
                         if returned_match is not None:
                             self.multiplayer.refresh_returned_room(*returned_match)
                     self.log['offline_menu_preview_activation_count'] = self.preview_cycles.count

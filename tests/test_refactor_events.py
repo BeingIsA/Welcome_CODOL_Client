@@ -18,7 +18,7 @@ from codol_rebuild.runtime.scheduler import PeriodicTask
 from codol_rebuild.runtime.session import ProcessSession
 
 class BridgeEventTests(unittest.TestCase):
-    def bridge(self, fail=False):
+    def bridge(self):
         events=[]; memory={};ctx=bytearray(716)
         struct.pack_into('<I',ctx,180,0x30000000);struct.pack_into('<I',ctx,196,0x30000000)
         def write(address,data):
@@ -27,38 +27,95 @@ class BridgeEventTests(unittest.TestCase):
             write=write,context=lambda tid:(1,ctx),set_context=lambda *a:None,close_thread=lambda h:events.append(('close',)),
             periodic=lambda interval:PeriodicTask(interval))
         bridge=GameSessionBridge(SimpleNamespace(local_profile=True),Path('.'),None,None,{},lambda r:None,lambda n:None,process,None,(OSError,ValueError))
-        class Names:
-            name_snapshot={'revision':2,'value':'Before'}
-            def validate_name(self,value):events.append(('validate',value))
-            def rename(self,value):
-                events.append(('commit',value))
-                if fail:raise ValueError('conflict')
-                self.name_snapshot={'revision':3,'value':value}
-        bridge.profiles=Names()
-        bridge.observe_state=lambda:{'dw_enabled':0}
-        bridge.name_adapter={'state':0x20000000,'ready':0x20001000,'traps':{101:'request',102:'applied',103:'rolled_back'}}
-        return bridge,events
+        bridge.profiles = Mock()
+        bridge.profiles.name_snapshot = {'revision': 2, 'value': 'Before'}
+        bridge.observe_state = lambda: {'dw_enabled': 0}
+        bridge.name_adapter = {'state': 0x20000000, 'ready': 0x20001000, 'traps': {101: 'restored'}}
+        return bridge, events
 
-    def test_success_requires_readback_then_commit_then_ack(self):
-        bridge,events=self.bridge()
-        with patch.object(player_name,'read_request',return_value='After'),patch.object(player_name,'stage_name',side_effect=lambda *a:events.append(('stage',))),patch.object(player_name,'verify_applied',side_effect=lambda *a,**k:events.append(('readback',))):
-            bridge.handle_exception(SimpleNamespace(tid=17),0x80000003,101,{})
-            bridge.handle_exception(SimpleNamespace(tid=17),0x80000003,102,{})
-        self.assertLess(events.index(('stage',)),events.index(('readback',)))
-        self.assertLess(events.index(('readback',)),events.index(('commit','After')))
-        self.assertLess(events.index(('commit','After')),events.index(('write',0x20000004,b'\1\0\0\0')))
-        self.assertIsNone(bridge.pending_name)
+    def test_offline_restore_reads_back_saved_name_without_issuing_rename(self):
+        bridge, events = self.bridge()
+        row = {}
+        with patch.object(player_name, 'verify_applied') as verify:
+            bridge.handle_exception(SimpleNamespace(tid=17), 0x80000003, 101, row)
+        verify.assert_called_once_with(bridge.process.read, 0x20000000)
+        self.assertEqual(events, [('write', 0x20000000, bytes(8)), ('close',)])
+        self.assertEqual(row['local_player_name_restored']['value'], 'Before')
+        self.assertEqual(bridge.profiles.method_calls, [])
 
-    def test_failed_commit_requests_rollback_and_preserves_snapshot(self):
-        bridge,events=self.bridge(fail=True);bridge.pending_name='After'
-        with patch.object(player_name,'verify_applied') as verify:
-            row={};bridge.handle_exception(SimpleNamespace(tid=17),0x80000003,102,row)
-            self.assertEqual(row['local_player_name_error'],'conflict')
-            self.assertIn(('write',0x20000004,bytes(4)),events)
-            self.assertEqual(bridge.profiles.name_snapshot,{'revision':2,'value':'Before'})
-            bridge.handle_exception(SimpleNamespace(tid=17),0x80000003,103,{})
-            self.assertTrue(verify.call_args.kwargs['rollback'])
-        self.assertIsNone(bridge.pending_name)
+    def test_installed_offline_entry_has_only_restore_trap_and_connection_message(self):
+        from test_refactor_equivalence import MemoryProcess
+        bridge, events = self.bridge()
+        bridge.process = MemoryProcess()
+        bridge._install_player_name_adapter(0x24000000, 0x25000000)
+        adapter = bridge.name_adapter
+        self.assertIsNone(bridge.server_name_bridge)
+        self.assertNotIn('poll', adapter)
+        self.assertEqual(list(adapter['traps'].values()), ['restored'])
+        message = '改名需要联网，请连接服务器后重试。'.encode('utf-8') + bytes(1)
+        self.assertEqual(bridge.process.read(adapter['state'] + 144, len(message)), message)
+
+    def test_duplicate_request_waits_for_first_server_result(self):
+        bridge, events = self.bridge()
+        session = Mock()
+        name_bridge = player_name.ServerNameBridge(
+            bridge.process, bridge.profiles, session, bridge.name_adapter, (ValueError,), Mock())
+        with patch.object(player_name, 'read_request', return_value='After'), patch.object(player_name, 'encode_name'):
+            name_bridge.handle('request', 0, {})
+            name_bridge.handle('request', 0, {})
+        session.begin.assert_called_once_with('After')
+        self.assertTrue(name_bridge.waiting_ui)
+        self.assertEqual(events, [])
+        confirmed_inventory = {'revision': 2, 'items': []}
+        session.poll.return_value = SimpleNamespace(error=None, notify=True, display_name='After',
+                                                    inventory=confirmed_inventory)
+        with patch.object(player_name, 'stage_name') as stage:
+            name_bridge.handle('poll', 0, {})
+        self.assertFalse(name_bridge.waiting_ui)
+        bridge.profiles.apply_inventory.assert_called_once_with(confirmed_inventory)
+        stage.assert_called_once_with(bridge.process.read, bridge.process.write, 0x20000000, 'After')
+        self.assertIn(('write', 0x20000000 + 136, struct.pack('<II', 1, 1)), events)
+
+    def test_first_online_profile_confirmation_controls_lobby_activation(self):
+        bridge, events = self.bridge()
+        bridge.online_session = Mock()
+        bridge.preview_traps = {400: 'before'}
+        bridge.preview_finish_address = 480
+        bridge.profiles.initial_profile_ready = False
+        event = SimpleNamespace(tid=17)
+        for frame in range(2):
+            self.assertTrue(bridge.handle_exception(event, 0x80000003, 400, {}))
+            context = bridge.process.context(event.tid)[1]
+            self.assertEqual(struct.unpack_from('<I', context, 184)[0], 480)
+        self.assertEqual(bridge.preview_cycles.count, 0)
+
+        bridge.profiles.initial_profile_ready = True
+        bridge.observe_state = lambda: {'dw_enabled': 0, 'client_object_ready': True}
+        for address, value in ((0x30000000+28, 1), (0x30000000+36, bridge.preview_caller_return),
+                               (layout.CATALOG_COUNT, 3), (layout.CATALOG_RECORDS, 0x10000)):
+            bridge.process.write(address, struct.pack('<I', value))
+        bridge.process.write(layout.CATALOG_READY, bytes([1]))
+        with patch('codol_rebuild.adapters.game.v1649370.frontend.viewer.view_state',
+                   return_value={'viewer_initialized': 1, 'weapon_definition_count': 2}):
+            self.assertTrue(bridge.handle_exception(event, 0x80000003, 400, {}))
+        self.assertEqual(bridge.preview_cycles.count, 1)
+        self.assertEqual(struct.unpack_from('<I', context, 184)[0], 401)
+
+    def test_online_idle_never_reads_running_game_between_native_frames(self):
+        bridge, events = self.bridge()
+        bridge.online_session = Mock()
+        bridge.idle()
+        bridge.profiles.save.assert_not_called()
+
+    def test_online_rename_unblocks_only_when_confirmed_name_is_restored(self):
+        bridge, events = self.bridge()
+        bridge.rename_session = Mock()
+        calls = Mock()
+        calls.attach_mock(bridge.rename_session.complete, 'enable_rename')
+        with patch.object(player_name, 'verify_applied') as verify:
+            calls.attach_mock(verify, 'readback')
+            bridge.handle_exception(SimpleNamespace(tid=17), 0x80000003, 101, {})
+        self.assertEqual([entry[0] for entry in calls.mock_calls], ['readback', 'enable_rename'])
 
     def test_wrong_thread_rejected_before_native_access(self):
         bridge,events=self.bridge()
@@ -150,7 +207,7 @@ class ProfileLifecycleTests(unittest.TestCase):
     def complete(self, bridge):
         with patch('codol_rebuild.adapters.game.profile_format.fields.Fields') as fields:
             fields.return_value.read.side_effect = self.selected_character
-            bridge.complete_native(self.data, self.pool, True)
+            bridge.complete_native(self.data, self.pool, False)
 
     def test_prepare_and_complete_preserve_publication_order(self):
         for initialized in (False, True):
@@ -167,7 +224,7 @@ class ProfileLifecycleTests(unittest.TestCase):
                     self.assertEqual(writes[-1][1], struct.pack('<I', 1))
                     self.assertEqual(len(events), 1)
                     self.assertEqual(events[0][:2], ('record', False))
-                    self.assertTrue(events[0][2]['local_store']['purchases_supported'])
+                    self.assertFalse(events[0][2]['local_store']['purchases_supported'])
                     self.assertTrue(bridge.ready)
                     self.assertEqual(bridge.inventory_count, 1)
                     self.assertEqual(bridge.inventory['selected_character_cache'], 545)
@@ -208,9 +265,6 @@ class ProfileLifecycleTests(unittest.TestCase):
                               'schemas', 'name_snapshot', 'profile_identities'):
                 with self.assertRaises(AttributeError):
                     setattr(bridge, attribute, None)
-            with patch('codol_rebuild.adapters.game.v1649370.accounts.purchase.quote', return_value={'sku': 1}) as quote:
-                self.assertEqual(bridge.quote(0x24000000), {'sku': 1})
-                self.assertEqual(quote.call_args.args[2][545]['type_bytes'][0], 0)
 
 class LifecycleTests(unittest.TestCase):
     def test_runtime_lease_released_after_failed_process_start(self):

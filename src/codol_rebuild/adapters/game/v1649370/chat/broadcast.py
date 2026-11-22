@@ -6,6 +6,7 @@ SendLoudSpeaker 的 GFx 参数取法来自 0x7273B0；接管类型 0（大）和
 所有进程访问均发生在主线程暂停点；网络结果由应用端口交接。
 """
 import struct
+from codol_rebuild.application.errors import OnlineError
 from codol_rebuild.application.broadcast.contracts import BroadcastPort
 from codol_rebuild.adapters.game.v1649370.chat.chat_message import (
     CAPACITY, MESSAGE_READY, MESSAGE_OBJECT, FIELDS, MESSAGE_FIELDS,
@@ -17,8 +18,9 @@ SEND_HANDLER = 0x7273B0
 # 原版 ChatSpeakerType 与 ChattingController 的大小喇叭类型和库存物品。
 SPEAKER_TYPES = {0: 'large', 1: 'small'}
 NATIVE_SPEAKER_TYPES = {speaker_type: native_type for native_type, speaker_type in SPEAKER_TYPES.items()}
-SPEAKER_ITEM_IDS = {'large': 50003, 'small': 50002}
 SENT_SPEAKER_TYPE = 12
+SEND_SUCCESS = 16
+ERROR_MESSAGE_SIZE = 512
 SEND_COMPLETE = 0
 BROADCAST_AVAILABLE = 8
 # IsInBigSpeakerChannel 只替换读取来源，保留原 GFx 布尔返回及对象释放逻辑。
@@ -101,7 +103,13 @@ def build_adapter(entry, state):
     clear(SEND_COMPLETE)
     emit('ff35')
     word(state + SENT_SPEAKER_TYPE)
-    emit('6a00 6a01')
+    # 原生成功通知的错误参数为 NULL，失败通知传入已写好的 UTF-8 文本。
+    emit('a1'); word(state + SEND_SUCCESS)
+    emit('33c9 85c0')
+    branch('0f85', 'completion_arguments')
+    emit('b9'); word(state + CAPACITY)
+    labels['completion_arguments'] = len(instructions)
+    emit('51 50')
     call(0x7C4AB0)
     labels['message'] = len(instructions)
     emit('8be5 619d')
@@ -116,10 +124,10 @@ def build_adapter(entry, state):
 class BroadcastBridge:
     """游戏线程执行原生操作，应用端口负责后台发送与推送交接。"""
 
-    def __init__(self, process, port: BroadcastPort, consume_item):
+    def __init__(self, process, port: BroadcastPort, apply_inventory):
         self.process = process
         self.port = port
-        self.consume_item = consume_item
+        self.apply_inventory = apply_inventory
         self.state = None
         self.plan = None
         self.traps = {}
@@ -138,10 +146,11 @@ class BroadcastBridge:
         for address, expected in CONTRACT.items():
             if self.process.read(address, len(expected)) != expected:
                 raise ValueError(f'广播 ABI 不匹配：{address:#x}')
-        self.state = self.process.allocate(CAPACITY)
+        self.state = self.process.allocate(CAPACITY + ERROR_MESSAGE_SIZE)
         entry = self.process.allocate(4096)
         self.plan = build_adapter(entry, self.state)
         self._write(self.state, bytes(FIELDS))
+        self._write(self.state + CAPACITY, b'\0')
         self._write(entry, self.plan['code'])
         self.process.executable(entry, 4096)
         self._write(SEND_HANDLER, self.plan['patch'])
@@ -167,19 +176,29 @@ class BroadcastBridge:
                     request = read_request(self.process.read, stack_address)
                     if request is not None:
                         self.port.begin(*request)
+                        self._write(self.state + SENT_SPEAKER_TYPE,
+                                    struct.pack('<I', NATIVE_SPEAKER_TYPES[request[1]]))
                         next_instruction = self.plan['return']
             else:
                 message = self.port.poll_message() if self.player_id is not None else None
                 if message is not None:
                     sender_id = native_sender_id(self.process.read, message['senderId'], self.player_id)
-                    self._write(self.state, encode_message(message, sender_id, self.state))
-                confirmation = self.port.poll_sent()
-                if confirmation is not None:
-                    # 仅 HTTP 确认消耗；原生成功通知随后负责冷却和库存刷新。
-                    speaker_type = confirmation['speakerType']
-                    self.consume_item(SPEAKER_ITEM_IDS[speaker_type])
-                    self._write(self.state + SENT_SPEAKER_TYPE,
-                                struct.pack('<I', NATIVE_SPEAKER_TYPES[speaker_type]))
+                    encoded_message = encode_message(message, sender_id, self.state)
+                    self._write(self.state + MESSAGE_OBJECT, encoded_message[MESSAGE_OBJECT:])
+                    self._write(self.state + MESSAGE_READY, struct.pack('<I', 1))
+                try:
+                    confirmation = self.port.poll_sent()
+                    if confirmation is not None:
+                        self.apply_inventory(confirmation['inventory'])
+                        self._write(self.state + CAPACITY, b'\0')
+                        self._write(self.state + SENT_SPEAKER_TYPE,
+                                    struct.pack('<I', NATIVE_SPEAKER_TYPES[confirmation['speakerType']]))
+                        self._write(self.state + SEND_SUCCESS, struct.pack('<I', 1))
+                        self._write(self.state + SEND_COMPLETE, struct.pack('<I', 1))
+                except (OnlineError, ValueError, OSError) as error:
+                    message = str(error).encode('utf-8')[:ERROR_MESSAGE_SIZE - 1].decode('utf-8', 'ignore')
+                    self._write(self.state + CAPACITY, message.encode('utf-8') + b'\0')
+                    self._write(self.state + SEND_SUCCESS, bytes(4))
                     self._write(self.state + SEND_COMPLETE, struct.pack('<I', 1))
                 self._write(self.state + BROADCAST_AVAILABLE,
                             struct.pack('<I', int(self.port.available())))

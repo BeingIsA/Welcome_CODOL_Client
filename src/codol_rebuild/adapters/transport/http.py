@@ -1,5 +1,7 @@
 """标准库 HTTP 玩家接口客户端；统一地址、超时、错误和响应契约检查。"""
 from codol_rebuild.application.errors import OnlineError
+import base64
+import binascii
 import http.client
 import json
 import re
@@ -8,6 +10,9 @@ import urllib.parse
 import urllib.request
 import uuid
 from codol_rebuild.application.room.contracts import valid_room_id
+
+PLAYER_PROFILE_VERSION = 'codol-1649370'
+PLAYER_PROFILE_SIZE = 32764
 
 
 def normalize_server(value: str) -> str:
@@ -38,13 +43,75 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+def _valid_inventory_item_id(item_id):
+    return type(item_id) is int and 0 < item_id < 65535 and item_id not in (15400, 20000)
+
+
+def validate_inventory(snapshot, *, uncertain=False):
+    """完整仓库允许空清单，拒绝缺字段、重复物品和超出终版表示范围的数值。"""
+    if not isinstance(snapshot, dict) or type(snapshot.get('revision')) is not int or snapshot['revision'] < 1:
+        raise OnlineError('INVALID_RESPONSE', '服务器未返回有效的仓库版本', uncertain=uncertain)
+    if any(type(snapshot.get(currency)) is not int or not 0 <= snapshot[currency] <= 2147483647
+           for currency in ('gp', 'cp')):
+        raise OnlineError('INVALID_RESPONSE', '服务器返回了无效余额', uncertain=uncertain)
+    items = snapshot.get('items')
+    if not isinstance(items, list):
+        raise OnlineError('INVALID_RESPONSE', '服务器未返回完整物品清单', uncertain=uncertain)
+    seen_ids = set()
+    for item in items:
+        if not isinstance(item, dict):
+            raise OnlineError('INVALID_RESPONSE', '服务器返回了无效物品', uncertain=uncertain)
+        item_id, quantity = item.get('itemId'), item.get('quantity')
+        if (not _valid_inventory_item_id(item_id)
+                or item_id in seen_ids or type(quantity) is not int or not 0 < quantity <= 2147483647):
+            raise OnlineError('INVALID_RESPONSE', '服务器返回了无效的物品编号或数量', uncertain=uncertain)
+        seen_ids.add(item_id)
+
+
+def _validate_reward(reward):
+    if not isinstance(reward, dict):
+        raise OnlineError('INVALID_RESPONSE', '服务器未返回开箱奖励', uncertain=True)
+    products = reward.get('product_ids')
+    if (not isinstance(products, list) or not products
+            or any(type(product_id) is not int or product_id < 0 for product_id in products)):
+        raise OnlineError('INVALID_RESPONSE', '开箱回执的商品编号无效', uncertain=True)
+    contents = reward.get('contents')
+    if not isinstance(contents, list) or not contents:
+        raise OnlineError('INVALID_RESPONSE', '开箱回执缺少奖励明细', uncertain=True)
+    for content in contents:
+        if not isinstance(content, dict):
+            raise OnlineError('INVALID_RESPONSE', '奖励明细格式无效', uncertain=True)
+        quantity = content.get('quantity')
+        increase = content.get('quantity_delta')
+        if (not _valid_inventory_item_id(content.get('item_id'))
+                or type(quantity) is not int or not 1 <= quantity <= 2147483647
+                or type(increase) is not int or not 0 <= increase <= quantity):
+            raise OnlineError('INVALID_RESPONSE', '奖励物品编号或数量无效', uncertain=True)
+
+
+def _validate_inventory_receipt(path, result, player_id, payload):
+    if not isinstance(result, dict):
+        raise OnlineError('INVALID_RESPONSE', '仓库事务回执必须是对象', uncertain=True)
+    validate_inventory(result.get('inventory'), uncertain=True)
+    if path == '/api/v1/players/me/supply-drop':
+        _validate_reward(result.get('reward'))
+    elif path == '/api/v1/players/me/rename':
+        if (result.get('playerId') != player_id or not isinstance(result.get('displayName'), str)
+                or result['displayName'] != payload['displayName']):
+            raise OnlineError('INVALID_RESPONSE', '改名回执的身份或昵称与请求不符', uncertain=True)
+    elif path == '/api/v1/broadcasts':
+        if not isinstance(result.get('messageId'), str) or not result['messageId']:
+            raise OnlineError('INVALID_RESPONSE', '喇叭回执缺少消息编号', uncertain=True)
+
+
 class HttpGateway:
-    """不重试写请求；连接与响应异常显式标记结果不确定。"""
+    """协议异常标明结果是否确定，仓库写入可凭同一操作编号重取回执。"""
 
     def send_broadcast(self, player_id: str, text: str, speaker_type: str) -> dict:
-        """发送大小喇叭；响应只确认接受，展示由 WS 推送负责。"""
-        return self._request('POST', '/api/v1/broadcasts',
-                             {'speakerType': speaker_type, 'text': text}, player_id)
+        """提交喇叭消耗与发送，广播展示由 WS 推送负责。"""
+        return self._inventory_command('/api/v1/broadcasts', player_id,
+                                       {'speakerType': speaker_type, 'text': text,
+                                        'operationId': uuid.uuid4().hex})
 
     def kick(self, player_id, room_id, target_player_id):
         """调用玩家房主接口，不使用管理端接口。"""
@@ -142,9 +209,75 @@ class HttpGateway:
         return data
 
     def rename(self, player_id, display_name):
-        """发送改名请求并返回服务端结果。"""
-        return self._request('POST', '/api/v1/players/me/rename',
-                             {'displayName': display_name}, player_id)
+        """提交改名及扣卡，返回同一事务的确认结果。"""
+        return self._inventory_command('/api/v1/players/me/rename', player_id,
+                                       {'displayName': display_name, 'operationId': uuid.uuid4().hex})
+
+    def inventory(self, player_id):
+        """读取当前玩家的服务端仓库。"""
+        snapshot = self._request('GET', '/api/v1/players/me/inventory', player_id=player_id)
+        validate_inventory(snapshot)
+        return snapshot
+
+    def load_player_profile(self, player_id):
+        """读取账号的配装和成长。版本零表示服务端尚无档案。"""
+        result = self._request('GET', '/api/v1/players/me/profile', player_id=player_id)
+        revision = result.get('revision')
+        if type(revision) is not int or revision < 0 or 'profile' not in result:
+            raise OnlineError('INVALID_RESPONSE', '服务器返回了无效的档案版本')
+        profile = result['profile']
+        if revision == 0 and profile is None:
+            return 0, {}
+        if (revision == 0 or not isinstance(profile, dict)
+                or profile.get('contentVersion') != PLAYER_PROFILE_VERSION):
+            raise OnlineError('INVALID_RESPONSE', '服务器返回的档案与客户端版本不匹配')
+        records = {}
+        for kind in ('public', 'secure'):
+            encoded = profile.get(kind)
+            if not isinstance(encoded, str) or len(encoded) != 4 * ((PLAYER_PROFILE_SIZE + 2) // 3):
+                raise OnlineError('INVALID_RESPONSE', '服务器返回的档案不完整')
+            try:
+                records[kind] = base64.b64decode(encoded, validate=True)
+            except (ValueError, binascii.Error) as error:
+                raise OnlineError('INVALID_RESPONSE', '服务器返回的档案编码无效') from error
+            if len(records[kind]) != PLAYER_PROFILE_SIZE:
+                raise OnlineError('INVALID_RESPONSE', '服务器返回的档案长度无效')
+        return revision, records
+
+    def save_player_profile(self, player_id, expected_revision, blobs):
+        """成对提交档案。回执丢失时使用相同版本和数据重取一次。"""
+        profile = {kind: base64.b64encode(blobs[kind]).decode('ascii') for kind in ('public', 'secure')}
+        payload = {'expectedRevision': expected_revision,
+                   'profile': {**profile, 'contentVersion': PLAYER_PROFILE_VERSION}}
+        for attempt in range(2):
+            try:
+                result = self._request('PUT', '/api/v1/players/me/profile', payload, player_id)
+                revision = result.get('revision')
+                if type(revision) is not int or revision != expected_revision + 1:
+                    raise OnlineError('INVALID_RESPONSE', '服务器未确认所提交的档案版本', uncertain=True)
+                return revision
+            except OnlineError as error:
+                if not error.uncertain or attempt == 1:
+                    raise
+
+    def purchase(self, player_id, sku_id, operation_id):
+        return self._inventory_command('/api/v1/players/me/purchase', player_id,
+                                       {'skuId': sku_id, 'operationId': operation_id})
+
+    def open_supply_drop(self, player_id, crate_id, operation_id):
+        return self._inventory_command('/api/v1/players/me/supply-drop', player_id,
+                                       {'crateItemId': crate_id, 'operationId': operation_id})
+
+    def _inventory_command(self, path, player_id, payload):
+        """写请求回执丢失时使用原操作编号查询同一次成交。"""
+        for attempt in range(2):
+            try:
+                result = self._request('POST', path, payload, player_id)
+                _validate_inventory_receipt(path, result, player_id, payload)
+                return result
+            except OnlineError as error:
+                if not error.uncertain or attempt == 1:
+                    raise
 
     def create(self, player_id, username, max_players, password, settings=None, profile=None, *, room_name):
         payload = {'displayName': username, 'roomName': room_name, 'maxPlayers': max_players, 'password': password}

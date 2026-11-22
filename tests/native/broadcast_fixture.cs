@@ -14,6 +14,7 @@ class BroadcastFixture {
     static List<Delegate> callbacks = new List<Delegate>();
     static Dictionary<string, object> fields = new Dictionary<string, object>();
     static int confirmations, messages, allocations, expectedSpeakerType, expectedChannel;
+    static bool expectedSuccess = true;
     const int State = 0x21000000;
     static int Read(int address) { return Marshal.ReadInt32(new IntPtr(address)); }
     static void Write(int address, int value) { Marshal.WriteInt32(new IntPtr(address), value); }
@@ -59,7 +60,10 @@ class BroadcastFixture {
         return 1;
     }
     static int Complete(int success, int error, int speakerType) {
-        if (success != 1 || error != 0 || speakerType != expectedSpeakerType) throw new Exception("wrong completion arguments");
+        if (success != (expectedSuccess ? 1 : 0) || speakerType != expectedSpeakerType)
+            throw new Exception("wrong completion result or speaker type");
+        if (expectedSuccess ? error != 0 : error != State + 65536 || Text(error) != "余额或道具不足")
+            throw new Exception("wrong completion error");
         confirmations++;
         return 1;
     }
@@ -76,7 +80,7 @@ class BroadcastFixture {
         try {
             expectedSpeakerType = int.Parse(arguments[3]);
             expectedChannel = arguments.Length > 4 ? int.Parse(arguments[4]) : 0;
-            Map(0x20000000, 65536); Map(State, 65536); Map(0x28000000, 65536);
+            Map(0x20000000, 65536); Map(State, 65536 + 512); Map(0x28000000, 65536);
             Callback(0x2800fd70, new One(Create), new byte[]{0xff,0x74,0x24,4}, new byte[]{0x83,0xc4,4,0xc3});
             Callback(0x28006750, new Three(Set), new byte[]{0xff,0x74,0x24,8,0xff,0x74,0x24,8,0x51}, new byte[]{0x83,0xc4,12,0xc2,8,0});
             Callback(0x28006660, new One(Release), new byte[]{0x51}, new byte[]{0x83,0xc4,4,0xc3});
@@ -96,12 +100,18 @@ class BroadcastFixture {
                 Console.WriteLine("native x86 chat: channel, receive ABI, ownership, repeated ticks passed");
                 return 0;
             }
-            Write(State + 12, expectedSpeakerType); Write(State, 1); run(); run();
+            Write(State + 16, 1); Write(State + 12, expectedSpeakerType); Write(State, 1); run(); run();
             if (confirmations != 1 || messages != 0) throw new Exception("HTTP inserted a message");
             Bytes(State, File.ReadAllBytes(arguments[2])); run(); run();
             if (confirmations != 1 || messages != 1 || allocations != 0) throw new Exception("push not independent");
-            Bytes(State, File.ReadAllBytes(arguments[2])); Write(State + 12, expectedSpeakerType); Write(State, 1); run(); run();
+            Bytes(State, File.ReadAllBytes(arguments[2])); Write(State + 16, 1);
+            Write(State + 12, expectedSpeakerType); Write(State, 1); run(); run();
             if (confirmations != 2 || messages != 2 || allocations != 0) throw new Exception("duplicate notification");
+            expectedSuccess = false;
+            Bytes(State, File.ReadAllBytes(arguments[2]));
+            Bytes(State + 65536, System.Text.Encoding.UTF8.GetBytes("余额或道具不足\0"));
+            Write(State + 16, 0); Write(State + 12, expectedSpeakerType); Write(State, 1); run(); run();
+            if (confirmations != 3 || messages != 3 || allocations != 0) throw new Exception("failed send lost the incoming message");
             GC.KeepAlive(callbacks);
             Console.WriteLine("native x86 broadcast: completion, receive ABI, ownership, repeated ticks passed");
             return 0;

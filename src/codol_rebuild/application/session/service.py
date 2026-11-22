@@ -13,13 +13,15 @@ class OnlineSession:
 
     def __init__(self, gateway: LoginGateway, store: IdentityStore, server: str,
                  fingerprint: str, rooms: RoomLifecycle,
-                 realtime: RealtimeConnection | None = None):
+                 realtime: RealtimeConnection | None = None, inventory=None, profiles=None):
         self._gateway = gateway
         self._store = store
         self._server = server
         self._fingerprint = fingerprint
         self._rooms = rooms
         self._realtime = realtime
+        self._inventory = inventory
+        self._profiles = profiles
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='codol-login')
         self._player_id = None
         self._pending = None
@@ -52,6 +54,10 @@ class OnlineSession:
             # 先交接确认身份，保证保存/握手失败后退出仍能清理既有房间。
             self._rooms.bind_identity(identity)
             self._store.save(self._server, identity)
+            if self._inventory is not None:
+                self._inventory.load_for_login(identity.player_id)
+            if self._profiles is not None:
+                self._profiles.load_for_login(identity.player_id, data['displayName'])
             if self._realtime is not None:
                 self._realtime.start(identity.player_id, self._fingerprint)
             self._rooms.restore()

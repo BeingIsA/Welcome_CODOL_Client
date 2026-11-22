@@ -214,6 +214,7 @@ class MatchBridge:
                         self.room_id, self.room_pointer = room_id, room_pointer
                         self.host_lock_pending = True
                         self.record({'match_request': 'allocate', 'room_id': room_id})
+                        self.record_native_room('allocate', room_pointer)
                     struct.pack_into('<I', context, 176, int(accepted))
                     next_instruction = address+6
             elif phase == 'send' and self.allocation is not None:
@@ -343,6 +344,23 @@ class MatchBridge:
             if next_address is not None:
                 return next_address
         return self.poll_start_confirmation(resume_address)
+
+    def record_native_room(self, phase, room_pointer):
+        """仅在开局申请处采集原生成员准备值，读取失败只记诊断信息。"""
+        try:
+            count = self.integer(room_pointer + 0x105D8)
+            if not 0 <= count <= 24:
+                raise ValueError('原生成员数超出采集范围')
+            members = []
+            for index in range(count):
+                slot = room_pointer + 0xE368 + index * 0x1D0
+                members.append({'nativeId': self.process.read(slot, 8).hex(),
+                                'ready': self.process.read(slot + 0x90, 1)[0],
+                                'owner': self.process.read(slot + 0x92, 1)[0]})
+            self.record({'room_return': phase, 'roomId': self.current_room(),
+                         'nativeMembers': members})
+        except (OSError, ValueError) as error:
+            self.record({'room_return': 'read_failed', 'phase': phase, 'error': str(error)})
 
     def consume_returned_match(self):
         """界面重新激活时，只交付一次确已通知入局且仍属于当前房间的对局。"""

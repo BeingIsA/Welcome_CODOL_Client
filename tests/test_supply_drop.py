@@ -1,155 +1,81 @@
-"""单箱商品候选、库存发放及原子持久化回归。"""
-import unittest
-import copy
-from contextlib import closing
+"""单箱原生结果编码及异步任务通知回归。"""
 from pathlib import Path
-import sqlite3
-import tempfile
-from unittest.mock import patch
+import struct
+import unittest
+from unittest.mock import Mock
 
-from codol_rebuild.application.accounts.supply_drop import draw_reward
+from codol_rebuild.adapters.game.v1649370.accounts import supply_drop
+from codol_rebuild.application.errors import OnlineError
+from test_purchase import Memory
 
 
 class SupplyDropTests(unittest.TestCase):
-    def setUp(self):
-        self.state = {'version': 1, 'owned_ids': [60216], 'gp': 0, 'cp': 0,
-                      'quantities': {'60216': 5}}
-        self.pool = [{'product_id': item_id + 1000, 'contents': [
-            {'item_id': item_id, 'stackable': False, 'count': 1}]}
-            for item_id in range(101, 105)]
+    def supply_drop_request(self, inventory_session):
+        memory = Memory()
+        frame = 0x13000000
+        parameters = frame + 1024
+        values = parameters + 128
+        context = bytearray(208)
+        for offset in (180, 196):
+            struct.pack_into('<I', context, offset, frame)
+        memory.word(frame + 40, parameters)
+        memory.word(parameters + 20, 2)
+        memory.word(parameters + 16, values)
+        memory.word(values + 12, 3)
+        memory.word(values + 16, 60216)
+        memory.word(values + 44, 3)
+        memory.word(values + 48, 1)
+        process = Mock(read=memory.read, write=memory.write, main_thread_id=4)
+        process.context.return_value = (5, context)
+        bridge = supply_drop.SupplyDropBridge(process, Mock(), Mock(), (ValueError,), inventory_session)
+        bridge.state = frame + 4096
+        bridge.traps = {11: 'request', 12: 'poll', 13: 'reward_ready'}
+        bridge.handle(Mock(tid=4), 11)
+        return memory, bridge
 
-    def test_every_unowned_item_has_one_selection_index(self):
-        for selected_index in range(4):
-            with patch('codol_rebuild.application.accounts.supply_drop.secrets.randbelow',
-                       side_effect=[selected_index, 0, 0]) as random_choice:
-                next_state, reward = draw_reward(self.state, self.pool, 60216)
-            self.assertEqual([call.args[0] for call in random_choice.call_args_list], [4, 3, 2])
-            self.assertEqual(len(reward['product_ids']), 3)
-            self.assertEqual(len(set(reward['product_ids'])), 3)
-            self.assertEqual(reward['contents'][0]['item_id'], 101 + selected_index)
-            self.assertEqual(next_state['quantities']['60216'], 4)
-        self.assertEqual(self.state['owned_ids'], [60216])
+    def test_supply_drop_waits_then_applies_only_confirmed_inventory(self):
+        service = Mock()
+        memory, bridge = self.supply_drop_request(service)
+        service.begin_supply_drop.assert_called_once_with(60216)
+        snapshot = {'revision': 4, 'items': [], 'gp': 10, 'cp': 5}
+        service.poll.side_effect = [None, {'inventory': snapshot, 'reward': {
+            'contents': [{'item_id': 55, 'quantity': 3, 'quantity_delta': 1}]}}]
+        event = Mock(tid=4)
+        bridge.handle(event, 12)
+        bridge.profiles.apply_inventory.assert_not_called()
+        self.assertEqual(supply_drop.u32(memory.read, bridge.state), 0)
+        bridge.handle(event, 12)
+        bridge.profiles.apply_inventory.assert_called_once_with(snapshot)
+        self.assertEqual(supply_drop.u32(memory.read, bridge.state), 1)
+        bridge.handle(event, 13)
+        bridge.profiles.apply_inventory.assert_called_once_with(snapshot)
+        service.begin_supply_drop.assert_called_once_with(60216)
 
-    def test_two_candidates_grant_both_and_consume_one_crate(self):
-        next_state, reward = draw_reward(self.state, self.pool[:2], 60216)
-        self.assertEqual(set(reward['product_ids']), {1101, 1102})
-        self.assertEqual(next_state['quantities']['60216'], 4)
+    def test_offline_and_server_failure_publish_a_failed_task(self):
+        memory, bridge = self.supply_drop_request(None)
+        self.assertEqual(supply_drop.u32(memory.read, bridge.state), 0)
+        self.assertIn('离线'.encode('utf-8'), memory.read(bridge.state + supply_drop.MESSAGE, 80))
+        service = Mock()
+        memory, bridge = self.supply_drop_request(service)
+        service.poll.side_effect = OnlineError('MISSING_ITEM', '没有军火箱')
+        bridge.handle(Mock(tid=4), 12)
+        self.assertEqual(supply_drop.u32(memory.read, bridge.state), 0)
+        self.assertEqual(supply_drop.u32(memory.read, bridge.state + supply_drop.ONLINE_TASK_STATE), 2)
+        bridge.profiles.apply_inventory.assert_not_called()
 
-    def test_shared_stackable_contents_accumulate_across_products(self):
-        reward_pool = [{'product_id': product_id, 'contents': [
-            {'item_id': 201, 'stackable': True, 'count': 2}]}
-            for product_id in (901, 902, 903)]
-        next_state, reward = draw_reward(self.state, reward_pool, 60216)
-        self.assertEqual(next_state['quantities']['201'], 6)
-        self.assertEqual([content['quantity'] for content in reward['contents']], [2, 4, 6])
-
-    def test_weapon_pool_still_grants_one_reward(self):
-        reward_pool = [{**reward, 'product_id': 0} for reward in self.pool]
-        next_state, reward = draw_reward(self.state, reward_pool, 60216)
-        self.assertEqual(len(reward['contents']), 1)
-
-    def test_owned_items_excluded(self):
-        self.state['owned_ids'] += [101, 102, 103]
-        next_state, reward = draw_reward(self.state, self.pool, 60216)
-        self.assertEqual(reward['contents'][0]['item_id'], 104)
-
-    def test_product_with_owned_equipment_and_stackable_item_remains_eligible(self):
-        self.state['owned_ids'] += [101, 102]
-        self.state['quantities']['102'] = 7
-        product = {'product_id': 900, 'contents': [
-            {'item_id': 101, 'stackable': False, 'count': 1},
-            {'item_id': 102, 'stackable': True, 'count': 3},
-            {'item_id': 103, 'stackable': False, 'count': 1}]}
-        next_state, reward = draw_reward(self.state, [product], 60216)
-        self.assertEqual(next_state['quantities']['102'], 10)
-        self.assertEqual([content['quantity_delta'] for content in reward['contents']], [0, 3, 1])
-        self.assertEqual(reward['product_ids'], [900])
-        self.assertIn(103, next_state['owned_ids'])
-        self.assertEqual(self.state['quantities']['102'], 7)
-
-    def test_owned_stackable_only_product_can_repeat(self):
-        product = {'product_id': 901, 'contents': [
-            {'item_id': 60216, 'stackable': True, 'count': 10}]}
-        next_state, reward = draw_reward(self.state, [product], 60216)
-        self.assertEqual(next_state['quantities']['60216'], 14)
-        self.assertEqual(reward['contents'][0]['quantity'], 14)
-
-    def test_weapon_pool_excludes_owned_items_even_if_stackable(self):
-        reward_pool = [{'product_id': 0, 'contents': [
-            {'item_id': 60216, 'stackable': True, 'count': 1}]}]
-        with self.assertRaises(ValueError):
-            draw_reward(self.state, reward_pool, 60216)
-        self.assertEqual(self.state['quantities']['60216'], 5)
-
-    def test_exhausted_pool_does_not_change_input(self):
-        self.state['owned_ids'] += [101, 102, 103, 104]
-        with self.assertRaises(ValueError):
-            draw_reward(self.state, self.pool, 60216)
-        self.assertEqual(self.state['quantities']['60216'], 5)
-
-    def test_reward_survives_reload_and_failed_commit(self):
-        from codol_rebuild.adapters.persistence.sqlite_accounts import AccountRepository
-        from codol_rebuild.application.accounts.service import AccountSession
-        from codol_rebuild.application.accounts.contracts import RevisionConflict
-        from types import SimpleNamespace
-        with tempfile.TemporaryDirectory() as directory:
-            repository = AccountRepository(Path(directory) / 'account.sqlite3')
-            repository.identity()
-            identities = {'public': {'test': 1}, 'secure': {'test': 2}}
-            repository.save('local', 0, {'public': b'public', 'secure': b'secure'}, identities,
-                            initialization=self.state)
-            session = AccountSession(repository, SimpleNamespace(identities=identities))
-            session.account = repository.load('local', identities)
-            with patch('codol_rebuild.application.accounts.supply_drop.secrets.randbelow', return_value=0):
-                plan = session.prepare_supply_drop(self.pool, 60216)
-            session.commit_supply_drop(plan)
-            restored = repository.load('local', identities)
-            self.assertEqual(restored, session.account)
-            self.assertIn(101, restored['initialization']['owned_ids'])
-            self.assertEqual(restored['initialization']['quantities']['60216'], 4)
-            with self.assertRaises(RevisionConflict):
-                session.commit_supply_drop(plan)
-            before = copy.deepcopy(session.account)
-            plan = session.prepare_supply_drop(self.pool, 60216)
-            with closing(sqlite3.connect(repository.path)) as database, database:
-                database.execute("CREATE TRIGGER reject_reward BEFORE UPDATE ON account_initialization BEGIN SELECT RAISE(ABORT, 'injected failure'); END")
-            with self.assertRaises(sqlite3.Error):
-                session.commit_supply_drop(plan)
-            self.assertEqual(session.account, before)
-            self.assertEqual(repository.load('local', identities), before)
-
-    def test_resource_pools_preserve_product_ids_and_contents(self):
-        import csv
-        from codol_rebuild.adapters.game.v1649370.accounts.supply_drop import load_reward_pool
-        resource_root = Path(__file__).resolve().parents[1] / 'resources'
-        with (resource_root / '军火箱发放商品表.csv').open(encoding='utf-8-sig') as stream:
-            rows = list(csv.DictReader(stream))
-        catalog = {}
-        for row in rows:
-            for entry in row['物品列表（ID:数量）'].split(';'):
-                item_id = int(entry.split(':')[0])
-                catalog[item_id] = {'raw': (bytes(32) + bytes([2])).hex()}
-        rewards = load_reward_pool(resource_root / '军火箱发放商品表.csv', catalog)
-        self.assertEqual(len(rewards), len(rows))
-        product = next(reward for reward in rewards if reward['product_id'] == 22485)
-        self.assertEqual([(content['item_id'], content['count']) for content in product['contents']],
-                         [(60240, 3), (60216, 3)])
-        with (resource_root / '高品质武器表.csv').open(encoding='utf-8-sig') as stream:
-            weapon_rows = list(csv.DictReader(stream))
-        catalog = {int(row['物品ID']): {'raw': bytes(33).hex()} for row in weapon_rows}
-        weapons = load_reward_pool(resource_root / '高品质武器表.csv', catalog)
-        self.assertEqual({reward['contents'][0]['item_id'] for reward in weapons}, set(catalog))
-        self.assertTrue(all(reward['product_id'] == 0 for reward in weapons))
+    def test_three_largest_reward_bundles_fit_in_one_native_result(self):
+        contents = [{'item_id': item_id, 'quantity': 1, 'quantity_delta': 1} for item_id in range(1, 60)]
+        payload = supply_drop.encode_result(0x11000000, 60216, {'contents': contents})
+        self.assertEqual(struct.unpack_from('<I', payload, 4)[0], 59)
+        self.assertLessEqual(len(payload), supply_drop.RESULT_CAPACITY)
+        self.assertEqual(struct.unpack_from('<I', payload, len(payload) - 16)[0], 60216)
 
     def test_native_result_displays_product_contents_as_items(self):
         import struct
         from codol_rebuild.adapters.game.v1649370.accounts import supply_drop
-        product = {'product_id': 900, 'contents': [
-            {'item_id': 101, 'stackable': False, 'count': 1},
-            {'item_id': 102, 'stackable': True, 'count': 3}]}
-        next_state, reward = draw_reward(self.state, [product], 60216)
+        reward = {'contents': [{'item_id': 101, 'quantity': 1, 'quantity_delta': 1},
+                               {'item_id': 102, 'quantity': 3, 'quantity_delta': 3}]}
         payload = supply_drop.encode_result(0x11000000, 60216, reward)
-        self.assertEqual(reward['product_ids'], [900])
         self.assertEqual(struct.unpack_from('<I', payload, 4)[0], 2)
         for content_index, item_id in enumerate((101, 102)):
             field_offset = supply_drop.FIELDS + content_index * len(supply_drop.REWARD_FIELDS) * 36
@@ -170,7 +96,7 @@ class SupplyDropTests(unittest.TestCase):
         for address, expected in supply_drop.CONTRACT.items():
             self.assertEqual(image.get_data(address - image.OPTIONAL_HEADER.ImageBase, len(expected)), expected)
         entry = 0x10000000
-        adapter = supply_drop.build_adapter(entry, 0x11000000, 0x12000000)
+        adapter = supply_drop.build_adapter(entry, 0x11000000, 0x12000000, deferred=True)
         instructions = list(capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32).disasm(adapter['code'], entry))
         self.assertEqual(sum(instruction.size for instruction in instructions), len(adapter['code']))
         addresses = {instruction.address for instruction in instructions}
@@ -178,42 +104,4 @@ class SupplyDropTests(unittest.TestCase):
             if instruction.mnemonic.startswith('j') and instruction.op_str.startswith('0x'):
                 target = int(instruction.op_str, 16)
                 self.assertTrue(target in addresses or target == supply_drop.HANDLER)
-        self.assertEqual(set(adapter['traps'].values()), {'request', 'commit', 'completed'})
-
-    def test_last_crate_slot_reuse_rolls_back_on_database_failure(self):
-        from unittest.mock import Mock
-        import struct
-        from codol_rebuild.adapters.game.v1649370.accounts.profile_bridge import LocalProfileBridge
-        from codol_rebuild.adapters.game.v1649370.accounts import purchase
-        from test_purchase import Memory
-        memory, pool_address = Memory(), 0x100000
-        memory.write(pool_address - 16, b'LOCAL-INVENTORY!')
-        memory.write(pool_address + purchase.CAPACITY * purchase.STRIDE, b'LOCAL-INVENTORY!')
-        memory.word(pool_address, 0xD59C78)
-        memory.write(pool_address + 0x40, struct.pack('<III', 60216, 1, 0))
-        memory.word(pool_address + 0x90, 0xffffffff)
-        memory.word(pool_address + 0x98, 0xffffffff)
-        memory.word(0x82C4A8C, 1)
-        purchase.publish_currency(memory.read, memory.write, self.state)
-        process = Mock(read=memory.read, write=memory.write)
-        bridge = LocalProfileBridge(process, None, {}, lambda value: None)
-        bridge._inventory = {'pool': hex(pool_address), 'items': 1, 'weapon_experience': 99}
-        bridge._catalog = {101: {'id': 101, 'type_bytes': [0, 0]}}
-        bridge._service = Mock()
-        bridge._service.commit_supply_drop.side_effect = ValueError('保存失败')
-        self.state['quantities']['60216'] = 1
-        next_state, reward = draw_reward(self.state, self.pool[:1], 60216)
-        plan = {'state': next_state, 'reward': reward, 'crate_item_id': 60216}
-        with self.assertRaises(ValueError):
-            bridge.commit_supply_drop(plan)
-        self.assertEqual(memory.read(pool_address + 0x40, 12), struct.pack('<III', 60216, 1, 0))
-        self.assertEqual(bridge._inventory['items'], 1)
-        bridge._service.commit_supply_drop.side_effect = None
-        bridge._service.commit_supply_drop.return_value = next_state
-        bridge.commit_supply_drop(plan)
-        self.assertEqual(memory.read(pool_address + 0x40, 12), struct.pack('<III', 101, 1, 99))
-        self.assertEqual(bridge._inventory['items'], 1)
-
-
-if __name__ == '__main__':
-    unittest.main()
+        self.assertEqual(set(adapter['traps'].values()), {'request', 'poll', 'reward_ready', 'completed'})

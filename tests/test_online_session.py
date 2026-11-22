@@ -4,10 +4,12 @@ from io import BytesIO
 from urllib.error import HTTPError, URLError
 from pathlib import Path
 import struct
+from threading import Event
 import unittest
 from unittest.mock import Mock, patch
 
 from codol_rebuild.application.errors import OnlineError
+from codol_rebuild.application.accounts.online_inventory import OnlineInventory
 from codol_rebuild.application.session.contracts import IdentityRecord, LoginCompletion
 from codol_rebuild.application.session.service import OnlineSession
 from codol_rebuild.application.room.service import RoomSession
@@ -58,7 +60,9 @@ class OnlineSessionTests(unittest.TestCase):
         rooms.restore.side_effect = lambda: calls.append('restore')
         rooms.close.side_effect = lambda: calls.append('leave')
         realtime.close.side_effect = lambda: calls.append('disconnect')
-        session = OnlineSession(gateway, store, 'http://localhost', 'machine', rooms, realtime)
+        profiles = Mock()
+        profiles.load_for_login.side_effect = lambda player_id, display_name: calls.append('profiles')
+        session = OnlineSession(gateway, store, 'http://localhost', 'machine', rooms, realtime, profiles=profiles)
         try:
             self.assertTrue(session.begin_login('本地昵称'))
             session._pending.result(timeout=2)
@@ -68,7 +72,8 @@ class OnlineSessionTests(unittest.TestCase):
             gateway.login.assert_called_once_with('machine', '本地昵称', 'pl_saved')
         finally:
             session.close()
-        self.assertEqual(calls, ['load', 'login', 'bind', 'save', 'connect', 'restore', 'leave', 'disconnect'])
+        profiles.load_for_login.assert_called_once_with('pl_saved', '服务端昵称')
+        self.assertEqual(calls, ['load', 'login', 'bind', 'save', 'profiles', 'connect', 'restore', 'leave', 'disconnect'])
 
     def test_failed_persistence_retains_confirmed_identity_for_explicit_retry(self):
         gateway, store, rooms = Mock(), Mock(), Mock()
@@ -132,6 +137,94 @@ class OnlineSessionTests(unittest.TestCase):
         self.assertEqual(struct.unpack('<I', process.read(state + LOGIN, 4))[0], 1)
         self.assertNotEqual(process.read(state + IDENTITY, 8), bytes(8))
 
+    def test_cold_login_trap_waits_for_server_inventory_before_native_gate_opens(self):
+        inventory_requested, inventory_released = Event(), Event()
+        snapshot = {'revision': 2, 'gp': 6, 'cp': 7, 'items': []}
+        gateway, store = Mock(), Mock()
+        store.load.return_value = None
+        gateway.login.return_value = {'playerId': 'pl_cold', 'displayName': '服务器昵称'}
+
+        def read_inventory(player_id):
+            inventory_requested.set()
+            self.assertTrue(inventory_released.wait(3))
+            return snapshot
+
+        gateway.inventory.side_effect = read_inventory
+        inventory = OnlineInventory(gateway)
+        session = OnlineSession(gateway, store, 'test-server', 'machine', Mock(), inventory=inventory)
+        state, trap = 0x21000000, 0x20000100
+        memory = Memory()
+        process = Mock(main_thread_id=1, read=memory.read, write=memory.write)
+        process.write(state, bytes(128))
+        process.context.return_value = (100, bytearray(256))
+        bridge = GameSessionBridge.__new__(GameSessionBridge)
+        bridge.process, bridge.login_trap = process, trap
+        connected, notify = Mock(), Mock()
+        bridge.online_bridge = online_session.OnlineSessionBridge(process, session, state, connected, Mock(), notify)
+        native_username = patch.object(online_session, 'username', return_value='原生昵称')
+        native_username.start()
+        self.addCleanup(native_username.stop)
+        event = Mock(tid=1)
+        try:
+            self.assertTrue(bridge.handle_exception(event, 0x80000003, trap, {}))
+            self.assertTrue(inventory_requested.wait(2))
+            self.assertTrue(bridge.handle_exception(event, 0x80000003, trap, {}))
+            self.assertEqual(struct.unpack_from('<I', process.set_context.call_args.args[1], 184)[0], trap + 1)
+            self.assertIsNone(inventory.initial_snapshot)
+            self.assertEqual(process.read(state + LOGIN, 4), bytes(4))
+            connected.assert_not_called()
+            gateway.login.assert_called_once_with('machine', '原生昵称', None)
+            inventory_released.set()
+            self.assertIsNone(session._pending.result(timeout=2).error)
+            self.assertEqual(inventory.initial_snapshot, snapshot)
+            self.assertEqual(process.read(state + LOGIN, 4), bytes(4))
+            self.assertTrue(bridge.handle_exception(event, 0x80000003, trap, {}))
+            self.assertEqual(process.read(state + LOGIN, 4), struct.pack('<I', 1))
+            connected.assert_called_once_with('pl_cold', '服务器昵称')
+            gateway.inventory.assert_called_once_with('pl_cold')
+            notify.assert_not_called()
+        finally:
+            inventory_released.set()
+            session.close()
+            inventory.close()
+
+    def test_login_inventory_failure_keeps_native_gate_closed(self):
+        gateway, store, rooms = Mock(), Mock(), Mock()
+        store.load.return_value = None
+        gateway.login.return_value = {'playerId': 'pl_cold', 'displayName': '玩家'}
+        release_failure = Event()
+
+        def fail_inventory(player_id):
+            self.assertTrue(release_failure.wait(3))
+            raise OnlineError('NETWORK_ERROR', '仓库请求失败')
+
+        gateway.inventory.side_effect = fail_inventory
+        inventory = OnlineInventory(gateway)
+        session = OnlineSession(gateway, store, 'test-server', 'machine', rooms, inventory=inventory)
+        process, state = Memory(), 0x21000000
+        process.write(state, bytes(128))
+        notify, connected = Mock(), Mock()
+        bridge = online_session.OnlineSessionBridge(process, session, state, connected, Mock(), notify)
+        native_username = patch.object(online_session, 'username', return_value='玩家')
+        native_username.start()
+        self.addCleanup(native_username.stop)
+        try:
+            # 显式等到失败结果，再从大厅线程消费，避免测试依赖线程结束的时机。
+            self.assertIsNone(bridge.poll())
+            release_failure.set()
+            self.assertEqual(session._pending.result(timeout=2).error.code, 'NETWORK_ERROR')
+            self.assertTrue(bridge.poll())
+            self.assertIsNone(inventory.initial_snapshot)
+            self.assertEqual(process.read(state + LOGIN, 4), bytes(4))
+            connected.assert_not_called()
+            rooms.restore.assert_not_called()
+            notify.assert_called_once()
+            gateway.inventory.assert_called_once_with('pl_cold')
+        finally:
+            release_failure.set()
+            session.close()
+            inventory.close()
+
     def test_public_frame_dispatches_without_any_speaker_adapter(self):
         bridge = GameSessionBridge.__new__(GameSessionBridge)
         process = Mock(main_thread_id=1, context=Mock(return_value=(100, bytearray(256))))
@@ -139,12 +232,34 @@ class OnlineSessionTests(unittest.TestCase):
         bridge.match_bridge = None
         bridge.supply_drop_bridge = Mock(traps={})
         bridge.session_traps = {0x2000: 'session_poll'}
+        bridge.login_trap = None
         bridge.online_bridge = Mock()
         bridge.realtime_dispatcher = Mock()
+        bridge.log = {}
+        bridge.checkpoint = Mock()
         self.assertTrue(bridge.handle_exception(Mock(tid=1), 2147483651, 0x2000, {}))
-        bridge.online_bridge.poll.assert_called_once()
+        bridge.online_bridge.poll.assert_not_called()
         bridge.realtime_dispatcher.poll.assert_called_once()
+        bridge.checkpoint.assert_called_once_with()
         self.assertEqual(struct.unpack_from('<I', process.set_context.call_args.args[1], 184)[0], 0x2001)
+
+    def test_profile_conflict_notifies_once_without_interrupting_public_frames(self):
+        bridge = GameSessionBridge.__new__(GameSessionBridge)
+        bridge.process = Mock(main_thread_id=1, context=Mock(return_value=(100, bytearray(256))))
+        bridge.match_bridge = None
+        bridge.supply_drop_bridge = Mock(traps={})
+        bridge.session_traps = {0x2000: 'session_poll'}
+        bridge.login_trap = None
+        bridge.realtime_dispatcher = Mock()
+        bridge.log = {}
+        bridge.multiplayer = Mock()
+        bridge.checkpoint = Mock(side_effect=OnlineError('PROFILE_CONFLICT', '其他会话已修改档案'))
+        for frame in range(2):
+            self.assertTrue(bridge.handle_exception(Mock(tid=1), 0x80000003, 0x2000, {}))
+        bridge.checkpoint.assert_called_once_with()
+        bridge.multiplayer.notifications.message.assert_called_once_with('账号档案保存失败：其他会话已修改档案')
+        self.assertEqual(bridge.log['profile_save_error'], '其他会话已修改档案')
+        self.assertEqual(bridge.realtime_dispatcher.poll.call_count, 2)
 
     def test_chat_checks_application_membership_even_when_native_room_is_still_visible(self):
         inbox, sender = EventInbox(), Mock()
