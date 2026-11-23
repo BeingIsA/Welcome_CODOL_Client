@@ -39,7 +39,7 @@ class SupplyDropTests(unittest.TestCase):
         service.begin_supply_drop.assert_called_once_with(60216)
         snapshot = {'revision': 4, 'items': [], 'gp': 10, 'cp': 5}
         service.poll.side_effect = [None, {'inventory': snapshot, 'reward': {
-            'contents': [{'item_id': 55, 'quantity': 3, 'quantity_delta': 1}]}}]
+            'product_ids': [123], 'contents': [{'item_id': 55, 'quantity': 3, 'quantity_delta': 1}]}}]
         event = Mock(tid=4)
         bridge.handle(event, 12)
         bridge.profiles.apply_inventory.assert_not_called()
@@ -65,15 +65,28 @@ class SupplyDropTests(unittest.TestCase):
 
     def test_three_largest_reward_bundles_fit_in_one_native_result(self):
         contents = [{'item_id': item_id, 'quantity': 1, 'quantity_delta': 1} for item_id in range(1, 60)]
-        payload = supply_drop.encode_result(0x11000000, 60216, {'contents': contents})
-        self.assertEqual(struct.unpack_from('<I', payload, 4)[0], 59)
+        payload = supply_drop.encode_result(0x11000000, 60216, {'product_ids': [34, 840, 14121], 'contents': contents})
+        self.assertEqual(struct.unpack_from('<I', payload, 4)[0], 3)
         self.assertLessEqual(len(payload), supply_drop.RESULT_CAPACITY)
         self.assertEqual(struct.unpack_from('<I', payload, len(payload) - 16)[0], 60216)
 
-    def test_native_result_displays_product_contents_as_items(self):
+    def test_outfit_and_single_item_keep_draw_order(self):
+        contents = [
+            {'item_id': 553, 'quantity': 1, 'quantity_delta': 0},
+            {'item_id': 556, 'quantity': 1, 'quantity_delta': 1},
+            {'item_id': 55, 'quantity': 3, 'quantity_delta': 2},
+        ]
+        payload = supply_drop.encode_result(0x11000000, 60216, {'product_ids': [10012, 2], 'contents': contents})
+        self.assertEqual(struct.unpack_from('<I', payload, 4)[0], 2)
+        for index, expected in enumerate(((0, 10012, 1, 1), (0, 2, 1, 1))):
+            start = supply_drop.FIELDS + index * len(supply_drop.REWARD_FIELDS) * 36
+            self.assertEqual(tuple(struct.unpack_from('<I', payload, start + field * 36 + 20)[0]
+                                   for field in (0, 1, 7, 8)), expected)
+
+    def test_item_pool_displays_items_with_granted_quantities(self):
         import struct
         from codol_rebuild.adapters.game.v1649370.accounts import supply_drop
-        reward = {'contents': [{'item_id': 101, 'quantity': 1, 'quantity_delta': 1},
+        reward = {'product_ids': [0], 'contents': [{'item_id': 101, 'quantity': 1, 'quantity_delta': 1},
                                {'item_id': 102, 'quantity': 3, 'quantity_delta': 3}]}
         payload = supply_drop.encode_result(0x11000000, 60216, reward)
         self.assertEqual(struct.unpack_from('<I', payload, 4)[0], 2)

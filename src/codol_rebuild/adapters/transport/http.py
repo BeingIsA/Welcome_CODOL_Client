@@ -73,7 +73,8 @@ def _validate_reward(reward):
         raise OnlineError('INVALID_RESPONSE', '服务器未返回开箱奖励', uncertain=True)
     products = reward.get('product_ids')
     if (not isinstance(products, list) or not products
-            or any(type(product_id) is not int or product_id < 0 for product_id in products)):
+            or any(type(product_id) is not int or not 0 <= product_id <= 2147483647 for product_id in products)
+            or (0 in products and products != [0])):
         raise OnlineError('INVALID_RESPONSE', '开箱回执的商品编号无效', uncertain=True)
     contents = reward.get('contents')
     if not isinstance(contents, list) or not contents:

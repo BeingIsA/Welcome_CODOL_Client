@@ -29,13 +29,18 @@ CONTRACT = {
 
 
 def encode_result(state, crate_id, reward):
-    """将商品展开为原生物品奖励，保留实际物品编号及数量变化。"""
-    contents = reward['contents']
-    result_size = FIELDS + (len(contents) * len(REWARD_FIELDS) + 1) * 36
+    """按原生卡片约定编码整套商品或单件物品。"""
+    product_ids = reward['product_ids']
+    if product_ids == [0]:
+        cards = [(content['item_id'], 0, content['quantity'], content['quantity_delta'])
+                 for content in reward['contents']]
+    else:
+        cards = [(0, product_id, 1, 1) for product_id in product_ids]
+    result_size = FIELDS + (len(cards) * len(REWARD_FIELDS) + 1) * 36
     if result_size > RESULT_CAPACITY:
         raise ValueError('开箱奖励结果超出数据页')
     payload = bytearray(result_size)
-    struct.pack_into('<I', payload, 4, len(contents))
+    struct.pack_into('<I', payload, 4, len(cards))
     for offset in (ARRAY, RESPONSE, ITEMS, REWARD, UNDEFINED):
         struct.pack_into('<IIII', payload, offset, 0xffffffff, 0xffffffff, 0, 0)
     names_offset = 768
@@ -46,10 +51,8 @@ def encode_result(state, crate_id, reward):
         name_addresses[name] = state + names_offset
         names_offset += len(name_bytes)
     field_values = []
-    for content in contents:
-        # 原生 UI 将非零 productID 解释为礼包；逐物品回显必须走 GetItemInfo。
-        values = (content['item_id'], 0, 0, False, 0, 0, False,
-                  content['quantity'], content['quantity_delta'], False, False)
+    for item_id, product_id, quantity, quantity_delta in cards:
+        values = (item_id, product_id, 0, False, 0, 0, False, quantity, quantity_delta, False, False)
         field_values.extend(zip(REWARD_FIELDS, values))
     field_values.append(('supplyDropID', crate_id))
     for field_index, (name, value) in enumerate(field_values):
@@ -181,7 +184,7 @@ class SupplyDropBridge:
             try:
                 if phase == 'request':
                     self.pending = None
-                    checked_write(self.process, self.state, encode_result(self.state, 0, {'product_id': 0, 'contents': []}))
+                    checked_write(self.process, self.state, encode_result(self.state, 0, {'product_ids': [], 'contents': []}))
                     frame = struct.unpack_from('<I', context, 180)[0]
                     if frame != struct.unpack_from('<I', context, 196)[0]:
                         raise ValueError('开箱桥保存帧不匹配')
