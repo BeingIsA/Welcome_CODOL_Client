@@ -46,7 +46,6 @@ class HostReleaseTests(unittest.TestCase):
             with (
                 patch.object(builder, 'CLIENT_ROOT', client),
                 patch.object(builder, 'compile_host', return_value=compiled),
-                patch.object(builder, 'copy_licenses', side_effect=lambda directory: directory.mkdir()),
                 patch.object(builder.subprocess, 'run') as launch_check,
                 patch.object(sys, 'argv', [str(tool_path), '--output', str(release)]),
                 patch('builtins.print'),

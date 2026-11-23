@@ -1,0 +1,121 @@
+name: 发布 Windows 客户端
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.14'
+          architecture: x64
+
+      - name: 安装构建依赖
+        run: python -m pip install -r requirements-build.txt
+
+      - name: 验证启动参数、发行目录和 Windows 权限
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
+        run: python -B -X utf8 -m unittest -v tests.test_host_launch_cli tests.test_host_release tests.test_runtime_cache
+
+      - name: 编译并运行 EXE 启动预检
+        run: python -B -X utf8 tools/build_host.py --output "$env:RUNNER_TEMP/CODOL-Windows-x64"
+
+      - name: 生成程序 ZIP 和 SHA-256
+        run: |
+          $package = Join-Path $env:RUNNER_TEMP 'CODOL-Windows-x64'
+          foreach ($directory in 'resources', 'workspaces', 'src', 'tests') {
+            if (Test-Path -LiteralPath (Join-Path $package $directory)) {
+              throw "发行目录含有 $directory"
+            }
+          }
+          $archive = "$package.zip"
+          [System.IO.Compression.ZipFile]::CreateFromDirectory($package, $archive)
+          $digest = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          [System.IO.File]::WriteAllText("$archive.sha256", "$digest  CODOL-Windows-x64.zip`n")
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-release
+          path: |
+            ${{ runner.temp }}/CODOL-Windows-x64.zip
+            ${{ runner.temp }}/CODOL-Windows-x64.zip.sha256
+          compression-level: 0
+          if-no-files-found: error
+          overwrite: true
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    # 多次推送可同时编译，发布时排队，以便按构建序号更新 Latest。
+    concurrency:
+      group: codol-client-publish
+      queue: max
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: windows-release
+          path: assets
+
+      - name: 校验下载的程序包
+        working-directory: assets
+        run: sha256sum --check CODOL-Windows-x64.zip.sha256
+
+      - name: 发布本次推送
+        working-directory: assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          tag="build-$GITHUB_RUN_NUMBER"
+          # 一次读取已有标签、草稿和 Latest，查询失败时由 shell 终止发布。
+          state=$(gh api graphql -f owner="$GITHUB_REPOSITORY_OWNER" -f name="${GH_REPO#*/}" \
+            -f tag="$tag" -f ref="refs/tags/$tag" -f query='
+              query($owner: String!, $name: String!, $tag: String!, $ref: String!) {
+                repository(owner: $owner, name: $name) {
+                  ref(qualifiedName: $ref) { name }
+                  release(tagName: $tag) { isDraft }
+                  latestRelease { tagName }
+                }
+              }' --jq '.data.repository')
+          if jq -e '.ref != null' <<< "$state" > /dev/null; then
+            tag_commit=$(gh api "repos/$GH_REPO/commits/$tag" --jq .sha)
+            if [[ "$tag_commit" != "$GITHUB_SHA" ]]; then
+              echo "::error::已有标签 $tag 指向其他提交"
+              exit 1
+            fi
+          fi
+          if jq -e '.release.isDraft == false' <<< "$state" > /dev/null; then
+            echo "$tag 已发布"
+            exit 0
+          fi
+          if jq -e '.release == null' <<< "$state" > /dev/null; then
+            gh release create "$tag" --draft --target "$GITHUB_SHA" --title "CODOL Windows x64 · $tag" \
+              --notes "下载 CODOL-Windows-x64.zip 并完整解压，将单独准备的游戏资源放在 CODOL.exe 旁的 resources/v1649370/packed/，然后双击 CODOL.exe。 [对应源码]($GITHUB_SERVER_URL/$GH_REPO/tree/$GITHUB_SHA)"
+          else
+            draft_target=$(gh release view "$tag" --json targetCommitish --jq .targetCommitish)
+            if [[ "$draft_target" != "$GITHUB_SHA" ]]; then
+              echo "::error::已有草稿 $tag 使用了其他发布目标"
+              exit 1
+            fi
+          fi
+          gh release upload "$tag" CODOL-Windows-x64.zip CODOL-Windows-x64.zip.sha256 --clobber
+          latest_tag=$(jq -r '.latestRelease.tagName // empty' <<< "$state")
+          make_latest=true
+          if [[ "$latest_tag" =~ ^build-([0-9]+)$ ]] && (( BASH_REMATCH[1] > GITHUB_RUN_NUMBER )); then
+            make_latest=false
+          fi
+          gh release edit "$tag" --target "$GITHUB_SHA" --draft=false --latest="$make_latest"

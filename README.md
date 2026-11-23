@@ -34,7 +34,6 @@ client/
 ├── resources/              固定版本运行资源
 ├── workspaces/             运行会话、缓存和构建中间材料
 ├── manifests/              输入版本清单
-├── licenses/               组件许可材料
 └── docs/                   架构与变更记录
 ```
 
@@ -77,7 +76,7 @@ resources/v1649370/packed/IIPS/IIPSDownload/
 & .\workspaces\nuitka-env\Scripts\python.exe .\tools\build_host.py --output ..\outputs\CODOL-Windows-x64
 ```
 
-`requirements-build.txt` 固定使用 Nuitka 4.3.5。每次构建使用一个尚不存在的输出目录。上述命令生成 `outputs/CODOL-Windows-x64/`，其中包含 GUI 入口 `CODOL.exe`、配置、原生组件、许可证和运行库。用户无需安装 Python。
+`requirements-build.txt` 固定使用 Nuitka 4.3.5。每次构建使用一个尚不存在的输出目录。上述命令生成 `outputs/CODOL-Windows-x64/`，其中包含 GUI 入口 `CODOL.exe`、配置、原生组件和运行库。用户无需安装 Python。
 
 游戏原包单独交付，构建产物不含 `resources/`。部署时把发行目录放到本地 NTFS 卷，再把已准备好的整个 `packed/` 目录放到 `CODOL.exe` 旁的 `resources/v1649370/` 下。部署完成后应能看到 `resources/v1649370/packed/packed-index.json.gz` 和 `resources/v1649370/packed/IIPS/IIPSDownload/`。用户双击 `CODOL.exe`，启动器读取同目录下的 `config/server.ini`。
 
@@ -91,7 +90,21 @@ if ($process.ExitCode -ne 0) { throw "客户端预检失败，退出码 $($proce
 
 开发时仍可在 `client/` 运行 `start_client.cmd`，直接使用源码和项目内的资源。
 
-发行目录不附带项目的 `.py` 文件。部分资源读取代码标有 `AGPL-3.0-or-later`。对外提供下载时，请一并保留许可证，并按第 6 节为所分发的受许可程序提供对应源码。例如，可以在二进制下载页同时提供该版本对应源码的免费下载链接。[许可证全文](licenses/AGPL-3.0.txt)
+发行目录不附带项目的 `.py` 文件。
+
+## 自动发布到 GitHub Releases
+
+首次启用时，在客户端仓库的 `master` 分支提交工作流和说明，然后推送。下面使用本机的远端名称 `client`。
+
+```powershell
+git add .github/workflows/release.yml README.md
+git commit -m "添加 Windows 客户端自动发布流程"
+git push client master
+```
+
+首次推送就会触发构建。以后每次推送到 `master`，GitHub Actions 都会检出这次推送的最后一个提交，在 Windows x64 上运行发行测试并构建程序。验证通过后发布一个版本，标签为 `build-<运行编号>`。如果运行失败，可以打开日志查看原因。遇到临时故障时选择 **Re-run failed jobs**，重试沿用原标签。[查看 Actions 运行记录](https://github.com/BeingIsA/Welcome_CODOL_Client/actions/workflows/release.yml)
+
+在 Release 的 **Assets** 下下载 `CODOL-Windows-x64.zip`，可用同页的 `CODOL-Windows-x64.zip.sha256` 核对文件。把 ZIP 解压到本地 NTFS 目录，将游戏原包放到 `CODOL.exe` 旁的 `resources/v1649370/packed/`，再双击 `CODOL.exe`。[下载 Releases](https://github.com/BeingIsA/Welcome_CODOL_Client/releases)
 
 ## 从源码启动客户端
 

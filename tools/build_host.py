@@ -1,6 +1,5 @@
 """编译 Windows 图形宿主，装配独立程序包；游戏资源单独部署。"""
 import argparse
-from importlib.metadata import distribution
 import os
 from importlib.resources import files
 from pathlib import Path
@@ -37,23 +36,6 @@ def compile_host(build_directory: Path) -> Path:
     return compiled_directory
 
 
-def copy_licenses(destination: Path) -> None:
-    destination.mkdir()
-    shutil.copy2(CLIENT_ROOT / 'licenses/AGPL-3.0.txt', destination)
-    shutil.copy2(Path(sys.base_prefix) / 'LICENSE.txt', destination / 'CPython.txt')
-    for name in ('Nuitka', 'pefile', 'capstone', 'pycryptodome', 'aplib', 'websockets'):
-        package = distribution(name)
-        notice_names = set(package.metadata.get_all('License-File') or ())
-        package_directory = destination / name
-        package_directory.mkdir()
-        for record in package.files or ():
-            if record.parts[0].endswith('.dist-info') and record.name in notice_names:
-                shutil.copy2(package.locate_file(record), package_directory / record.name)
-                notice_names.remove(record.name)
-        if notice_names:
-            raise FileNotFoundError(f'{name} 缺少许可材料：{sorted(notice_names)}')
-
-
 def assemble_release(compiled_directory: Path, destination: Path) -> None:
     shutil.copytree(compiled_directory, destination)
     runtime_files = (
@@ -66,7 +48,6 @@ def assemble_release(compiled_directory: Path, destination: Path) -> None:
         target = destination / relative_path
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
-    copy_licenses(destination / 'licenses')
     for path in destination.rglob('*'):
         if path.suffix.lower() in {'.py', '.pyw', '.pyi', '.pyc', '.pyo'}:
             raise ValueError(f'发行目录含 Python 源文件或字节码：{path}')
