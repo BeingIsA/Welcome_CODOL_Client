@@ -67,27 +67,19 @@ jobs:
           if-no-files-found: error
           overwrite: true
 
-  publish:
+  reserve_version:
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    # 多次推送可同时编译，串行分配版本号，避免两个提交占用同一标签。
+    outputs:
+      tag: ${{ steps.reserve.outputs.tag }}
     concurrency:
-      group: codol-client-publish
+      group: codol-client-version
       queue: max
     steps:
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: windows-release
-          path: assets
-
-      - name: 校验下载的程序包
-        working-directory: assets
-        run: sha256sum --check CODOL-Windows-x64.zip.sha256
-
-      - name: 发布本次推送
-        working-directory: assets
+      - name: 预留本次提交的版本号
+        id: reserve
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -114,14 +106,12 @@ jobs:
             fi
           done < "$RUNNER_TEMP/version-refs.tsv"
           tag=${tag:-"$tag_prefix$next_patch"}
-          # 一次读取已有标签、草稿和 Latest，查询失败时由 shell 终止发布。
           state=$(gh api graphql -f owner="$GITHUB_REPOSITORY_OWNER" -f name="${GH_REPO#*/}" \
             -f tag="$tag" -f ref="refs/tags/$tag" -f query='
               query($owner: String!, $name: String!, $tag: String!, $ref: String!) {
                 repository(owner: $owner, name: $name) {
                   ref(qualifiedName: $ref) { name }
                   release(tagName: $tag) { isDraft }
-                  latestRelease { tagName }
                 }
               }' --jq '.data.repository')
           if jq -e '.ref != null' <<< "$state" > /dev/null; then
@@ -130,10 +120,6 @@ jobs:
               echo "::error::已有标签 $tag 指向其他提交"
               exit 1
             fi
-          fi
-          if jq -e '.release.isDraft == false' <<< "$state" > /dev/null; then
-            echo "$tag 已发布"
-            exit 0
           fi
           if jq -e '.release.isDraft == true and .ref == null' <<< "$state" > /dev/null; then
             draft_target=$(gh release view "$tag" --json targetCommitish --jq .targetCommitish)
@@ -144,6 +130,46 @@ jobs:
           fi
           if jq -e '.ref == null' <<< "$state" > /dev/null; then
             gh api --method POST "repos/$GH_REPO/git/refs" -f ref="refs/tags/$tag" -f sha="$GITHUB_SHA" --silent
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: reserve_version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: codol-client-publish
+      queue: max
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: windows-release
+          path: assets
+
+      - name: 校验下载的程序包
+        working-directory: assets
+        run: sha256sum --check CODOL-Windows-x64.zip.sha256
+
+      - name: 发布 GitHub Release
+        working-directory: assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          tag: ${{ needs.reserve_version.outputs.tag }}
+        shell: bash
+        run: |
+          state=$(gh api graphql -f owner="$GITHUB_REPOSITORY_OWNER" -f name="${GH_REPO#*/}" \
+            -f tag="$tag" -f query='
+              query($owner: String!, $name: String!, $tag: String!) {
+                repository(owner: $owner, name: $name) {
+                  release(tagName: $tag) { isDraft }
+                  latestRelease { tagName }
+                }
+              }' --jq '.data.repository')
+          if jq -e '.release.isDraft == false' <<< "$state" > /dev/null; then
+            echo "$tag 已发布"
+            exit 0
           fi
           if jq -e '.release == null' <<< "$state" > /dev/null; then
             gh release create "$tag" --draft --verify-tag --target "$GITHUB_SHA" --title "CODOL $tag · Windows x64" \
@@ -162,3 +188,36 @@ jobs:
             fi
           fi
           gh release edit "$tag" --target "$GITHUB_SHA" --draft=false --latest="$make_latest"
+
+  publish_r2:
+    needs: reserve_version
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: windows-release
+          path: assets
+
+      - name: 校验下载的程序包
+        working-directory: assets
+        run: sha256sum --check CODOL-Windows-x64.zip.sha256
+
+      - name: 上传版本文件到 Cloudflare R2
+        working-directory: assets
+        env:
+          RELEASE_TAG: ${{ needs.reserve_version.outputs.tag }}
+          R2_BUCKET: ${{ vars.R2_BUCKET }}
+          R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+        shell: bash
+        run: |
+          : "${R2_BUCKET:?缺少 R2_BUCKET}" "${R2_ENDPOINT:?缺少 R2_ENDPOINT}"
+          : "${AWS_ACCESS_KEY_ID:?缺少 R2_ACCESS_KEY_ID}" "${AWS_SECRET_ACCESS_KEY:?缺少 R2_SECRET_ACCESS_KEY}"
+          destination="s3://$R2_BUCKET/releases/$RELEASE_TAG"
+          for file in CODOL-Windows-x64.zip CODOL-Windows-x64.zip.sha256; do
+            aws s3 cp "$file" "$destination/$file" --endpoint-url "$R2_ENDPOINT" --only-show-errors
+          done

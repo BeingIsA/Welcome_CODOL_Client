@@ -92,7 +92,7 @@ if ($process.ExitCode -ne 0) { throw "客户端预检失败，退出码 $($proce
 
 发行目录不附带项目的 `.py` 文件。
 
-## 自动发布到 GitHub Releases
+## 自动发布到 GitHub Releases 和 Cloudflare R2
 
 首次启用时，在客户端仓库的 `master` 分支提交工作流和说明，然后推送。下面使用本机的远端名称 `client`。
 
@@ -105,6 +105,8 @@ git push client master
 每次推送到 `master`，GitHub Actions 都会检出这次推送的最后一个提交，在 Windows x64 上运行发行测试并构建程序。构建通过后，工作流按进入发布步骤的顺序分配版本号。当前系列从 `v0.1.0` 起步，之后依次发布 `v0.1.1`、`v0.1.2`。旧提交晚于新提交发布时，新提交的版本保留 **Latest** 标记。
 
 日常修订只需推送代码。要开启新系列，在提交中把 `src/codol_rebuild/__init__.py` 的 `__version__` 改为起始版本，例如 `0.2.0` 或 `1.0.0`。该系列的首个 Release 就使用这个版本号。[版本配置](src/codol_rebuild/__init__.py)
+
+版本预留成功后，GitHub Release 和 Cloudflare R2 两个任务并行下载同一份构建产物，各自校验 SHA-256。R2 将 ZIP 和校验文件上传到桶内的 `releases/<版本标签>/`。在仓库 Actions Variables 设置 `R2_BUCKET` 和 `R2_ENDPOINT`，在 Actions Secrets 设置 `R2_ACCESS_KEY_ID` 和 `R2_SECRET_ACCESS_KEY`。
 
 遇到临时故障时，在 Actions 中选择 **Re-run failed jobs**。如果工作流已经为该提交预留了版本号，重试会接着发布同一版本。[查看 Actions 运行记录](https://github.com/BeingIsA/Welcome_CODOL_Client/actions/workflows/release.yml)
 
