@@ -5,7 +5,7 @@ from urllib.parse import urlsplit
 from codol_rebuild.core.paths import REBUILD_ROOT as ROOT
 from codol_rebuild.bootstrap.config import parse_args
 from codol_rebuild.bootstrap.logging_setup import session_logging
-from codol_rebuild.bootstrap.resource_setup import prepare, FORBIDDEN
+from codol_rebuild.bootstrap.resource_setup import close_runtime_resources, prepare, FORBIDDEN
 from codol_rebuild.adapters.game.v1649370.accounts.profile_codec import AccountCodec
 from codol_rebuild.application.accounts.service import AccountSession
 from codol_rebuild.application.errors import OnlineError
@@ -55,9 +55,11 @@ def run_session(args, reporter):
     broadcast_session = None
     realtime_dispatcher = None
     runtime_lease = None
+    packed_view = None
     try:
         prepared=prepare(args,run_dir,stage,log,phase_done)
         runtime_lease = prepared.get('runtime_lease')
+        packed_view = prepared.get('packed_view')
         if runtime_lease is not None:
             process.stage = runtime_lease.path
             process.runtime_lease = runtime_lease
@@ -121,6 +123,7 @@ def run_session(args, reporter):
         finally:
             try:process.close()
             finally:
+                close_runtime_resources(runtime_lease, packed_view, log)
                 if online_session:
                     try:online_session.close()
                     except Exception as error:
@@ -144,8 +147,6 @@ def run_session(args, reporter):
                     try:broadcast_session.close()
                     except Exception as error:
                         log['broadcast_cleanup_error'] = str(error)
-                if runtime_lease is not None:
-                    runtime_lease.close()
     return log
 
 
@@ -154,7 +155,7 @@ def main(argv=None):
     result=run(parse_args(argv))
     print(json.dumps({k:v for k,v in result.items() if k not in ('events','modules','traceback','patches')},ensure_ascii=False,indent=2))
     cleanup=result.get('guard_cleanup',{})
-    failed=(result.get('error') or result.get('profile_save_error') or result.get('stop_reason') in ('unhandled_exception','forbidden_module_before_initialization','fatal_dialog')
+    failed=(result.get('error') or result.get('profile_save_error') or result.get('packed_view_cleanup_error') or result.get('stop_reason') in ('unhandled_exception','forbidden_module_before_initialization','fatal_dialog')
             or result.get('exit_code',0)!=0 or result.get('child_terminated') is False
             or result.get('guard_cleanup_timeout') or cleanup.get('error') or cleanup.get('engine_close_status',0)!=0)
     return 1 if failed else 0

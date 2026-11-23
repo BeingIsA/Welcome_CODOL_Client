@@ -41,9 +41,9 @@ client/
 
 ## 环境准备
 
-- **系统**：Windows。实际运行依赖 Win32 API、低权限令牌、目录联接及原生组件。
-- **Python**：现有启动脚本固定使用 `C:\Python314\python.exe`。以下命令沿用此路径；使用其他安装路径时，可直接调用 Python 启动入口。
-- **输入与资源**：需要匹配 1649370 的输入文件、固定离线镜像、守卫、补丁记录及已准备好的资源库。仅有 Python 源码和依赖不能完成启动。
+- Windows 客户端使用 Cloud Files 在本地 NTFS 卷上按需提供游戏文件。
+- 源码版启动脚本通过 PATH 调用 64 位 Python。以下示例使用本机安装路径。
+- 发行资源解压到 `client/`。游戏使用项目内的终版原包、读取组件、固定镜像、守卫和补丁。
 
 在 `client/` 目录打开 PowerShell，安装依赖：
 
@@ -56,25 +56,27 @@ client/
 ```text
 bin/v1649370/codol1649370-offline.exe
 bin/offline_guard.exe
-resources/v1649370/offline-menu-patches.json
-resources/v1649370/offline-resources/
-resources/v1649370/offline-image-library/
-resources/v1649370/offline-loose-library/
+manifests/offline-menu-patches.json
+bin/v1649370/packed-reader/ifs_reader.exe
+bin/v1649370/packed-reader/cloud_files.dll
+resources/v1649370/packed/packed-index.json.gz
+resources/v1649370/packed/IIPS/IFS2.dll
+resources/v1649370/packed/IIPS/IIPSDownload/
 ```
 
-镜像和补丁会进行固定指纹检查，不可用其他版本文件直接替换。资源来源、准备流程及清单约定见[固定版本运行资源](resources/v1649370/README.md)，镜像说明见[离线运行基底](bin/v1649370/README.md)。
+镜像和补丁会进行固定指纹检查，不可用其他版本文件直接替换。资源来源、准备流程及清单约定见[固定版本运行资源](docs/终版原包资源.md)，镜像说明见[离线运行基底](bin/v1649370/README.md)。
 
 ## 启动客户端
 
 以下命令均在 `client/` 目录执行。
 
-### 1. 校验输入版本
+### 1. 核验自带资源
 
 ```powershell
-& C:\Python314\python.exe -B -X utf8 .\run.py check
+python -B -X utf8 .\tools\launch_client.py --prepare-only --verify-resources
 ```
 
-此命令按 `manifests/build1649370.json` 校验关键输入，不启动游戏。
+此命令按固定索引核验包文件与包外依赖，准备运行目录后退出。
 
 ### 2. 检查启动计划
 
@@ -90,17 +92,14 @@ resources/v1649370/offline-loose-library/
 .\start_client.cmd
 ```
 
-也可双击 `start_client.cmd`。脚本默认启用本地档案，并使用固定图片库与松散资源库，运行到关闭客户端或发生致命错误。
+也可双击 `start_client.cmd`。启动器从自身目录下的 `resources/v1649370/packed/` 查找资源。游戏首次访问某个资源时，读取组件从本地 IFS 提供该文件。
 
 启动过程中临时断网守卫可能请求 UAC，Python 宿主保持当前用户权限，客户端使用低权限令牌。守卫未就绪时不会恢复客户端执行。
 
 需要使用其他 Python 路径时，可按以下参数直接调用启动工具：
 
 ```powershell
-& C:\Python314\python.exe -B -X utf8 .\tools\launch_client.py `
-  --resource-library .\resources\v1649370\offline-image-library `
-  --loose-library .\resources\v1649370\offline-loose-library `
-  --local-profile
+& C:\Python314\python.exe -B -X utf8 .\tools\launch_client.py --local-profile --server-config .\config\server.ini
 ```
 
 常用参数可追加到启动脚本后：
@@ -142,8 +141,8 @@ resources/v1649370/offline-loose-library/
 
 - **持久数据**：服务端保存角色档案和仓库。本机的 `%APPDATA%/CODOL/data/accounts/server-identities.json` 用于找回服务端身份，原生设置位于 `%APPDATA%/CODOL/players/`。
 - **会话产物**：每次实际运行在 `workspaces/offline-runs/<会话名>/` 中保存独立程序副本、配置及诊断产物；启动输出会给出对应目录。
-- **固定资源**：`resources/v1649370/` 提供基础覆盖层、图片库和模型音频等松散资源库。
-- **直接共享资源**：普通启动校验并保护固定资源库，通过目录联接直接访问，不再复制整库；`workspaces/resource-library-verification/` 仅保存校验记录。运行期间不要替换源资源库。诊断补件模式仍使用 `workspaces/offline-resource-cache/`，旧缓存清理前须考虑已有会话引用。
+- **自带资源**：终版 IFS、包外依赖与索引随客户端放在 `resources/v1649370/packed/`。
+- **按需缓存**：游戏访问某个文件时才填充其内容。宿主在游戏退出后关闭视图并释放本次缓存；玩家设置保存在独立目录。
 
 不要直接修改固定离线镜像。宿主会先将其复制到会话目录，再应用运行补丁。`workspaces/` 还包含资源输入副本和提取中间材料，不能整体当作可丢弃缓存；清理会话时也不能递归穿过资源目录联接。详见[工作目录说明](workspaces/README.md)。
 
@@ -177,7 +176,7 @@ resources/v1649370/offline-loose-library/
 | 文档 | 内容 |
 | --- | --- |
 | [客户端架构设计](docs/架构设计.md) | 模块边界、账号策略、运行装配与依赖方向 |
-| [固定版本运行资源](resources/v1649370/README.md) | 资源内容、准备流程与清单约定 |
+| [固定版本运行资源](docs/终版原包资源.md) | 资源内容、准备流程与清单约定 |
 | [离线运行基底](bin/v1649370/README.md) | 固定镜像来源、指纹与使用方式 |
 | [客户端自动化测试](tests/README.md) | 测试范围、夹具与环境依赖 |
 

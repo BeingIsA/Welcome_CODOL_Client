@@ -206,4 +206,5 @@ class NativeLibraryTests(unittest.TestCase):
                     parse_args(['--name', 'test', legacy, 'old'])
             with self.assertRaises(SystemExit):
                 parse_args(['--name', 'test', '--supply-resources'])
-        self.assertEqual(parse_args(['--name', 'test']).native_library.name, 'game')
+        self.assertIsNone(parse_args(['--name', 'test']).native_library)
+        self.assertEqual(parse_args(['--name', 'test', '--native-library', 'expanded']).native_library, Path('expanded'))

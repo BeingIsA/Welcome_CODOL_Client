@@ -16,7 +16,7 @@ def pair(label):
 def codec():
     result = Mock()
     result.initialization_data.return_value = {
-        'progression': {}, 'starting_loadouts': [], 'default_character': 545, 'initial_item_ids': [11]}
+        'progression': {}, 'starting_loadouts': [], 'default_character': 545}
     result.initialize.return_value = pair(b'default'), {}
     result.migrate.side_effect = dict
     return result
@@ -99,7 +99,7 @@ class OnlineProfileTests(unittest.TestCase):
 
     def test_offline_sessions_always_start_with_their_temporary_defaults(self):
         offline = AccountSession(codec())
-        self.assertEqual(offline.initialize()['initialization']['owned_ids'], [11])
+        self.assertEqual(offline.initialize()['initialization']['owned_ids'], [])
         self.assertTrue(offline.initial_profile_ready)
         offline.save(pair(b'offline edit'))
         restarted = AccountSession(codec())

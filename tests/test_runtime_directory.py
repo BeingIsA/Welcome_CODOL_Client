@@ -122,7 +122,12 @@ class RuntimeDirectoryTests(unittest.TestCase):
             mocks.enter_context(patch.object(resource_setup, 'protect_cache'))
             mocks.enter_context(patch.object(resource_setup, 'apply_runtime_acl'))
             mocks.enter_context(patch.object(resource_setup, 'prepare_runtime_image', side_effect=prepare_image))
+            # 首次安装失败后应释放槽位，下一次仍能在同一槽位发布完整目录。
+            with patch.object(resource_setup, 'protect_cache', side_effect=OSError('injected failure')):
+                with self.assertRaisesRegex(OSError, 'injected failure'):
+                    prepare('interrupted')
             first, first_log = prepare('first')
+            self.assertEqual(first['runtime_lease'].slot.name, 'slot-0001')
             executable_identity = first['exe'].stat().st_ino
             first['runtime_lease'].close()
             with patch.object(resource_setup.shutil, 'copyfile', side_effect=AssertionError('unexpected copy')):

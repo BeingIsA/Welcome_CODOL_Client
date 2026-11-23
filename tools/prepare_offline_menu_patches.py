@@ -15,7 +15,7 @@ IMAGE_SHA = '55f067ac24e7d5ea9bea5acd46a1514eb1b7780a627b73c2094f41133dce3ffd'
 
 def main() -> None:
     image = ROOT / 'bin/v1649370/codol1649370-offline.exe'
-    patch_path = ROOT / 'resources/v1649370/offline-menu-patches.json'
+    patch_path = ROOT / 'manifests/offline-menu-patches.json'
     report_path = ROOT.parent / 'research/client/evidence/startup-command-whitelist.json'
     if patch_path.exists() or report_path.exists():
         raise ValueError('输出已存在，拒绝覆盖补丁或证据')
@@ -141,15 +141,18 @@ def main() -> None:
                   '不是-q清空整个命令行；过滤证据独立于-q入口校验。',
                   '补丁不设登录成功，不写ready，不移除全量命令过滤，尚未实测主菜单。']}
     report['patches'] = patches
-    runtime_patches = [
-        {key: patch[key] for key in ('va', 'before', 'after')}
-        for patch in patches
-    ]
+    # 本报告分析启动白名单；交付清单还包括正式入口已核验的两项灵敏度补丁。
+    from launch_client import PATCH_BYTES
+    report_patches = [(patch['va'], patch['before'], patch['after']) for patch in patches]
+    if tuple(report_patches) != PATCH_BYTES[:len(report_patches)]:
+        raise ValueError('启动白名单研究结果与正式入口不符')
+    runtime_patches = [dict(va=address, before=before, after=after)
+                       for address, before, after in PATCH_BYTES]
     for path,value in ((patch_path,runtime_patches),(report_path,report)):
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open('x',encoding='utf-8') as stream:
             json.dump(value,stream,ensure_ascii=False,indent=2);stream.write('\n')
-    print(json.dumps({'patches':str(patch_path),'report':str(report_path),'total_patches':len(patches),
+    print(json.dumps({'patches':str(patch_path),'report':str(report_path),'total_patches':len(runtime_patches),
                       'new_patch_bytes':12,'game_executed':False},ensure_ascii=False))
 
 

@@ -6,18 +6,18 @@ from pathlib import Path
 from urllib.parse import urlsplit
 from codol_rebuild.core.paths import REBUILD_ROOT as ROOT, accounts_dir
 
-def parse_args(argv=None):
+def build_parser():
     """显式单次命令，所有会话放项目目录；不会把未验收窗口判成成功。"""
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--image',type=Path,default=ROOT/'bin/v1649370/codol1649370-offline.exe')
     parser.add_argument('--name',required=True)
-    parser.add_argument('--verify-resources',action='store_true',help='强制资源 SHA-256 全量复核')
+    parser.add_argument('--verify-resources',action='store_true',help='复核全部 IFS 原包与包外文件；显式展开库模式复核展开文件')
     parser.add_argument('--prepare-only',action='store_true',help='仅准备运行目录并计时，不创建客户端或守卫')
     lifetime=parser.add_mutually_exclusive_group()
     lifetime.add_argument('--seconds',type=int,default=30)
     lifetime.add_argument('--until-close',action='store_true')
     parser.add_argument('--patches',type=Path)
-    parser.add_argument('--native-library',type=Path,default=ROOT/'resources/v1649370/game',help='完整原生资源根，只联接顶层目录')
+    parser.add_argument('--native-library',type=Path,help='开发对照用的展开资源目录；省略时读取随项目交付的原包')
     parser.add_argument('--trace-files',action='store_true')
     parser.add_argument('--trace-native-exit', action='store_true', default=True, help='启用一次性原生退出诊断断点（默认开启）')
     parser.add_argument('--no-trace-native-exit', action='store_false', dest='trace_native_exit', help='关闭原生退出诊断')
@@ -27,13 +27,20 @@ def parse_args(argv=None):
     parser.add_argument('--server-url',help='启用服务端登录与房间接口，例如 http://127.0.0.1:8080')
     parser.add_argument('--server-timeout',type=float,default=5.0,help='业务请求超时秒数（0.1～30）')
     parser.add_argument('--server-identity',type=Path,
-                        default=accounts_dir()/'server-identities.json',
+                        default=None,
                         help='服务器身份文件；验证时指定隔离路径')
     parser.add_argument('--capture-schema',action='store_true',
                         help='在前端帧只读扫描 DDL 指纹并导出档案结构定义（不写目标进程）')
     parser.add_argument('--breakpoint',action='append',default=[])
     parser.add_argument('argument',nargs='*')
-    args=parser.parse_args(argv)
+    return parser
+
+
+def parse_args(argv=None):
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.server_identity is None:
+        args.server_identity = accounts_dir() / 'server-identities.json'
     args.server_address = None
     if not 1 <= args.client_port <= 65535:
         parser.error('客户端UDP端口必须为1～65535')

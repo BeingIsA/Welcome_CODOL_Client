@@ -1,5 +1,4 @@
 """验证新档授权、余额保存与旧档兼容，不接入游戏运行目录。"""
-import csv
 import json
 import re
 from pathlib import Path
@@ -40,12 +39,9 @@ class InitializationTests(unittest.TestCase):
         preserved, _ = codec.initialize({'profiles': profiles, 'uid': 1}, policy)
         self.assertEqual(preserved['public'], profiles['public'])
 
-    def test_offline_default_camo_grants_and_loadouts(self):
+    def test_offline_new_account_has_empty_inventory_and_default_profile(self):
         from codol_rebuild.adapters.game.v1649370.accounts.profile_codec import AccountCodec
         captured = json.loads((ROOT/'research/account-initialization/capture/market-memory.json').read_text(encoding='utf-8'))
-        with (ROOT/'client/resources/迷彩表.csv').open(encoding='utf-8-sig', newline='') as resource_file:
-            expected_ids = sorted(int(item_row['物品ID']) for item_row in csv.DictReader(resource_file))
-        self.assertEqual(len(expected_ids), 2860)
         tables = {**captured['tables'], 'mp/coStartingLoadoutSetting.csv': []}
         schemas = {kind: json.loads(Path(captured['schemas'][label]['schema']).read_text(encoding='utf-8'))
                    for kind, label in [('public', 'playerdata'), ('secure', 'playersecuredata')]}
@@ -68,12 +64,8 @@ class InitializationTests(unittest.TestCase):
             inventory_memory[address:address + len(content)] = content
         inventory_report = populate_inventory(read_inventory, write_inventory, 0,
             captured['catalog'], 0, created['initialization']['owned_ids'])
-        self.assertEqual(inventory_report['items'], len(expected_ids))
-        inventory_items = [struct.unpack_from('<II', inventory_memory, inventory_index * STRIDE + 0x40)
-                           for inventory_index in range(len(expected_ids))]
-        self.assertEqual(sorted(inventory_items), [(item_id, 1) for item_id in expected_ids])
-
-        self.assertEqual(created['initialization']['owned_ids'], expected_ids)
+        self.assertEqual(inventory_report['items'], 0)
+        self.assertEqual(created['initialization']['owned_ids'], [])
         self.assertEqual(codec.validate_snapshot(created['profiles']), 545)
 
         from codol_rebuild.adapters.game.profile_format.fields import Fields
@@ -90,11 +82,11 @@ class InitializationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_account_native_contract(lambda a, n: bytes(n))
 
-    def test_new_account_uses_explicit_grants(self):
+    def test_new_account_has_empty_initial_inventory_and_starting_balances(self):
         from codol_rebuild.application.accounts.policy import validate_initialization
-        data = {'progression': {'rank': 70}, 'default_character': 545, 'starting_loadouts': [], 'initial_item_ids': [570, 2]}
+        data = {'progression': {'rank': 70}, 'default_character': 545, 'starting_loadouts': []}
         policy = new_account_policy(data)
-        self.assertEqual(policy['initialization'], {'version': 1, 'owned_ids': [2, 570], 'gp': 2000000000, 'cp': 100000})
+        self.assertEqual(policy['initialization'], {'version': 1, 'owned_ids': [], 'gp': 2000000000, 'cp': 100000})
         self.assertEqual(validate_initialization(policy['initialization']), policy['initialization'])
         self.assertTrue(policy['fill_unlock_flags'])
         self.assertEqual(policy['unlock_threshold'], 32767)

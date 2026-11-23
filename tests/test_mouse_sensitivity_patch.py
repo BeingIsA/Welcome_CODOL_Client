@@ -18,7 +18,7 @@ class MouseSensitivityPatchTests(unittest.TestCase):
                                 and any(isinstance(target, ast.Name) and target.id == 'PATCH_BYTES'
                                         for target in statement.targets))
         approved_patches = ast.literal_eval(patch_assignment.value)
-        patch_list = json.loads((client_root / 'resources/v1649370/offline-menu-patches.json').read_text())
+        patch_list = json.loads((client_root / 'manifests/offline-menu-patches.json').read_text())
         self.assertEqual([(patch['va'], patch['before'], patch['after']) for patch in patch_list],
                          list(approved_patches))
 
@@ -27,7 +27,7 @@ class MouseSensitivityPatchTests(unittest.TestCase):
         image_path = client_root / 'bin/v1649370/codol1649370-offline.exe'
         original_image = image_path.read_bytes()
         executable = pefile.PE(data=original_image)
-        patch_list = json.loads((client_root / 'resources/v1649370/offline-menu-patches.json').read_text())
+        patch_list = json.loads((client_root / 'manifests/offline-menu-patches.json').read_text())
         patched_image = bytearray(original_image)
         input_patches = [patch for patch in patch_list
                          if 0x5B1770 <= int(patch['va'], 0) < 0x5B183A]

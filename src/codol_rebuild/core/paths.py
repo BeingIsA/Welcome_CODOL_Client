@@ -4,9 +4,13 @@
 与程序目录解耦；程序目录仅保留可重建的固定资源、缓存与会话日志。
 """
 import os
+import sys
 from pathlib import Path
 
-REBUILD_ROOT = Path(__file__).resolve().parents[3]
+if '__compiled__' in globals():
+    REBUILD_ROOT = Path(sys.executable).resolve().parent
+else:
+    REBUILD_ROOT = Path(__file__).resolve().parents[3]
 PROJECT_ROOT = REBUILD_ROOT.parent
 
 # 持久用户数据根目录：Windows 下取 %APPDATA%（漫游）下的 CODOL 子目录。

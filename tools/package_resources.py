@@ -1,4 +1,4 @@
-"""按 Git 忽略规则打包本地版本资源；运行即创建标准 ZIP 分卷。"""
+"""按终版索引打包独立运行所需的原包、读取组件和菜单补丁。"""
 from __future__ import annotations
 
 import argparse
@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import os
 import re
 import time
@@ -13,6 +14,10 @@ from collections import deque
 
 
 CLIENT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(CLIENT_ROOT / 'src'))
+from codol_rebuild.resources.packed_library import INDEX_NAME, read_packed_index
+from codol_rebuild.resources.packed_view import PACKED_READER_FILES
+
 VOLUME_LIMIT = 2_500_000_000
 
 
@@ -62,27 +67,23 @@ def run_with_progress(command: list[str], directory: Path, label: str, file_coun
 
 
 def collect_resources(client_root: Path) -> list[Path]:
-    """包含被忽略的版本资源；拒绝链接，避免跨目录读取或递归联接。"""
-    resource_root = client_root / 'resources' / 'v1649370'
-    candidates = []
-    directories = [resource_root]
-    while directories:
-        directory = directories.pop()
-        for resource_path in directory.iterdir():
-            if resource_path.is_symlink() or resource_path.is_junction():
-                raise ValueError('资源不能包含链接：' + str(resource_path))
-            if resource_path.is_dir():
-                directories.append(resource_path)
-            elif resource_path.is_file():
-                candidates.append(resource_path.relative_to(client_root).as_posix())
-    # --no-index 同时识别尚未从索引移除、但已被规则忽略的旧清单。
-    result = subprocess.run(
-        ['git', '-C', str(client_root), 'check-ignore', '--no-index', '-z', '--stdin'],
-        input=('\0'.join(candidates) + '\0').encode('utf-8'), capture_output=True,
-    )
-    if result.returncode not in (0, 1):
-        raise RuntimeError(result.stderr.decode('utf-8', errors='replace'))
-    return sorted(client_root / name.decode('utf-8') for name in result.stdout.split(b'\0') if name)
+    """按独立索引核验发布输入，开发用展开库及构建工作区不参与枚举。"""
+    client_root = client_root.resolve()
+    resource_directory = client_root / 'resources'
+    version_directory = resource_directory / 'v1649370'
+    packed_root = version_directory / 'packed'
+    reader_directory = client_root / 'bin/v1649370/packed-reader'
+    index = read_packed_index(packed_root, verify_resources=True)
+    files = [
+        packed_root / INDEX_NAME,
+        *(packed_root / name for name in index.physical_files),
+        *(reader_directory / name for name in PACKED_READER_FILES),
+        client_root / 'manifests/offline-menu-patches.json',
+    ]
+    for resource_path in files:
+        if resource_path.resolve(strict=True) != resource_path or not resource_path.is_file():
+            raise ValueError('发布文件不是客户端目录内的普通文件：' + str(resource_path))
+    return sorted(files)
 
 
 def write_archive(client_root: Path, resources: list[Path], output: Path, limit: int = VOLUME_LIMIT) -> None:
@@ -120,21 +121,17 @@ def write_archive(client_root: Path, resources: list[Path], output: Path, limit:
 
 
 def main() -> None:
-    """收集被忽略资源，检查空间并直接输出完整分卷包。"""
+    """核验独立客户端资源并输出标准 ZIP 分卷。"""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, help='输出名称基准，如 D:/packages/resources.zip；生成 .z01、.z02 和 .zip')
     options = parser.parse_args()
-    print('正在扫描资源并匹配 Git 忽略规则……', flush=True)
+    print('正在核验项目自带的终版原包和配套组件……', flush=True)
     resources = collect_resources(CLIENT_ROOT)
-    required = CLIENT_ROOT / 'resources/v1649370/native-library-manifest.json'
-    if required not in resources or not any(
-            resource.is_relative_to(required.parent / 'game') for resource in resources):
-        raise ValueError('缺少完整游戏资源或配套完成清单')
     total_bytes = sum(resource.stat().st_size for resource in resources)
     output = (options.output or CLIENT_ROOT / 'workspaces/resource-packages' /
               ('resources-1649370-' + datetime.now().strftime('%Y%m%d-%H%M%S') + '.zip')).resolve()
     print(f'文件数：{len(resources)}；原始大小：{total_bytes / 1024**3:.2f} GiB；输出：{output}')
-    print('包含所有被 Git 忽略的版本资源、历史材料及生成清单；解压目标为 client 目录。')
+    print('包含终版原包、独立索引、原生读取组件和菜单补丁。解压目标为 client 目录。')
     print(f'标准 ZIP 分卷，每卷不超过 {VOLUME_LIMIT:,} 字节；所有分卷放在一起，从 .zip 解压。')
     existing_parent = output.parent
     while not existing_parent.exists():
