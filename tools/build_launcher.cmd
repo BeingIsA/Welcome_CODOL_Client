@@ -1,6 +1,6 @@
 @echo off
 setlocal
-pushd "%~dp0" || exit /b 1
+pushd "%~dp0.." || exit /b 1
 set "PYTHONPATH=%CD%\src"
 set "BUILD_PYTHON=..\verification\client\workspaces\host-build-env\Scripts\python.exe"
 if exist "%BUILD_PYTHON%" goto compile
@@ -12,9 +12,8 @@ if not exist "%BUILD_PYTHON%" (
 
 :compile
 "%BUILD_PYTHON%" -m nuitka --mode=onefile --enable-plugin=tk-inter --msvc=latest --assume-yes-for-downloads --windows-console-mode=disable --windows-icon-from-exe=bin/v1649370/codol1649370-offline.exe --output-filename=CODOLLauncher.exe --output-dir=workspaces/launcher-build tools/launch_updater.py || goto failed
-if not exist "..\outputs\" mkdir "..\outputs" || goto failed
-copy /y "workspaces\launcher-build\CODOLLauncher.exe" "..\outputs\CODOLLauncher.exe" >nul || goto failed
-echo Built: "%CD%\..\outputs\CODOLLauncher.exe"
+copy /y "workspaces\launcher-build\CODOLLauncher.exe" "CODOLLauncher.exe" >nul || goto failed
+echo Built: "%CD%\CODOLLauncher.exe"
 popd
 exit /b 0
 
