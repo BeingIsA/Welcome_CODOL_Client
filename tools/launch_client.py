@@ -48,7 +48,9 @@ def build_plan(options: argparse.Namespace) -> dict:
         from codol_rebuild.resources.packed_view import PACKED_READER_FILES
         resource_root = ROOT / 'resources/v1649370/packed'
         reader_directory = ROOT / 'bin/v1649370/packed-reader'
-        for path in (resource_root / INDEX_NAME, *(reader_directory / name for name in PACKED_READER_FILES)):
+        if not (resource_root / INDEX_NAME).is_file():
+            raise ValueError(f'缺少游戏资源。请将配套资源放入 {resource_root}，其中须包含 {INDEX_NAME}。')
+        for path in (reader_directory / name for name in PACKED_READER_FILES):
             if not path.is_file():
                 raise ValueError(f'客户端缺少随包交付的文件：{path}')
         # 正常启动由装配步骤读取一次索引。仅预检时也要核实来源文件齐备。
@@ -113,12 +115,25 @@ def build_plan(options: argparse.Namespace) -> dict:
             'capture_schema': options.capture_schema,
             'output_directory': str(ROOT / 'workspaces/offline-runs' / session),
             'lifetime': 'until-close' if options.seconds is None else 'bounded',
-            'seconds': options.seconds, 'python': sys.executable,
+            'seconds': options.seconds,
+            **({'host_executable': str(ROOT / 'CODOL.exe')} if '__compiled__' in globals()
+               else {'python': sys.executable}),
             'host_identity': '当前 Python 用户和权限；入口不请求提升宿主',
             'uac': '仅临时断网守卫；客户端使用低权限令牌且守卫未就绪时不恢复执行',
             'resource_library_root': str(resource_root), 'resource_library_policy': resource_policy,
             'missing_host_options': [], 'entrypoint': 'codol_rebuild.bootstrap.launch.main',
             'arguments': arguments}
+
+
+def report_start_error(message: str) -> None:
+    """命令行输出机器可读错误，双击发行版时通过 Windows 提示用户。"""
+    stream = sys.stderr if sys.stderr is not None else sys.stdout
+    if stream is not None:
+        print(json.dumps({'error': message, 'main_menu_verified': False}, ensure_ascii=False),
+              file=stream)
+    elif '__compiled__' in globals():
+        from ctypes import windll
+        windll.user32.MessageBoxW(None, message, 'CODOL 启动失败', 0x10)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -142,6 +157,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--verify-resources',action='store_true',help='强制资源 SHA-256 全量复核')
     parser.add_argument('--prepare-only',action='store_true',help='仅准备并测量启动目录，不运行游戏')
     parser.add_argument('--dry-run', action='store_true', help='只显示计划及检查支持情况，不启动')
+    if '__compiled__' in globals():
+        # 双击发行版 EXE 时沿用 start_client.cmd 的档案和服务器配置。
+        parser.set_defaults(local_profile=True, server_config=ROOT / 'config/server.ini')
     options = parser.parse_args(argv)
     if not 0.1 <= options.server_timeout <= 30:
         parser.error('--server-timeout 必须为 0.1～30 秒')
@@ -159,11 +177,19 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         # 保持当前用户/令牌，不启动额外提升 shell；仅宿主内部的守卫使用 runas。
         from codol_rebuild.bootstrap.launch import main as debug_main
-        return debug_main(plan['arguments'])
+        exit_code = debug_main(plan['arguments'])
+        if exit_code and sys.stdout is None and sys.stderr is None:
+            report_start_error(f"本次运行失败，详细记录见 {Path(plan['output_directory']) / 'result.json'}")
+        return exit_code
     except (OSError, ValueError, SyntaxError, configparser.Error) as error:
-        print(json.dumps({'error': str(error), 'main_menu_verified': False}, ensure_ascii=False), file=sys.stderr)
+        report_start_error(str(error))
         return 1
 
 
 if __name__ == '__main__':
+    if '__compiled__' in globals():
+        # 与源码入口的 -X utf8 一致，重定向日志时也能保留中文。
+        for stream in (sys.stdout, sys.stderr):
+            if stream is not None:
+                stream.reconfigure(encoding='utf-8')
     raise SystemExit(main())

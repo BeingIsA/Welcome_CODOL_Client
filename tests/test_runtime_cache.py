@@ -44,6 +44,41 @@ class RuntimeCacheTests(unittest.TestCase):
                 prepare_library(*args)
 
 
+    @unittest.skipUnless(os.name == 'nt', 'Windows GUI 启动')
+    def test_gui_acl_commands_work_without_standard_input(self):
+        """双击启动没有可继承的标准输入，权限命令仍应静默完成并报告真实失败。"""
+        import _winapi
+        from ctypes import WinError
+        from codol_rebuild.platform.resource_acl import apply_runtime_acl
+        from codol_rebuild.platform.resource_cache_acl import protect_cache
+
+        original_get_handle = _winapi.GetStdHandle
+
+        def get_handle_without_input(handle_type):
+            if handle_type == _winapi.STD_INPUT_HANDLE:
+                raise WinError(6)
+            return original_get_handle(handle_type)
+
+        with (tempfile.TemporaryDirectory() as folder,
+              patch.object(_winapi, 'GetStdHandle', side_effect=get_handle_without_input),
+              patch.object(subprocess, 'run', wraps=subprocess.run) as run_command):
+            for function, name, error_message in (
+                (protect_cache, 'cache', '共享资源保护失败'),
+                (apply_runtime_acl, 'runtime', '独立运行目录ACL失败'),
+            ):
+                with self.subTest(directory=name):
+                    directory = Path(folder) / name
+                    directory.mkdir()
+                    function(directory)
+                    with patch.object(subprocess, 'run', return_value=subprocess.CompletedProcess(
+                            ['icacls'], 1, b'', b'access denied')):
+                        with self.assertRaisesRegex(RuntimeError, error_message + ': access denied'):
+                            function(directory)
+            for invocation in run_command.call_args_list:
+                self.assertEqual(invocation.args[0][0], 'icacls')
+                self.assertTrue(invocation.kwargs['creationflags'] & subprocess.CREATE_NO_WINDOW)
+
+
     @unittest.skipUnless(os.name == 'nt', 'Windows junction')
     def test_junction_readable_but_cache_not_writable_by_client(self):
         from codol_rebuild.platform.resource_mount import mount_resource

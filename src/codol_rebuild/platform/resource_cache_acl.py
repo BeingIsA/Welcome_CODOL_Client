@@ -12,8 +12,8 @@ def protect_cache(path):
     for options in [('/grant:r', '*' + current_sid() + ':(OI)(CI)F', '/T'),
                     ('/setintegritylevel', '(OI)(CI)M', '/T'),
                     ('/inheritance:d', '/T')]:
-        result = subprocess.run(['icacls', str(path), *options], capture_output=True,
-                                creationflags=subprocess.CREATE_NO_WINDOW)
+        result = subprocess.run(['icacls', str(path), *options], stdin=subprocess.DEVNULL,
+                                capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
         if result.returncode:
             raise RuntimeError('共享资源保护失败: ' +
                                (result.stdout + result.stderr).decode('mbcs', errors='replace'))

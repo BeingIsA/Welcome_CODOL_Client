@@ -25,6 +25,7 @@ client/
 ├── start_client.cmd        Windows 离线启动入口
 ├── run.py                  版本预检与离线分析入口
 ├── requirements.txt        Python 依赖
+├── requirements-build.txt  Windows EXE 构建依赖
 ├── src/codol_rebuild/      客户端生产源码
 ├── native/                 原生守卫源码
 ├── tools/                  启动及资源准备工具
@@ -66,7 +67,33 @@ resources/v1649370/packed/IIPS/IIPSDownload/
 
 镜像和补丁会进行固定指纹检查，不可用其他版本文件直接替换。资源来源、准备流程及清单约定见[固定版本运行资源](docs/终版原包资源.md)，镜像说明见[离线运行基底](bin/v1649370/README.md)。
 
-## 启动客户端
+## 构建 Windows EXE 发行包
+
+在 Windows x64 构建机上安装 64 位 Python 3.14 和 Visual Studio 的“使用 C++ 的桌面开发”工作负载（MSVC 和 Windows SDK）。在 `client/` 目录打开 PowerShell，创建构建环境并生成发行目录。
+
+```powershell
+& C:\Python314\python.exe -m venv .\workspaces\nuitka-env
+& .\workspaces\nuitka-env\Scripts\python.exe -m pip install -r .\requirements-build.txt
+& .\workspaces\nuitka-env\Scripts\python.exe .\tools\build_host.py --output ..\outputs\CODOL-Windows-x64
+```
+
+`requirements-build.txt` 固定使用 Nuitka 4.3.5。每次构建使用一个尚不存在的输出目录。上述命令生成 `outputs/CODOL-Windows-x64/`，其中包含 GUI 入口 `CODOL.exe`、配置、原生组件、许可证和运行库。用户无需安装 Python。
+
+游戏原包单独交付，构建产物不含 `resources/`。部署时把发行目录放到本地 NTFS 卷，再把已准备好的整个 `packed/` 目录放到 `CODOL.exe` 旁的 `resources/v1649370/` 下。部署完成后应能看到 `resources/v1649370/packed/packed-index.json.gz` 和 `resources/v1649370/packed/IIPS/IIPSDownload/`。用户双击 `CODOL.exe`，启动器读取同目录下的 `config/server.ini`。
+
+自动化预检可以从 `client/` 运行下面的 PowerShell 命令。`Start-Process -Wait -PassThru` 等待 GUI 进程退出并返回退出码。`--verify-resources` 会逐个校验已部署的资源。
+
+```powershell
+$launcher = (Resolve-Path '..\outputs\CODOL-Windows-x64\CODOL.exe').Path
+$process = Start-Process -FilePath $launcher -ArgumentList '--dry-run', '--verify-resources' -Wait -PassThru
+if ($process.ExitCode -ne 0) { throw "客户端预检失败，退出码 $($process.ExitCode)" }
+```
+
+开发时仍可在 `client/` 运行 `start_client.cmd`，直接使用源码和项目内的资源。
+
+发行目录不附带项目的 `.py` 文件。部分资源读取代码标有 `AGPL-3.0-or-later`。对外提供下载时，请一并保留许可证，并按第 6 节为所分发的受许可程序提供对应源码。例如，可以在二进制下载页同时提供该版本对应源码的免费下载链接。[许可证全文](licenses/AGPL-3.0.txt)
+
+## 从源码启动客户端
 
 以下命令均在 `client/` 目录执行。
 
