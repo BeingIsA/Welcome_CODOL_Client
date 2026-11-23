@@ -179,7 +179,7 @@ python -B -X utf8 .\tools\launch_client.py --prepare-only --verify-resources
 
 启动脚本默认连接 `http://127.0.0.1:8080`，可追加 `--server-url` 指定其他地址。游戏读取本地档案和昵称后自动登录；登录成功才激活大厅。原有创建房间、退出房间入口改为调用服务端，响应成功后完成原生界面回调。人数与密码来自游戏房间配置，服务端 `displayName` 是玩家昵称，不是房间标题；目前服务端不保存房间标题、地图或模式。HTTP 在后台线程执行，重复点击不重复提交。直接调用 `tools/launch_client.py` 且未指定 `--server-url` 时保留离线流程。
 
-身份按服务器地址保存在 `%APPDATA%/CODOL/data/accounts/server-identities.json`，重登时客户端带回 `playerId` 并恢复该玩家的档案。删除身份记录后再登录会创建新账号。机器指纹来自 SMBIOS 系统 UUID 的摘要，服务器更换域名、协议或端口会对应不同的身份记录。
+本机唯一的玩家 ID 保存在 `%APPDATA%/CODOL/data/accounts/identity.json`，重登时客户端带回 `playerId` 并恢复该玩家的档案。删除身份记录后再登录会创建新账号。机器指纹来自 SMBIOS 系统 UUID 的摘要，更换服务器地址时仍使用同一个玩家 ID；房间恢复信息单独保存。
 
 建房请求发送前保存恢复标记。响应丢失时不会自动重放建房；下一次尝试会分页查询自己的房间并清理后重建。正常关闭客户端会尝试离房；失败保留记录，下次登录清理。离房失败会保留原生房间，允许重试。首次登录响应完全丢失时，当前服务端没有幂等登录键，尚不能恢复未收到的 `playerId`。
 
@@ -191,7 +191,7 @@ python -B -X utf8 .\tools\launch_client.py --prepare-only --verify-resources
 
 ## 档案、资源与日志
 
-- **持久数据**：服务端保存角色档案和仓库。本机的 `%APPDATA%/CODOL/data/accounts/server-identities.json` 用于找回服务端身份，原生设置位于 `%APPDATA%/CODOL/players/`。
+- **持久数据**：服务端保存角色档案和仓库。本机的 `%APPDATA%/CODOL/data/accounts/identity.json` 用于找回服务端身份，原生设置位于 `%APPDATA%/CODOL/players/`。
 - **会话产物**：每次实际运行在 `workspaces/offline-runs/<会话名>/` 中保存独立程序副本、配置及诊断产物；启动输出会给出对应目录。
 - **自带资源**：终版 IFS、包外依赖与索引随客户端放在 `resources/v1649370/packed/`。
 - **按需缓存**：游戏访问某个文件时才填充其内容。宿主在游戏退出后关闭视图并释放本次缓存；玩家设置保存在独立目录。

@@ -4,6 +4,7 @@ from pathlib import Path
 import tempfile
 import threading
 import time
+import json
 import unittest
 from unittest.mock import Mock
 from codol_rebuild.application.session.contracts import IdentityRecord
@@ -345,12 +346,27 @@ class RoomTests(unittest.TestCase):
         self.assertEqual(self.gateway.calls, [])
         self.assertEqual(self.store.path.read_text(encoding='utf-8'), '{broken')
 
-    def test_identity_scoped_by_server(self):
-        self.store.save('http://one', IdentityRecord('pl_one'))
-        self.store.save('http://two', IdentityRecord('pl_two'))
-        self.assertEqual(self.store.load('http://one').player_id, 'pl_one')
-        self.assertEqual(self.store.load('http://two').player_id, 'pl_two')
-        self.assertIsNone(self.store.load('http://three'))
+    def test_identity_shared_but_room_scoped_by_server(self):
+        record = IdentityRecord('pl_one', 'rm_current', uncertain_join=True)
+        self.store.save('http://one', record)
+        self.assertEqual(self.store.load('http://one'), record)
+        self.assertEqual(self.store.load('http://two'), IdentityRecord('pl_one'))
+        self.assertEqual(json.loads(self.store.path.read_text()), {'player_id': 'pl_one'})
+
+    def test_legacy_file_migrates_only_unambiguous_identity(self):
+        legacy = self.store.path.with_name('server-identities.json')
+        rows = {'http://one': {'player_id': 'pl_one', 'uncertain_create': True},
+                'http://two': {'player_id': 'pl_two'}}
+        legacy.write_text(json.dumps({'version': 1, 'servers': rows}))
+        with self.assertRaises(ValueError):
+            self.store.load('http://one')
+        self.assertTrue(legacy.exists())
+        self.assertFalse(self.store.path.exists())
+        rows['http://two']['player_id'] = 'pl_one'
+        legacy.write_text(json.dumps({'version': 1, 'servers': rows}))
+        self.assertEqual(self.store.load('http://one'), IdentityRecord('pl_one', uncertain_create=True))
+        self.assertFalse(legacy.exists())
+        self.assertEqual(self.store.load('http://three'), IdentityRecord('pl_one'))
 
     def test_server_address_validation(self):
         self.assertEqual(normalize_server('HTTP://LOCALHOST:80/'), 'http://localhost')

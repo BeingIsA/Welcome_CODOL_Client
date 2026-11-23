@@ -6,7 +6,7 @@ from codol_rebuild.application.errors import OnlineError
 
 @dataclass(frozen=True)
 class IdentityRecord:
-    """按服务器保存的身份及待恢复房间；不保存硬件原始信息或密码。"""
+    """本机玩家身份及当前服务器的待恢复房间；不保存硬件原始信息或密码。"""
     player_id: str
     room_id: str | None = None
     uncertain_create: bool = False

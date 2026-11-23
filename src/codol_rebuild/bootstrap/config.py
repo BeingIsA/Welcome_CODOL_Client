@@ -40,7 +40,7 @@ def parse_args(argv=None):
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.server_identity is None:
-        args.server_identity = accounts_dir() / 'server-identities.json'
+        args.server_identity = accounts_dir() / 'identity.json'
     args.server_address = None
     if not 1 <= args.client_port <= 65535:
         parser.error('客户端UDP端口必须为1～65535')
