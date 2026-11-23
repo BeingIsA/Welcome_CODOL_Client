@@ -10,6 +10,8 @@ permissions:
 jobs:
   build:
     runs-on: windows-2025
+    outputs:
+      base_version: ${{ steps.version.outputs.base_version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -19,6 +21,17 @@ jobs:
         with:
           python-version: '3.14'
           architecture: x64
+
+      - name: 读取客户端发行版本
+        id: version
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
+        run: |
+          $baseVersion = python -c "from codol_rebuild import __version__; print(__version__)"
+          if ($LASTEXITCODE -ne 0 -or $baseVersion -cnotmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
+            throw "客户端发行版本应为三个不带前导零的整数，例如 0.1.0"
+          }
+          "base_version=$baseVersion" >> $env:GITHUB_OUTPUT
 
       - name: 安装构建依赖
         run: python -m pip install -r requirements-build.txt
@@ -59,7 +72,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    # 多次推送可同时编译，发布时排队，以便按构建序号更新 Latest。
+    # 多次推送可同时编译，串行分配版本号，避免两个提交占用同一标签。
     concurrency:
       group: codol-client-publish
       queue: max
@@ -78,9 +91,29 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          BASE_VERSION: ${{ needs.build.outputs.base_version }}
         shell: bash
         run: |
-          tag="build-$GITHUB_RUN_NUMBER"
+          tag_prefix="v${BASE_VERSION%.*}."
+          next_patch=${BASE_VERSION##*.}
+          tag=""
+          # 发布步骤用轻量标签记录提交与版本的对应关系，失败重跑时可找回原版本。
+          gh api --paginate "repos/$GH_REPO/git/matching-refs/tags/$tag_prefix" \
+            --jq '.[] | [.ref, .object.sha, .object.type] | @tsv' > "$RUNNER_TEMP/version-refs.tsv"
+          while IFS=$'\t' read -r tag_ref target object_type; do
+            patch_number=${tag_ref#"refs/tags/$tag_prefix"}
+            [[ "$patch_number" =~ ^(0|[1-9][0-9]*)$ ]] || continue
+            if [[ "$object_type" == tag ]]; then
+              target=$(gh api "repos/$GH_REPO/commits/${tag_ref#refs/tags/}" --jq .sha)
+            fi
+            if [[ "$target" == "$GITHUB_SHA" ]]; then
+              tag=${tag_ref#refs/tags/}
+            fi
+            if (( patch_number >= next_patch )); then
+              next_patch=$((patch_number + 1))
+            fi
+          done < "$RUNNER_TEMP/version-refs.tsv"
+          tag=${tag:-"$tag_prefix$next_patch"}
           # 一次读取已有标签、草稿和 Latest，查询失败时由 shell 终止发布。
           state=$(gh api graphql -f owner="$GITHUB_REPOSITORY_OWNER" -f name="${GH_REPO#*/}" \
             -f tag="$tag" -f ref="refs/tags/$tag" -f query='
@@ -102,20 +135,30 @@ jobs:
             echo "$tag 已发布"
             exit 0
           fi
-          if jq -e '.release == null' <<< "$state" > /dev/null; then
-            gh release create "$tag" --draft --target "$GITHUB_SHA" --title "CODOL Windows x64 · $tag" \
-              --notes "下载 CODOL-Windows-x64.zip 并完整解压，将单独准备的游戏资源放在 CODOL.exe 旁的 resources/v1649370/packed/，然后双击 CODOL.exe。 [对应源码]($GITHUB_SERVER_URL/$GH_REPO/tree/$GITHUB_SHA)"
-          else
+          if jq -e '.release.isDraft == true and .ref == null' <<< "$state" > /dev/null; then
             draft_target=$(gh release view "$tag" --json targetCommitish --jq .targetCommitish)
             if [[ "$draft_target" != "$GITHUB_SHA" ]]; then
               echo "::error::已有草稿 $tag 使用了其他发布目标"
               exit 1
             fi
           fi
+          if jq -e '.ref == null' <<< "$state" > /dev/null; then
+            gh api --method POST "repos/$GH_REPO/git/refs" -f ref="refs/tags/$tag" -f sha="$GITHUB_SHA" --silent
+          fi
+          if jq -e '.release == null' <<< "$state" > /dev/null; then
+            gh release create "$tag" --draft --verify-tag --target "$GITHUB_SHA" --title "CODOL $tag · Windows x64" \
+              --notes ""
+          fi
           gh release upload "$tag" CODOL-Windows-x64.zip CODOL-Windows-x64.zip.sha256 --clobber
           latest_tag=$(jq -r '.latestRelease.tagName // empty' <<< "$state")
           make_latest=true
-          if [[ "$latest_tag" =~ ^build-([0-9]+)$ ]] && (( BASH_REMATCH[1] > GITHUB_RUN_NUMBER )); then
-            make_latest=false
+          if [[ -n "$latest_tag" && "$latest_tag" != "$tag" ]]; then
+            relationship=$(gh api "repos/$GH_REPO/compare/$latest_tag...$GITHUB_SHA" --jq .status)
+            if [[ "$relationship" == behind ]]; then
+              make_latest=false
+            elif [[ "$latest_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] && \
+                 [[ "$(printf '%s\n' "$latest_tag" "$tag" | sort -V | tail -1)" != "$tag" ]]; then
+              make_latest=false
+            fi
           fi
           gh release edit "$tag" --target "$GITHUB_SHA" --draft=false --latest="$make_latest"

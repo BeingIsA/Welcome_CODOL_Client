@@ -102,7 +102,11 @@ git commit -m "添加 Windows 客户端自动发布流程"
 git push client master
 ```
 
-首次推送就会触发构建。以后每次推送到 `master`，GitHub Actions 都会检出这次推送的最后一个提交，在 Windows x64 上运行发行测试并构建程序。验证通过后发布一个版本，标签为 `build-<运行编号>`。如果运行失败，可以打开日志查看原因。遇到临时故障时选择 **Re-run failed jobs**，重试沿用原标签。[查看 Actions 运行记录](https://github.com/BeingIsA/Welcome_CODOL_Client/actions/workflows/release.yml)
+每次推送到 `master`，GitHub Actions 都会检出这次推送的最后一个提交，在 Windows x64 上运行发行测试并构建程序。构建通过后，工作流按进入发布步骤的顺序分配版本号。当前系列从 `v0.1.0` 起步，之后依次发布 `v0.1.1`、`v0.1.2`。旧提交晚于新提交发布时，新提交的版本保留 **Latest** 标记。
+
+日常修订只需推送代码。要开启新系列，在提交中把 `src/codol_rebuild/__init__.py` 的 `__version__` 改为起始版本，例如 `0.2.0` 或 `1.0.0`。该系列的首个 Release 就使用这个版本号。[版本配置](src/codol_rebuild/__init__.py)
+
+遇到临时故障时，在 Actions 中选择 **Re-run failed jobs**。如果工作流已经为该提交预留了版本号，重试会接着发布同一版本。[查看 Actions 运行记录](https://github.com/BeingIsA/Welcome_CODOL_Client/actions/workflows/release.yml)
 
 在 Release 的 **Assets** 下下载 `CODOL-Windows-x64.zip`，可用同页的 `CODOL-Windows-x64.zip.sha256` 核对文件。把 ZIP 解压到本地 NTFS 目录，将游戏原包放到 `CODOL.exe` 旁的 `resources/v1649370/packed/`，再双击 `CODOL.exe`。[下载 Releases](https://github.com/BeingIsA/Welcome_CODOL_Client/releases)
 
