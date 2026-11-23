@@ -17,6 +17,7 @@ class RuntimeCacheTests(unittest.TestCase):
             root = Path(folder)
             library = root / 'library'
             (library / 'main').mkdir(parents=True)
+            resolved_library = library.resolve()
             asset = library / 'main/asset'
             asset.write_bytes(b'original')
             (library / 'manifest.json').write_bytes(b'manifest')
@@ -26,10 +27,10 @@ class RuntimeCacheTests(unittest.TestCase):
             args = (root / 'receipts', library, b'manifest', entries, lambda n: n, lambda p: None)
             audit = {}
             with patch('shutil.copyfile', side_effect=AssertionError('unexpected copy')):
-                self.assertEqual(prepare_library(*args, audit=audit), library)
+                self.assertEqual(prepare_library(*args, audit=audit), resolved_library)
                 self.assertEqual(audit['copied_bytes'], 0)
                 with patch('codol_rebuild.resources.runtime_cache.digest', side_effect=AssertionError('unexpected hash')):
-                    self.assertEqual(prepare_library(*args, audit=audit), library)
+                    self.assertEqual(prepare_library(*args, audit=audit), resolved_library)
                 self.assertEqual(audit['hashed_bytes'], 0)
             with patch('codol_rebuild.resources.runtime_cache.digest', side_effect=RuntimeError('forced')):
                 with self.assertRaisesRegex(RuntimeError, 'forced'):
