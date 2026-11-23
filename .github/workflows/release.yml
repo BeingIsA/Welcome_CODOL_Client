@@ -12,6 +12,8 @@ jobs:
     runs-on: windows-2025
     outputs:
       base_version: ${{ steps.version.outputs.base_version }}
+      archive_size: ${{ steps.archive.outputs.size }}
+      archive_sha256: ${{ steps.archive.outputs.sha256 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -39,12 +41,22 @@ jobs:
       - name: 验证启动参数、发行目录和 Windows 权限
         env:
           PYTHONPATH: ${{ github.workspace }}/src
-        run: python -B -X utf8 -m unittest -v tests.test_host_launch_cli tests.test_host_release tests.test_runtime_cache
+        run: python -B -X utf8 -m unittest -v tests.test_host_launch_cli tests.test_host_release tests.test_runtime_cache tests.test_updater
 
       - name: 编译并运行 EXE 启动预检
         run: python -B -X utf8 tools/build_host.py --output "$env:RUNNER_TEMP/CODOL-Windows-x64"
 
+      - name: 编译更新启动器
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
+        run: |
+          python -m nuitka --mode=onefile --msvc=latest --assume-yes-for-downloads --windows-console-mode=disable --windows-icon-from-exe=bin/v1649370/codol1649370-offline.exe --output-filename=CODOLLauncher.exe --output-dir="$env:RUNNER_TEMP/launcher-build" tools/launch_updater.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item "$env:RUNNER_TEMP/launcher-build/CODOLLauncher.exe" "$env:RUNNER_TEMP/CODOL-Windows-x64/"
+          [IO.File]::WriteAllText("$env:RUNNER_TEMP/CODOL-Windows-x64/release-commit.txt", $env:GITHUB_SHA)
+
       - name: 生成程序 ZIP 和 SHA-256
+        id: archive
         run: |
           $package = Join-Path $env:RUNNER_TEMP 'CODOL-Windows-x64'
           foreach ($directory in 'resources', 'workspaces', 'src', 'tests') {
@@ -55,6 +67,8 @@ jobs:
           $archive = "$package.zip"
           [System.IO.Compression.ZipFile]::CreateFromDirectory($package, $archive)
           $digest = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          "size=$((Get-Item $archive).Length)" >> $env:GITHUB_OUTPUT
+          "sha256=$digest" >> $env:GITHUB_OUTPUT
           [System.IO.File]::WriteAllText("$archive.sha256", "$digest  CODOL-Windows-x64.zip`n")
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -218,6 +232,31 @@ jobs:
           : "${R2_BUCKET:?缺少 R2_BUCKET}" "${R2_ENDPOINT:?缺少 R2_ENDPOINT}"
           : "${AWS_ACCESS_KEY_ID:?缺少 R2_ACCESS_KEY_ID}" "${AWS_SECRET_ACCESS_KEY:?缺少 R2_SECRET_ACCESS_KEY}"
           destination="s3://$R2_BUCKET/releases/$RELEASE_TAG"
-          for file in CODOL-Windows-x64.zip CODOL-Windows-x64.zip.sha256; do
-            aws s3 cp "$file" "$destination/$file" --endpoint-url "$R2_ENDPOINT" --only-show-errors
-          done
+          aws s3 cp CODOL-Windows-x64.zip "$destination/CODOL-Windows-x64.zip" --endpoint-url "$R2_ENDPOINT" --only-show-errors
+
+  update_manifest:
+    needs: [build, reserve_version, publish, publish_r2]
+    runs-on: ubuntu-latest
+    concurrency:
+      group: codol-update-manifest
+      queue: max
+    steps:
+      - name: 发布最新版本清单
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.reserve_version.outputs.tag }}
+          SIZE: ${{ needs.build.outputs.archive_size }}
+          DIGEST: ${{ needs.build.outputs.archive_sha256 }}
+          R2_BUCKET: ${{ vars.R2_BUCKET }}
+          R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+        shell: bash
+        run: |
+          latest=$(gh api "repos/$GH_REPO/releases/latest" --jq .tag_name)
+          [[ "$latest" == "$RELEASE_TAG" ]] || exit 0
+          jq -n --arg commit "$GITHUB_SHA" --arg version "$RELEASE_TAG" --arg sha256 "$DIGEST" --argjson size "$SIZE" '{commit:$commit,version:$version,sha256:$sha256,size:$size,path:("releases/"+$version+"/CODOL-Windows-x64.zip")}' > latest.json
+          aws s3 cp latest.json "s3://$R2_BUCKET/releases/latest.json" --endpoint-url "$R2_ENDPOINT" --content-type application/json --cache-control no-store

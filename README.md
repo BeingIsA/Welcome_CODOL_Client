@@ -92,6 +92,12 @@ if ($process.ExitCode -ne 0) { throw "客户端预检失败，退出码 $($proce
 
 发行目录不附带项目的 `.py` 文件。
 
+## 启动器检查更新
+
+双击发行包中的 `CODOLLauncher.exe`，启动器从 R2 的 `releases/latest.json` 读取最新版本。选择更新会下载完整程序 ZIP 并校验大小和 SHA-256；成功安装后启动 `CODOL.exe`。离线时可选择启动已安装的客户端。更新会保留已有配置和单独部署的游戏资源。首次使用可把启动器复制到旧版 `CODOL.exe` 旁。
+
+GitHub 和 R2 都成功发布后，工作流为 GitHub 当前 Latest 版本写入更新清单。安装目录中的 `installed-version.json` 记录已安装版本。启动器本身可通过从新版 ZIP 提取 `CODOLLauncher.exe` 手动升级。
+
 ## 自动发布到 GitHub Releases 和 Cloudflare R2
 
 首次启用时，在客户端仓库的 `master` 分支提交工作流和说明，然后推送。下面使用本机的远端名称 `client`。
@@ -106,7 +112,7 @@ git push client master
 
 日常修订只需推送代码。要开启新系列，在提交中把 `src/codol_rebuild/__init__.py` 的 `__version__` 改为起始版本，例如 `0.2.0` 或 `1.0.0`。该系列的首个 Release 就使用这个版本号。[版本配置](src/codol_rebuild/__init__.py)
 
-版本预留成功后，GitHub Release 和 Cloudflare R2 两个任务并行下载同一份构建产物，各自校验 SHA-256。R2 将 ZIP 和校验文件上传到桶内的 `releases/<版本标签>/`。在仓库 Actions Variables 设置 `R2_BUCKET` 和 `R2_ENDPOINT`，在 Actions Secrets 设置 `R2_ACCESS_KEY_ID` 和 `R2_SECRET_ACCESS_KEY`。
+版本预留成功后，GitHub Release 和 Cloudflare R2 两个任务并行下载同一份构建产物，各自校验 SHA-256。R2 只将 ZIP 上传到桶内的 `releases/<版本标签>/`。在仓库 Actions Variables 设置 `R2_BUCKET` 和 `R2_ENDPOINT`，在 Actions Secrets 设置 `R2_ACCESS_KEY_ID` 和 `R2_SECRET_ACCESS_KEY`。
 
 遇到临时故障时，在 Actions 中选择 **Re-run failed jobs**。如果工作流已经为该提交预留了版本号，重试会接着发布同一版本。[查看 Actions 运行记录](https://github.com/BeingIsA/Welcome_CODOL_Client/actions/workflows/release.yml)
 
