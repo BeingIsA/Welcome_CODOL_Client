@@ -94,7 +94,7 @@ if ($process.ExitCode -ne 0) { throw "客户端预检失败，退出码 $($proce
 
 ## 启动器检查更新
 
-双击发行包中的 `CODOLLauncher.exe`，启动器从 R2 的 `releases/latest.json` 读取最新版本。选择更新会下载完整程序 ZIP 并校验大小和 SHA-256；成功安装后启动 `CODOL.exe`。离线时可选择启动已安装的客户端。更新会保留已有配置和单独部署的游戏资源。首次使用可把启动器复制到旧版 `CODOL.exe` 旁。
+从 GitHub Release 单独下载 `CODOLLauncher.exe`，放入目标目录后打开，点击“下载最新版”即可将客户端程序安装到同级目录。准备好游戏原包后点击“开始游戏”。后续打开时会在后台检查更新，也可手动检查或直接启动已安装的游戏。
 
 GitHub 和 R2 都成功发布后，工作流为 GitHub 当前 Latest 版本写入更新清单。安装目录中的 `installed-version.json` 记录已安装版本。启动器本身可通过从新版 ZIP 提取 `CODOLLauncher.exe` 手动升级。
 

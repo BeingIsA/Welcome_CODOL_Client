@@ -6,7 +6,11 @@ from pathlib import Path
 import re
 import shutil
 import tempfile
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
+
+
+def release_request(url):
+    return Request(url, headers={'User-Agent': 'CODOLLauncher/1.0'})
 from zipfile import ZipFile
 
 
@@ -19,7 +23,7 @@ def version_number(tag):
 def check_release(base_url):
     if not base_url.startswith('https://'):
         raise ValueError('请配置 HTTPS 公开下载地址')
-    with urlopen(base_url + '/releases/latest.json', timeout=5) as response:
+    with urlopen(release_request(base_url + '/releases/latest.json'), timeout=5) as response:
         release = json.loads(response.read(8193))
     version_number(release['version'])
     if release['path'] != f"releases/{release['version']}/CODOL-Windows-x64.zip":
@@ -29,13 +33,20 @@ def check_release(base_url):
     return release
 
 
-def install_release(root, base_url, release):
+def install_release(root, base_url, release, *, progress=None):
     # 先完整下载、核验并解包，再替换安装文件。
     with tempfile.TemporaryDirectory(dir=root) as temporary:
         stage = Path(temporary)
         archive = stage / 'update.zip'
-        with urlopen(base_url + '/' + release['path'], timeout=30) as response, archive.open('wb') as output:
-            shutil.copyfileobj(response, output)
+        with urlopen(release_request(base_url + '/' + release['path']), timeout=30) as response, archive.open('wb') as output:
+            downloaded = 0
+            while chunk := response.read(256 * 1024):
+                downloaded += len(chunk)
+                if downloaded > release['size']:
+                    raise ValueError('下载文件校验失败')
+                output.write(chunk)
+                if progress:
+                    progress(downloaded)
         with archive.open('rb') as stream:
             if archive.stat().st_size != release['size'] or hashlib.file_digest(stream, 'sha256').hexdigest() != release['sha256']:
                 raise ValueError('下载文件校验失败')

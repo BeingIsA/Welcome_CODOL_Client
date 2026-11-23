@@ -50,8 +50,9 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}/src
         run: |
-          python -m nuitka --mode=onefile --msvc=latest --assume-yes-for-downloads --windows-console-mode=disable --windows-icon-from-exe=bin/v1649370/codol1649370-offline.exe --output-filename=CODOLLauncher.exe --output-dir="$env:RUNNER_TEMP/launcher-build" tools/launch_updater.py
+          python -m nuitka --mode=onefile --enable-plugin=tk-inter --msvc=latest --assume-yes-for-downloads --windows-console-mode=disable --windows-icon-from-exe=bin/v1649370/codol1649370-offline.exe --output-filename=CODOLLauncher.exe --output-dir="$env:RUNNER_TEMP/launcher-build" tools/launch_updater.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item "$env:RUNNER_TEMP/launcher-build/CODOLLauncher.exe" "$env:RUNNER_TEMP/CODOLLauncher.exe"
           Copy-Item "$env:RUNNER_TEMP/launcher-build/CODOLLauncher.exe" "$env:RUNNER_TEMP/CODOL-Windows-x64/"
           [IO.File]::WriteAllText("$env:RUNNER_TEMP/CODOL-Windows-x64/release-commit.txt", $env:GITHUB_SHA)
 
@@ -75,6 +76,7 @@ jobs:
         with:
           name: windows-release
           path: |
+            ${{ runner.temp }}/CODOLLauncher.exe
             ${{ runner.temp }}/CODOL-Windows-x64.zip
             ${{ runner.temp }}/CODOL-Windows-x64.zip.sha256
           compression-level: 0
@@ -189,7 +191,7 @@ jobs:
             gh release create "$tag" --draft --verify-tag --target "$GITHUB_SHA" --title "CODOL $tag · Windows x64" \
               --notes ""
           fi
-          gh release upload "$tag" CODOL-Windows-x64.zip CODOL-Windows-x64.zip.sha256 --clobber
+          gh release upload "$tag" CODOLLauncher.exe CODOL-Windows-x64.zip CODOL-Windows-x64.zip.sha256 --clobber
           latest_tag=$(jq -r '.latestRelease.tagName // empty' <<< "$state")
           make_latest=true
           if [[ -n "$latest_tag" && "$latest_tag" != "$tag" ]]; then
