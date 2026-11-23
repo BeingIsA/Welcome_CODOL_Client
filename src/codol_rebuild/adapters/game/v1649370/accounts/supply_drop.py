@@ -28,14 +28,32 @@ CONTRACT = {
 }
 
 
-def encode_result(state, crate_id, reward):
+def product_card_ids(read, product_id):
+    """按终版商品索引和成员表解析卡片，与 IsBundleProduct 使用同一计数规则。"""
+    if not 0 < product_id < u32(read, 0x7797FFC):
+        raise ValueError(f'开箱商品 {product_id} 超出原生商品索引')
+    index_table = u32(read, 0x7797FF8)
+    record_index = struct.unpack('<H', read(index_table + product_id * 2, 2))[0]
+    if not 0 < record_index < u32(read, 0x7797FEC):
+        raise ValueError(f'开箱商品 {product_id} 缺少原生商品记录')
+    record = u32(read, 0x7797FE8) + record_index * 28
+    member_count = read(record + 14, 1)[0]
+    members = read(u32(read, record + 16), member_count * 4) if member_count else b''
+    item_ids = [item_id for item_id, in struct.iter_unpack('<H2x', members)
+                if item_id not in (15400, 20000)]
+    if not item_ids:
+        raise ValueError(f'开箱商品 {product_id} 缺少可展示的物品')
+    return (0, product_id) if len(item_ids) > 1 else (item_ids[0], 0)
+
+
+def encode_result(state, crate_id, reward, read):
     """按原生卡片约定编码整套商品或单件物品。"""
     product_ids = reward['product_ids']
     if product_ids == [0]:
         cards = [(content['item_id'], 0, content['quantity'], content['quantity_delta'])
                  for content in reward['contents']]
     else:
-        cards = [(0, product_id, 1, 1) for product_id in product_ids]
+        cards = [(*product_card_ids(read, product_id), 1, 1) for product_id in product_ids]
     result_size = FIELDS + (len(cards) * len(REWARD_FIELDS) + 1) * 36
     if result_size > RESULT_CAPACITY:
         raise ValueError('开箱奖励结果超出数据页')
@@ -184,7 +202,8 @@ class SupplyDropBridge:
             try:
                 if phase == 'request':
                     self.pending = None
-                    checked_write(self.process, self.state, encode_result(self.state, 0, {'product_ids': [], 'contents': []}))
+                    checked_write(self.process, self.state,
+                                  encode_result(self.state, 0, {'product_ids': [], 'contents': []}, self.process.read))
                     frame = struct.unpack_from('<I', context, 180)[0]
                     if frame != struct.unpack_from('<I', context, 196)[0]:
                         raise ValueError('开箱桥保存帧不匹配')
@@ -209,7 +228,7 @@ class SupplyDropBridge:
                         reward = completion['reward']
                         if not reward['contents']:
                             raise ValueError('服务器开箱结果缺少奖励明细')
-                        payload = encode_result(self.state, self.pending, reward)
+                        payload = encode_result(self.state, self.pending, reward, self.process.read)
                         checked_write(self.process, self.state, payload)
                         checked_write(self.process, self.state + MESSAGE, '开箱已在服务器完成，奖励展示失败'.encode('utf-8') + b'\0')
                         checked_write(self.process, self.state + SUCCESS, struct.pack('<I', 1))

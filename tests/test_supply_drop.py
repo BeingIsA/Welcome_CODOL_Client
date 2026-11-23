@@ -10,6 +10,23 @@ from test_purchase import Memory
 
 
 class SupplyDropTests(unittest.TestCase):
+    def product_memory(self, products, memory=None):
+        memory = memory or Memory()
+        index_table, records, members = 0x20000000, 0x20100000, 0x20200000
+        memory.word(0x7797FF8, index_table)
+        memory.word(0x7797FFC, max(products) + 1)
+        memory.word(0x7797FE8, records)
+        memory.word(0x7797FEC, len(products) + 1)
+        for record_index, (product_id, item_ids) in enumerate(products.items(), 1):
+            memory.write(index_table + product_id * 2, struct.pack('<H', record_index))
+            record = records + record_index * 28
+            memory.write(record + 14, bytes([len(item_ids)]))
+            memory.word(record + 16, members)
+            for item_id in item_ids:
+                memory.write(members, struct.pack('<HH', item_id, 1))
+                members += 4
+        return memory
+
     def supply_drop_request(self, inventory_session):
         memory = Memory()
         frame = 0x13000000
@@ -36,6 +53,7 @@ class SupplyDropTests(unittest.TestCase):
     def test_supply_drop_waits_then_applies_only_confirmed_inventory(self):
         service = Mock()
         memory, bridge = self.supply_drop_request(service)
+        self.product_memory({123: [55]}, memory)
         service.begin_supply_drop.assert_called_once_with(60216)
         snapshot = {'revision': 4, 'items': [], 'gp': 10, 'cp': 5}
         service.poll.side_effect = [None, {'inventory': snapshot, 'reward': {
@@ -65,7 +83,9 @@ class SupplyDropTests(unittest.TestCase):
 
     def test_three_largest_reward_bundles_fit_in_one_native_result(self):
         contents = [{'item_id': item_id, 'quantity': 1, 'quantity_delta': 1} for item_id in range(1, 60)]
-        payload = supply_drop.encode_result(0x11000000, 60216, {'product_ids': [34, 840, 14121], 'contents': contents})
+        memory = self.product_memory({34: range(1, 21), 840: range(21, 41), 14121: range(41, 60)})
+        payload = supply_drop.encode_result(0x11000000, 60216, {'product_ids': [34, 840, 14121], 'contents': contents},
+                                            memory.read)
         self.assertEqual(struct.unpack_from('<I', payload, 4)[0], 3)
         self.assertLessEqual(len(payload), supply_drop.RESULT_CAPACITY)
         self.assertEqual(struct.unpack_from('<I', payload, len(payload) - 16)[0], 60216)
@@ -76,19 +96,27 @@ class SupplyDropTests(unittest.TestCase):
             {'item_id': 556, 'quantity': 1, 'quantity_delta': 1},
             {'item_id': 55, 'quantity': 3, 'quantity_delta': 2},
         ]
-        payload = supply_drop.encode_result(0x11000000, 60216, {'product_ids': [10012, 2], 'contents': contents})
+        memory = self.product_memory({10012: [553, 556], 2: [55, 15400, 20000]})
+        payload = supply_drop.encode_result(0x11000000, 60216, {'product_ids': [10012, 2], 'contents': contents},
+                                            memory.read)
         self.assertEqual(struct.unpack_from('<I', payload, 4)[0], 2)
-        for index, expected in enumerate(((0, 10012, 1, 1), (0, 2, 1, 1))):
+        for index, expected in enumerate(((0, 10012, 1, 1), (55, 0, 1, 1))):
             start = supply_drop.FIELDS + index * len(supply_drop.REWARD_FIELDS) * 36
             self.assertEqual(tuple(struct.unpack_from('<I', payload, start + field * 36 + 20)[0]
                                    for field in (0, 1, 7, 8)), expected)
+
+    def test_reported_unnamed_cards_use_item_lookup(self):
+        products = {23642: [10105], 40226: [29553], 32428: [23618]}
+        memory = self.product_memory(products)
+        for product_id, (item_id,) in products.items():
+            self.assertEqual(supply_drop.product_card_ids(memory.read, product_id), (item_id, 0))
 
     def test_item_pool_displays_items_with_granted_quantities(self):
         import struct
         from codol_rebuild.adapters.game.v1649370.accounts import supply_drop
         reward = {'product_ids': [0], 'contents': [{'item_id': 101, 'quantity': 1, 'quantity_delta': 1},
                                {'item_id': 102, 'quantity': 3, 'quantity_delta': 3}]}
-        payload = supply_drop.encode_result(0x11000000, 60216, reward)
+        payload = supply_drop.encode_result(0x11000000, 60216, reward, Memory().read)
         self.assertEqual(struct.unpack_from('<I', payload, 4)[0], 2)
         for content_index, item_id in enumerate((101, 102)):
             field_offset = supply_drop.FIELDS + content_index * len(supply_drop.REWARD_FIELDS) * 36
