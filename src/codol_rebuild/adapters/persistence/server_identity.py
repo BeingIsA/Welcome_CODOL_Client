@@ -31,22 +31,6 @@ class JsonIdentityStore:
         return IdentityRecord(row['player_id'], row.get('room_id'), row.get('uncertain_create', False),
                               row.get('uncertain_join', False))
 
-    def _migrate(self, source, data):
-        if not isinstance(data, dict) or data.get('version') != 1 or not isinstance(data.get('servers'), dict):
-            raise ValueError('服务器身份文件损坏')
-        records = {server: self._record(row) for server, row in data['servers'].items()}
-        player_ids = {record.player_id for record in records.values()}
-        if len(player_ids) > 1:
-            raise ValueError('旧身份文件包含多个玩家 ID，请选择要保留的账号后再登录')
-        recovery = {self._server_key(server): self._room_fields(record)
-                    for server, record in records.items() if self._room_fields(record)}
-        if recovery:
-            self._write(self.recovery_path, recovery)
-        if player_ids:
-            self._write(self.path, {'player_id': player_ids.pop()})
-        if source != self.path or not records:
-            source.unlink()
-
     @staticmethod
     def _room_fields(record):
         return {field: getattr(record, field) for field in ('room_id', 'uncertain_create', 'uncertain_join')
@@ -61,15 +45,9 @@ class JsonIdentityStore:
         return recovery
 
     def load(self, server):
-        source = self.path
-        if not source.exists() and source.name == 'identity.json':
-            source = source.with_name('server-identities.json')
-        if not source.exists():
+        if not self.path.exists():
             return None
-        data = json.loads(source.read_text(encoding='utf-8'))
-        if source != self.path or isinstance(data, dict) and 'servers' in data:
-            self._migrate(source, data)
-            return self.load(server)
+        data = json.loads(self.path.read_text(encoding='utf-8'))
         identity = self._record(data)
         fields = self._recovery().get(self._server_key(server), {})
         return self._record({**fields, 'player_id': identity.player_id})

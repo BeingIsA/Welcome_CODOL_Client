@@ -353,20 +353,14 @@ class RoomTests(unittest.TestCase):
         self.assertEqual(self.store.load('http://two'), IdentityRecord('pl_one'))
         self.assertEqual(json.loads(self.store.path.read_text()), {'player_id': 'pl_one'})
 
-    def test_legacy_file_migrates_only_unambiguous_identity(self):
-        legacy = self.store.path.with_name('server-identities.json')
-        rows = {'http://one': {'player_id': 'pl_one', 'uncertain_create': True},
-                'http://two': {'player_id': 'pl_two'}}
-        legacy.write_text(json.dumps({'version': 1, 'servers': rows}))
-        with self.assertRaises(ValueError):
-            self.store.load('http://one')
-        self.assertTrue(legacy.exists())
-        self.assertFalse(self.store.path.exists())
-        rows['http://two']['player_id'] = 'pl_one'
-        legacy.write_text(json.dumps({'version': 1, 'servers': rows}))
-        self.assertEqual(self.store.load('http://one'), IdentityRecord('pl_one', uncertain_create=True))
-        self.assertFalse(legacy.exists())
-        self.assertEqual(self.store.load('http://three'), IdentityRecord('pl_one'))
+    def test_old_identity_file_is_ignored(self):
+        old_path = self.store.path.with_name('server-identities.json')
+        old_path.write_bytes(b'invalid json')
+        self.assertIsNone(self.store.load('http://one'))
+        record = IdentityRecord('pl_new')
+        self.store.save('http://one', record)
+        self.assertEqual(self.store.load('http://one'), record)
+        self.assertEqual(old_path.read_bytes(), b'invalid json')
 
     def test_server_address_validation(self):
         self.assertEqual(normalize_server('HTTP://LOCALHOST:80/'), 'http://localhost')
