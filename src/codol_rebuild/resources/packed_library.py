@@ -47,8 +47,13 @@ def read_packed_index(packed_root: Path, *, verify_resources: bool = False) -> P
         if path.resolve() != path:
             raise ValueError(f'终版资源文件发生重定向：{relative_name}')
         status = path.stat()
-        if not stat.S_ISREG(status.st_mode) or status.st_size != record['size']:
-            raise ValueError(f'终版资源文件长度或类型不符：{relative_name}')
+        if not stat.S_ISREG(status.st_mode):
+            actual_type = '目录' if stat.S_ISDIR(status.st_mode) else stat.filemode(status.st_mode)
+            raise ValueError(f'终版资源文件类型不符：{path}，期望为普通文件，实际为{actual_type}')
+        if status.st_size != record['size']:
+            raise ValueError(
+                f"终版资源文件长度不符：{path}，索引要求 {record['size']} 字节，实际 {status.st_size} 字节"
+            )
         if verify_resources:
             with path.open('rb') as stream:
                 if hashlib.file_digest(stream, 'sha256').hexdigest() != record['sha256']:
