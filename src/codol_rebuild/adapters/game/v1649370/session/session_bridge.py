@@ -53,6 +53,8 @@ class GameSessionBridge:
             from codol_rebuild.adapters.game.v1649370.rooms.room_session_bridge import RoomSessionBridge
             self.multiplayer = RoomSessionBridge(
                 process, multiplayer, record, lambda: self.profiles.schemas['public'])
+            if self.match_bridge is not None:
+                self.match_bridge.can_apply_member_start = self.multiplayer.can_apply_member_start
             if rename_session is not None:
                 self.multiplayer.account_ready = lambda: rename_session.ready
 

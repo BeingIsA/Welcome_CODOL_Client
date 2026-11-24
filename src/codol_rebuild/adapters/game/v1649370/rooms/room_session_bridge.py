@@ -178,6 +178,7 @@ class RoomSessionBridge:
         self.members_apply = None
         self.ready_buffer = None
         self.applying_members = False
+        self.applying_settings = False
         self.returned_start_id = None
         self.last_returned_start_id = None
         self.return_snapshot_prepared = False
@@ -264,7 +265,8 @@ class RoomSessionBridge:
             build_match_evaluation,
         )
         self.ready_bridge = RoomReadyBridge(self.process, self.port, self._team_room_state,
-                                           lambda: self.applying_members)
+                                           lambda: self.applying_members or self.applying_settings
+                                           or self.pending is not None or self.join_cleanup)
         ready_traps = self.ready_bridge.install()
         self.return_sync_flag = self.process.allocate(4)
         checked_write(self.process, self.return_sync_flag, bytes(4))
@@ -322,6 +324,11 @@ class RoomSessionBridge:
 
     def _word(self, offset, value):
         checked_write(self.process, self.state+offset, struct.pack('<I', value))
+
+    def can_apply_member_start(self):
+        """在本人准备回执和原生成员刷新完成后交付服务端连接通知。"""
+        return (self.ready_bridge is not None and self.ready_bridge.pending_room is None
+                and not self.applying_members)
 
     def _team_room_state(self):
         """以已确认房间及原生对象身份关联换队完成，防止离房后的迟到回显。"""
@@ -452,6 +459,7 @@ class RoomSessionBridge:
             elif phase == 'realtime':
                 self._poll_realtime_event()
             elif phase == 'settings_applied':
+                self.applying_settings = False
                 self.record({'multiplayer_settings_received': self.current_room_id})
             else:
                 if self.pending:
@@ -475,6 +483,7 @@ class RoomSessionBridge:
                         self.member_profiles = {}
                         self.join_snapshot = None
                         self.applying_members = False
+                        self.applying_settings = False
                         self._word(52, 0)
                         if self.departure_message is not None:
                             self.notifications.message(self.departure_message)
@@ -930,6 +939,7 @@ class RoomSessionBridge:
         for offset, raw in scalars:
             checked_write(self.process, room+0x105F0+offset, raw)
         self._word(SETTINGS_ROOM_OFFSET, room)
+        self.applying_settings = True
         self._word(SETTINGS_READY_OFFSET, 1)
 
     def _poll(self):

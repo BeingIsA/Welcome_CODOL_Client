@@ -211,6 +211,10 @@ class MatchBridgeTests(unittest.TestCase):
         self.session.poll.return_value = None
         self.process.write(ROOM_POINTER, struct.pack('<I', 0x40000))
         self.process.write(0x4001c, struct.pack('<I', 0x50000))
+        self.bridge.can_apply_member_start = lambda: False
+        self.bridge.poll(0x500123)
+        self.session.begin.assert_not_called()
+        self.bridge.can_apply_member_start = lambda: True
         self.assertEqual(self.bridge.poll(0x500123), 0x500123)
         self.bridge.poll(0x500123)
         self.session.begin.assert_called_once_with('member_connect', 'room', start_id='first')

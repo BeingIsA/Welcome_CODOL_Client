@@ -77,6 +77,7 @@ class MatchBridge:
         self.delivered_allocation = None
         self.notification_ready = False
         self.member_start_id = None
+        self.can_apply_member_start = lambda: True
         self.host_lock_pending = False
         self.notify = lambda message: self.record({'match_start_error': message})
 
@@ -422,7 +423,8 @@ class MatchBridge:
         if room_pointer < 0x10000 or not self.integer(room_pointer + 0x1C):
             return None
         if not self.process.read(room_pointer+0x278, 1)[0]:
-            self.begin_member_connection(start, room_pointer)
+            if self.can_apply_member_start():
+                self.begin_member_connection(start, room_pointer)
             return None
         if self.member_start_id is not None:
             return None

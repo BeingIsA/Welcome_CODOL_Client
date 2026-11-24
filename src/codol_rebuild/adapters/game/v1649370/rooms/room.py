@@ -103,11 +103,11 @@ class RoomTeamBridge:
 class RoomReadyBridge:
     """准备专用 GFx 适配：命令提交、本人状态读取与成员回显来源分离。"""
 
-    def __init__(self, process, port, room_state, applying_members):
+    def __init__(self, process, port, room_state, applying_room_update):
         self.process = process
         self.port = port
         self.room_state = room_state
-        self.applying_members = applying_members
+        self.applying_room_update = applying_room_update
         self.pending_room = None
         self.continuations = {}
 
@@ -159,7 +159,7 @@ class RoomReadyBridge:
                 # 发布器约定本人排在第一槽，原生登录对象不作为服务端身份来源。
                 ready = self.process.read(room_state[1]+0xE368+0x90, 1)[0]
                 self.process.write(frame+28, struct.pack('<I', int(bool(ready))))
-            elif not self.applying_members() and self.pending_room is None:
+            elif not self.applying_room_update() and self.pending_room is None:
                 parameters = struct.unpack('<I', self.process.read(frame+40, 4))[0]
                 arguments = struct.unpack('<I', self.process.read(parameters+16, 4))[0]
                 ready = bool(self.process.read(arguments+16, 1)[0])

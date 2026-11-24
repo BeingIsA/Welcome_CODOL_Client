@@ -14,6 +14,27 @@ from test_refactor_equivalence import MemoryProcess
 
 
 class ReadySessionTests(unittest.TestCase):
+    def test_member_submits_ready_without_match_information(self):
+        gateway = Mock()
+        session = RoomSession(gateway, Mock(), 'http://server')
+        self.addCleanup(session._executor.shutdown)
+        session._record = IdentityRecord('late')
+        room_id = 'rm_started'
+        joined = {'roomId': room_id, 'ownerPlayerId': 'owner',
+                  'members': [{'playerId': 'late', 'readyState': False}]}
+        gateway.join.return_value = joined
+        gateway.member_profile.return_value = None
+        self.assertTrue(session.begin('join', '后来者', room_id=room_id))
+        session._pending.result(timeout=3)
+        self.assertIsNone(session.poll().error)
+        gateway.change_ready.assert_not_called()
+        gateway.change_ready.return_value = {
+            **joined, 'members': [{'playerId': 'late', 'readyState': True}]}
+        self.assertTrue(session.begin_change_ready(room_id, True))
+        session._ready_pending.result(timeout=3)
+        gateway.change_ready.assert_called_once_with('late', room_id, True)
+        self.assertIsNone(session.poll_change_ready().error)
+
     def test_ready_result_is_consumed_before_queued_member_push(self):
         realtime = Mock()
         payload = {'roomId': 'rm_test', 'ownerPlayerId': 'pl_a', 'members': [{'playerId': 'pl_a'}]}
