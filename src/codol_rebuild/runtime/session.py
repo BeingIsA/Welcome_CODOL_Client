@@ -132,8 +132,9 @@ class ProcessSession:
         if self.runtime_lease is not None:
             self.runtime_lease.hold_for_process(self.info.process)
         self.log['pid'] = self.info.pid
-        self.log['token'] = token_info(self.info.process)
-        if self.log['token'] != {'elevated': 0, 'appcontainer': 0, 'integrity': 4096}:
+        process_token_info = token_info(self.info.process)
+        self.log['token'] = process_token_info
+        if process_token_info['appcontainer'] != 0 or process_token_info['integrity'] != 4096:
             raise RuntimeError('目标令牌不符合低权限隔离约束')
         times = [C.c_uint64() for _ in range(4)]
         check(api(K, 'GetProcessTimes', W.BOOL, PTR, *[PTR] * 4)(self.info.process, *(C.byref(t) for t in times)))
