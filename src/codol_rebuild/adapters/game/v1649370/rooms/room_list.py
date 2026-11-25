@@ -170,9 +170,9 @@ def build_adapter(entry, state):
 
 class RoomListBridge:
     """只在游戏主线程处理视图生命期；通过应用端口获取不可变结果快照。"""
-    def __init__(self, process, port, record, username, error_text):
+    def __init__(self, process, port, record, username, notify):
         self.process, self.port, self.record = process, port, record
-        self.username, self.error_text = username, error_text
+        self.username, self.notify = username, notify
         self.state = None
         self.traps = {}
         self.view = None
@@ -267,7 +267,9 @@ class RoomListBridge:
         if self.view is None:
             return
         self._publish(result.data['rooms'] if result.error is None else [],
-                      self.error_text(result.error) if result.error else None)
+                      str(result.error) if result.error else None)
+        if result.error is not None:
+            self.notify(str(result.error))
 
     def _publish(self, rooms, error=None):
         data, ids = encode_rows(rooms, self.mode, self.state)

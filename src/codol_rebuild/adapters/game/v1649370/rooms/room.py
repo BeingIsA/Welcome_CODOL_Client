@@ -39,7 +39,8 @@ class RoomTeamBridge:
     SLOT = 0xDDD788
     HANDLER = 0x7CFB80
 
-    def __init__(self, process, port, room_state):
+    def __init__(self, process, port, room_state, notify):
+        self.notify = notify
         self.process = process
         self.port = port
         self.room_state = room_state
@@ -83,14 +84,17 @@ class RoomTeamBridge:
         struct.pack_into('<I', context, 184, continuation)
 
     def poll(self):
-        """失败只释放请求；成功快照仅交给仍有效的原生房间。"""
+        """失败提示后释放请求；成功快照仅交给仍有效的原生房间。"""
         if self.pending_room is None:
             return None
         result = self.port.poll_change_team()
         if result is None:
             return None
         requested_room, self.pending_room = self.pending_room, None
-        if result.error is not None or requested_room != self.room_state():
+        if requested_room != self.room_state():
+            return None
+        if result.error is not None:
+            self.notify(str(result.error))
             return None
         return result.data
 
@@ -477,7 +481,7 @@ JOIN_INPUT = 0x5D3216
 # 联机通信页中的入房失败码；由版本桥在失败通知前写入。
 JOIN_ERROR_OFFSET = 40
 # 禁入专用码不占用原版 0..47；文本沿用现有失败任务的展示流程。
-JOIN_BLOCKED_ERROR = 0x10000
+JOIN_MESSAGE_ERROR = 0x10000
 JOIN_ERROR_TEXT_CALL = 0x7C46EB
 # 设置回显独立于建房、入房、离房任务槽，避免完成通知互相覆盖。
 SETTINGS_READY_OFFSET, SETTINGS_ROOM_OFFSET = 44, 48
@@ -575,7 +579,7 @@ def build_join_adapter(entry, state, scratch, profile_capture=None):
     emit('619d c3')
     # 只适配入房失败通知中的文本转换调用；其他错误原样交给原生函数。
     label('join_error_text')
-    emit('3d'); word(JOIN_BLOCKED_ERROR)
+    emit('3d'); word(JOIN_MESSAGE_ERROR)
     branch('0f85', 'native_join_error_text')
     emit('b8'); word(state+JOIN_ERROR_MESSAGE_OFFSET)
     emit('c3')

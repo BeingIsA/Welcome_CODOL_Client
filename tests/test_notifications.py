@@ -22,11 +22,22 @@ class NativeNotificationTests(unittest.TestCase):
                 with self.subTest(language=language_value, message=message):
                     notifications, process = self.make_notifications(language_value)
                     notifications.message(message)
+                    notifications.prepare_next_message()
                     text_call, publish_call = process.write.call_args_list
                     self.assertEqual(text_call.args[0], notifications.buffer+128)
                     self.assertEqual(text_call.args[1][:-1].decode(encoding), message)
                     self.assertEqual(text_call.args[1][-1:], b'\0')
                     self.assertEqual(publish_call.args, (notifications.buffer, struct.pack('<I', 1)))
+
+    def test_two_failures_are_published_in_order(self):
+        notifications, process = self.make_notifications(0)
+        for message in ('房间数量已达上限', '身份已封禁'):
+            notifications.message(message)
+        for message in ('房间数量已达上限', '身份已封禁'):
+            notifications.prepare_next_message()
+            self.assertEqual(process.write.call_args_list[-2].args[1], message.encode() + bytes(1))
+        notifications.prepare_next_message()
+        self.assertEqual(process.write.call_count, 4)
 
     def test_truncation_keeps_complete_characters_and_terminator(self):
         for language_value, encoding, expected in ((0, 'utf-8', 'A'+'中'*333),
@@ -34,6 +45,7 @@ class NativeNotificationTests(unittest.TestCase):
             with self.subTest(language=language_value):
                 notifications, process = self.make_notifications(language_value)
                 notifications.message('A'+'中'*600)
+                notifications.prepare_next_message()
                 encoded_text = process.write.call_args_list[0].args[1]
                 self.assertLessEqual(len(encoded_text), 1001)
                 self.assertEqual(encoded_text[-1:], b'\0')

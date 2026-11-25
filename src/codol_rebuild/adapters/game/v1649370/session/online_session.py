@@ -3,7 +3,6 @@ import hashlib
 import struct
 from codol_rebuild.application.session.contracts import SessionPort
 from codol_rebuild.adapters.game.v1649370.native_state import checked_write, IDENTITY, LOGIN
-from codol_rebuild.adapters.game.v1649370.frontend.notifications import display_message
 from codol_rebuild.adapters.game.v1649370.accounts.player_name import username
 
 
@@ -34,7 +33,7 @@ class OnlineSessionBridge:
         if result is None:
             return
         if result.error is not None:
-            message = display_message(result.error)
+            message = str(result.error)
             self.notify(LOGIN_FAILURE_MESSAGES.get(result.error.code, message))
             self.record({'multiplayer': 'login', 'success': False, 'error': message})
             return message

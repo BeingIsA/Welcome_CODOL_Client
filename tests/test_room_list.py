@@ -99,7 +99,7 @@ class RoomListTests(unittest.TestCase):
         memory, port, events = Memory(), Mock(), []
         port.poll_list.return_value = None
         port.begin_list.return_value = True
-        bridge = listing.RoomListBridge(memory, port, events.append, lambda: '玩家', str)
+        bridge = listing.RoomListBridge(memory, port, events.append, lambda: '玩家', Mock())
         bridge.state = 0x21000000
         memory.write(bridge.state, bytes(listing.ROWS))
         view, frame, mode = 0x22000000, 0x23000000, 0x24000000
@@ -140,3 +140,4 @@ class RoomListTests(unittest.TestCase):
         self.assertEqual(memory.read(bridge.state, 4), b'\1\0\0\0')
         self.assertEqual(memory.read(bridge.state+listing.COUNT, 4), bytes(4))
         self.assertEqual(events[-1]['error'], '断网')
+        bridge.notify.assert_called_once_with('断网')

@@ -17,7 +17,8 @@ class TeamBridgeTests(unittest.TestCase):
         self.process = MemoryProcess()
         self.port = Mock()
         self.state = ('rm_test', 0x30000000, 0x31000000)
-        self.bridge = RoomTeamBridge(self.process, self.port, lambda: self.state)
+        self.notify = Mock()
+        self.bridge = RoomTeamBridge(self.process, self.port, lambda: self.state, self.notify)
         self.bridge.install()
 
     def command(self, value):
@@ -41,11 +42,12 @@ class TeamBridgeTests(unittest.TestCase):
             self.port.begin_change_team.assert_called_once_with('rm_test', target)
         self.assertFalse(any(address >= 0x30000000 for address, data in self.process.writes))
 
-    def test_failure_is_consumed_silently_and_next_request_allowed(self):
+    def test_failure_is_reported_and_next_request_allowed(self):
         self.command(2)
         self.port.poll_change_team.return_value = Completion('change_team', error=OnlineError('ROOM_TEAM_FULL', '满员'))
         before = list(self.process.writes)
         self.assertIsNone(self.bridge.poll())
+        self.notify.assert_called_once_with('满员')
         self.assertEqual(self.process.writes, before)
         self.assertIsNone(self.bridge.pending_room)
         self.command(0)

@@ -62,9 +62,3 @@ class SessionPort(Protocol):
     def poll_login(self) -> LoginCompletion | None:
         """非阻塞消费一次登录结果。"""
         ...
-
-
-# 权限类错误码：登录或鉴权被服务端以身份/权限理由拒绝。
-PERMISSION_ERROR_CODES = frozenset({'BANNED', 'FORBIDDEN', 'UNAUTHENTICATED'})
-
-

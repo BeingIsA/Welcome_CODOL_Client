@@ -7,12 +7,12 @@ import hashlib
 import struct
 from codol_rebuild.application.room.contracts import RoomPort
 from codol_rebuild.adapters.game.v1649370.rooms.room import (
-    JOIN_ERROR_OFFSET, JOIN_BLOCKED_ERROR, JOIN_ERROR_MESSAGE_OFFSET,
+    JOIN_ERROR_OFFSET, JOIN_MESSAGE_ERROR, JOIN_ERROR_MESSAGE_OFFSET,
     READY_RECEIVE_ONLY, SETTINGS_READY_OFFSET, SETTINGS_ROOM_OFFSET,
 )
 from codol_rebuild.adapters.game.v1649370.rooms import member_profile
 from codol_rebuild.adapters.game.v1649370.native_state import POLL, ACTION, ROOM, SESSION, LEAVE_ARG, UNDEFINED, MESSAGE, u32, checked_write
-from codol_rebuild.adapters.game.v1649370.frontend.notifications import display_message
+from codol_rebuild.adapters.game.v1649370.frontend.notifications import NativeNotifications
 from codol_rebuild.adapters.game.v1649370.accounts.player_name import username
 
 ROOM_POINTER = 0x82E13FC
@@ -233,8 +233,9 @@ class RoomSessionBridge:
     def install_adapters(self, room_plan):
         """安装房间原生入口，返回公共调度需要的显式发布接口。"""
         from codol_rebuild.adapters.game.v1649370.rooms.room_list import RoomListBridge
+        self.notifications = NativeNotifications(self.process)
         self.room_list = RoomListBridge(self.process, self.port, self.record,
-                                       lambda: username(self.process.read), display_message)
+                                       lambda: username(self.process.read), self.notifications.message)
         publisher = self.room_list.install()
         from codol_rebuild.adapters.game.v1649370.rooms.room import build_join_adapter, validate_join_contract
         validate_join_contract(self.process.read)
@@ -249,8 +250,6 @@ class RoomSessionBridge:
         room_plan = {**room_plan, 'entries': {**room_plan['entries'], **join_plan['entries'],
                                             'members_apply': self.members_apply}}
         from codol_rebuild.adapters.game.v1649370.rooms.room_member_menu import RoomMemberMenu
-        from codol_rebuild.adapters.game.v1649370.frontend.notifications import NativeNotifications
-        self.notifications = NativeNotifications(self.process)
         room_plan['entries']['notifications'] = self.notifications.install()
         self.member_menu = RoomMemberMenu(self.process, self.port,
             lambda: (self.current_room_id, self.is_owner, self.player_id,
@@ -258,7 +257,7 @@ class RoomSessionBridge:
             self.record, self.notifications.message)
         menu_traps = self.member_menu.install()
         from codol_rebuild.adapters.game.v1649370.rooms.room import RoomTeamBridge
-        self.team_bridge = RoomTeamBridge(self.process, self.port, self._team_room_state)
+        self.team_bridge = RoomTeamBridge(self.process, self.port, self._team_room_state, self.notifications.message)
         team_traps = self.team_bridge.install()
         from codol_rebuild.adapters.game.v1649370.rooms.room import (
             RoomReadyBridge, build_local_ready_notification, build_ready_receive,
@@ -347,7 +346,7 @@ class RoomSessionBridge:
                 and u32(read, session+0x25C8) == room and read(session, 1) != b'\0')
 
     def _failure(self, operation, message, error_code=None):
-        # 复用原版本地化文本；仅专用禁入错误进入局部文本转换分支。
+        # 踢出后再次入房使用原版本地化提示。
         if operation == 'join' and error_code == 'ROOM_JOIN_BLOCKED':
             message = '@SF_UI_NOTE_EVER_BE_KICKED'
         # 游戏 GFx 接口接收 UTF-8 文本；密码、机器码不进入错误日志。
@@ -356,8 +355,8 @@ class RoomSessionBridge:
         if operation == 'join':
             # 原生 0x731440 映射：5 为密码错误，3 为房间不存在。
             # 每次失败都覆盖；专用禁入码复用原版文本，其他失败沿用原有提示。
-            native_error_code = (JOIN_BLOCKED_ERROR if error_code == 'ROOM_JOIN_BLOCKED'
-                                 else 5 if error_code == 'INVALID_ROOM_PASSWORD' else 3)
+            native_error_code = (5 if error_code == 'INVALID_ROOM_PASSWORD'
+                                 else 3 if error_code in (None, 'ROOM_NOT_FOUND') else JOIN_MESSAGE_ERROR)
             self._word(JOIN_ERROR_OFFSET, native_error_code)
         self._word(ACTION, 6 if operation == 'join' else 2 if operation == 'create' else 4)
         self.record({'multiplayer': operation, 'success': False, 'error': message})
@@ -458,6 +457,7 @@ class RoomSessionBridge:
                 self._poll()
             elif phase == 'realtime':
                 self._poll_realtime_event()
+                self.notifications.prepare_next_message()
             elif phase == 'settings_applied':
                 self.applying_settings = False
                 self.record({'multiplayer_settings_received': self.current_room_id})
@@ -798,7 +798,7 @@ class RoomSessionBridge:
             if result is not None:
                 if result.error is not None:
                     # 原生请求锁依赖完成通知解除；保留已确认状态，不重试写请求。
-                    self.notifications.message(display_message(result.error))
+                    self.notifications.message(str(result.error))
                     self._word(56, 1)
                 else:
                     self._confirm_local_ready(result.data)
@@ -969,7 +969,7 @@ class RoomSessionBridge:
             self.record({'multiplayer_settings': 'done', 'success': result.error is None,
                          **({'error': str(result.error)} if result.error else {})})
             if result.error is not None:
-                self.notifications.message(display_message(result.error))
+                self.notifications.message(str(result.error))
             # 设置通道已腾空，无主流程在途时停止轮询，与登录分支同样处理。
             self._settings_outstanding = False
             if self.pending is None:
@@ -981,7 +981,10 @@ class RoomSessionBridge:
         elif self.pending is None or result.operation != self.pending[0]:
             raise ValueError('联机完成结果没有匹配的原生请求')
         elif result.error:
-            self._failure(result.operation, display_message(result.error), result.error.code)
+            self._failure(result.operation, str(result.error), result.error.code)
+            if result.operation == 'create':
+                # 本帧随后结束建房等待，通知发布器在下一前端帧显示错误。
+                self.notifications.message(str(result.error))
             if result.operation == 'join':
                 self.join_cleanup = self.port.begin('leave', username(self.process.read))
         elif result.operation == 'join':

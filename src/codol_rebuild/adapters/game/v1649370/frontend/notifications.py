@@ -1,14 +1,6 @@
 """固定版本原生单按钮通知：由调用方在主线程排队，前端帧负责发布。"""
+from collections import deque
 import struct
-from codol_rebuild.application.errors import OnlineError
-from codol_rebuild.application.session.contracts import PERMISSION_ERROR_CODES
-
-
-def display_message(error) -> str:
-    """权限类失败统一显示为缺少文件，不向用户暴露封禁等权限细节。"""
-    if isinstance(error, OnlineError) and error.code in PERMISSION_ERROR_CODES:
-        return '缺少文件'
-    return str(error)
 
 
 class NativeNotifications:
@@ -17,6 +9,7 @@ class NativeNotifications:
     def __init__(self, process):
         self.process = process
         self.buffer = None
+        self.pending_messages = deque()
 
     def install(self):
         """复用已确认的 cppShowNotification 包装入口，不修改其实现。"""
@@ -41,10 +34,17 @@ class NativeNotifications:
 
     def message(self, text):
         """主线程排队一次通知；原生确认按钮沿用原有关闭行为。"""
+        self.pending_messages.append(text)
+
+    def prepare_next_message(self):
+        """每个前端帧最多发布一条，避免多个完成结果覆写同一文本缓冲。"""
+        if not self.pending_messages:
+            return
+        text = self.pending_messages.popleft()
         # 普通通知经 0x72FB20 转换：英语直接使用 UTF-8，其他语言按 CP936 解码。
         language_pointer = struct.unpack('<I', self.process.read(0x7ACE410, 4))[0]
         language_value = struct.unpack('<I', self.process.read(language_pointer+12, 4))[0]
         encoding = 'utf-8' if language_value == 0 else 'gbk'
-        encoded_text = text.encode(encoding)[:1000].decode(encoding, errors='ignore').encode(encoding)+b'\0'
+        encoded_text = text.encode(encoding, errors='replace')[:1000].decode(encoding, errors='ignore').encode(encoding)+b'\0'
         self.process.write(self.buffer+128, encoded_text)
         self.process.write(self.buffer, struct.pack('<I', 1))

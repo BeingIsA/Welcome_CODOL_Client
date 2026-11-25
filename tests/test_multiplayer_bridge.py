@@ -237,8 +237,8 @@ class MultiplayerBridgeTests(unittest.TestCase):
     def test_join_failure_preserves_password_reason_and_resets_for_next_failure(self):
         memory, adapter, data, room, session = self.join_fixture()
         for code, expected in (('INVALID_ROOM_PASSWORD', 5), ('ROOM_NOT_FOUND', 3),
-                               ('ROOM_JOIN_BLOCKED', bridge.JOIN_BLOCKED_ERROR),
-                               ('INVALID_ROOM_PASSWORD', 5), ('ROOM_CLOSED', 3)):
+                               ('ROOM_JOIN_BLOCKED', bridge.JOIN_MESSAGE_ERROR),
+                               ('INVALID_ROOM_PASSWORD', 5), ('ROOM_CLOSED', bridge.JOIN_MESSAGE_ERROR)):
             with self.subTest(code=code):
                 adapter.port.poll.return_value = Completion('join', error=OnlineError(code, '入房失败'))
                 adapter.port.begin.reset_mock()
@@ -893,6 +893,17 @@ class MultiplayerBridgeTests(unittest.TestCase):
         process.write(session, b'\x01')
         return value, process, port, room, session
 
+    def test_create_failure_queues_server_message_once(self):
+        value, process, port, room, session = self.setup_bridge()
+        value.notifications = Mock()
+        value.pending = ('create', room, session)
+        port.poll.side_effect = [Completion('create', error=OnlineError(
+            'ROOM_LIMIT_REACHED', '房间数量已达上限')), None]
+        value._poll()
+        self.assertEqual(bridge.u32(process.read, value.state+bridge.ACTION), 2)
+        value._poll()
+        value.notifications.message.assert_called_once_with('房间数量已达上限')
+
     def test_failed_leave_preserves_native_room(self):
         value, process, port, room, session = self.setup_bridge()
         value.pending = ('leave', room, session)
@@ -926,14 +937,14 @@ class MultiplayerBridgeTests(unittest.TestCase):
         self.assertEqual(bridge.u32(process.read, value.state+bridge.ACTION), 0)
         self.assertEqual(value.pending, ('create', room, session))
 
-    def test_permission_failures_display_missing_file(self):
+    def test_permission_failures_display_original_message(self):
         value, process, port, room, session = self.setup_bridge()
         value.pending = ('leave', room, session)
         port.poll.return_value = Completion('leave', error=OnlineError('BANNED', '身份已封禁'))
         value._poll()
-        self.assertEqual(process.read(value.state+bridge.MESSAGE, 64).split(b'\0')[0], '缺少文件'.encode('utf-8'))
+        self.assertEqual(process.read(value.state+bridge.MESSAGE, 64).split(b'\0')[0], '身份已封禁'.encode('utf-8'))
         self.assertEqual(bridge.u32(process.read, value.state+bridge.ACTION), 4)
-        value.record.assert_called_with({'multiplayer': 'leave', 'success': False, 'error': '缺少文件'})
+        value.record.assert_called_with({'multiplayer': 'leave', 'success': False, 'error': '身份已封禁'})
         # 非权限失败仍显示原始错误。
         value.pending = ('leave', room, session)
         port.poll.return_value = Completion('leave', error=OnlineError('ROOM_FULL', '房间已满'))
@@ -961,7 +972,7 @@ class MultiplayerBridgeTests(unittest.TestCase):
             login_bridge.poll()
             login_bridge.poll()
         self.assertTrue(login_bridge.started)
-        notify.assert_called_once_with('缺少文件')
+        notify.assert_called_once_with('身份已封禁')
         self.assertEqual(bridge.u32(process.read, value.state+bridge.ACTION), 0)
         port.begin_login.assert_called_once()
 
