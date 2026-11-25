@@ -194,7 +194,7 @@ python -B -X utf8 .\tools\launch_client.py --prepare-only --verify-resources
 - **持久数据**：服务端保存角色档案和仓库。本机的 `%APPDATA%/CODOL/data/accounts/identity.json` 用于找回服务端身份，原生设置位于 `%APPDATA%/CODOL/players/`。
 - **会话产物**：每次实际运行在 `workspaces/offline-runs/<会话名>/` 中保存独立程序副本、配置及诊断产物；启动输出会给出对应目录。
 - **自带资源**：终版 IFS、包外依赖与索引随客户端放在 `resources/v1649370/packed/`。
-- **按需缓存**：游戏访问某个文件时才填充其内容。宿主在游戏退出后关闭视图并释放本次缓存；玩家设置保存在独立目录。
+- **按需缓存**：游戏访问某个文件时才填充其内容。游戏退出时宿主断开 Cloud Files 连接。下次租用同版本的同一槽位时复用占位文件和已填充内容，玩家设置保存在独立目录。
 
 不要直接修改固定离线镜像。宿主会先将其复制到会话目录，再应用运行补丁。`workspaces/` 还包含资源输入副本和提取中间材料，不能整体当作可丢弃缓存；清理会话时也不能递归穿过资源目录联接。详见[工作目录说明](workspaces/README.md)。
 

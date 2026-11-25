@@ -80,6 +80,11 @@ class PackedView:
         self.delivered_bytes = 0
         self.failed_fetches = 0
 
+    @property
+    def reused(self):
+        """本次会话是否连接到了已完成的资源视图。"""
+        return self.view.reused
+
     def _read_bytes(self, identity, process_id, offset, length, destination):
         try:
             path = identity.decode('utf-8')
@@ -137,15 +142,16 @@ class PackedView:
                 self.audit = None
 
 
-def start_packed_view(packed_root, resource_entries, view_root, binaries_directory, audit_path, *, view_factory):
-    """在已租用的槽中创建按需文件；由组合根注入 Windows 实现，退出守卫后由调用方关闭。"""
+def start_packed_view(packed_root, resource_entries, view_root, binaries_directory, audit_path, *, index_sha256, view_factory):
+    """在已租用的槽中打开该索引的按需视图；每次连接独立记录实际供件。"""
     resource_view = PackedView(packed_root, resource_entries, view_root)
     try:
         resource_view.audit = Path(audit_path).open('x', encoding='utf-8', buffering=1)
         resource_view.reader = ArchiveReader(resource_view.packed_root, binaries_directory / 'ifs_reader.exe')
         sizes = {path: member['size'] for path, member in resource_view.members.items()}
         resource_view.view = view_factory(resource_view.root, binaries_directory / 'cloud_files.dll',
-                                          sizes, resource_view._read_bytes, resource_view._complete)
+                                          sizes, resource_view._read_bytes, resource_view._complete,
+                                          index_sha256=index_sha256)
         resource_view.view.open()
         return resource_view
     except BaseException:

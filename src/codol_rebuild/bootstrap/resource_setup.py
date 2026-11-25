@@ -40,7 +40,7 @@ def digest(path):
 
 
 def close_runtime_resources(runtime_lease, packed_view, log):
-    """游戏停止后先释放当前槽位的资源视图，再允许下次启动租用槽位。"""
+    """游戏停止后先断开本次资源连接并关闭读取器，再释放槽位租约。"""
     try:
         if packed_view is not None:
             packed_view.close()
@@ -90,7 +90,7 @@ def prepare_reusable_runtime(args, run_dir, session_stage, log, phase_done, imag
         if packed_index is not None:
             from codol_rebuild.platform.cloud_files import CloudFilesView
             from codol_rebuild.resources.packed_view import start_packed_view
-            # 视图位置由槽位和索引版本确定，程序目录中的联接可跨次启动复用。
+            # 版本及独占槽位确定同步根；新会话为同一根重新连接供件回调。
             view_root = lease.slot / 'packed-view'
             fetch_log = run_dir / 'packed-fetch.jsonl'
             log['packed_library'] = {
@@ -101,7 +101,9 @@ def prepare_reusable_runtime(args, run_dir, session_stage, log, phase_done, imag
             }
             packed_view = start_packed_view(library, packed_index.members, view_root,
                                             ROOT / 'bin/v1649370/packed-reader',
-                                            audit_path=fetch_log, view_factory=CloudFilesView)
+                                            audit_path=fetch_log, index_sha256=manifest_digest,
+                                            view_factory=CloudFilesView)
+            log['packed_library']['view_reused'] = packed_view.reused
             mount_sources.extend((view_root, view_root / name) for name in ('main', 'hires', 'client_shipretail'))
             phase_done('packed-resource-view')
         program = lease.path

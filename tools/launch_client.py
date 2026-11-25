@@ -56,7 +56,7 @@ def build_plan(options: argparse.Namespace) -> dict:
         # 正常启动由装配步骤读取一次索引。仅预检时也要核实来源文件齐备。
         if options.dry_run:
             read_packed_index(resource_root, verify_resources=getattr(options, 'verify_resources', False))
-        resource_policy = '项目自带终版 IFS 原包；首次读取整文件填充，退出后释放'
+        resource_policy = '使用项目自带的终版 IFS 原包，按需填充文件，在同版本的同一槽位跨次复用'
     else:
         from codol_rebuild.resources.native_library import read_manifest
         resource_root = requested_native.resolve()
