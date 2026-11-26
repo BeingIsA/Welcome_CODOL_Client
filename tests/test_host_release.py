@@ -21,7 +21,7 @@ class HostReleaseTests(unittest.TestCase):
             module_spec.loader.exec_module(builder)
 
         runtime_files = (
-            'bin/offline_guard.exe', 'bin/v1649370/codol1649370-offline.exe', 'config/server.ini',
+            'bin/match_endpoint_guard.exe', 'bin/v1649370/codol1649370-offline.exe', 'config/server.ini',
             'manifests/offline-menu-patches.json', 'bin/v1649370/packed-reader/ifs_reader.exe',
             'bin/v1649370/packed-reader/cloud_files.dll',
         )

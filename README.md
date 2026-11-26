@@ -55,7 +55,7 @@ client/
 
 ```text
 bin/v1649370/codol1649370-offline.exe
-bin/offline_guard.exe
+bin/match_endpoint_guard.exe
 manifests/offline-menu-patches.json
 bin/v1649370/packed-reader/ifs_reader.exe
 bin/v1649370/packed-reader/cloud_files.dll
@@ -234,6 +234,6 @@ python -B -X utf8 .\tools\launch_client.py --prepare-only --verify-resources
 
 ### 本机游戏服务器配置
 
-`start_client.cmd` 读取 `config/server.ini` 的 `[server] ip/port`（服务器IPv4及HTTP端口）和 `[client] port`（客户端本地UDP端口，默认30001）。本机服务端填127.0.0.1，远程服务端填实际可访问的IPv4；无需填写客户端IP。每次联机启动按到服务器的系统路由选择本机地址，再通过原生2916/2917初始化网络。多客户端同机运行可分别指定不同 `--client-port`（使用配置文件时以文件值为准）。守卫只放行该服务器IP的全部UDP端口，其余原生流量保持阻断；对局实际端口由服务器下发并校验有效范围。独立离线启动不启用网络。服务端监听0.0.0.0、经127.0.0.1管理实例，不再下发对局IP；客户端始终使用配置的服务器IP，分配响应只提供端口和会话资料。此流程面向直连IPv4，不包含运行中切网恢复、NAT或反向代理适配。
+`start_client.cmd` 读取 `config/server.ini` 的 `[server] ip/port`（服务器IPv4及HTTP端口）和 `[client] port`（客户端本地UDP端口，默认30001）。本机服务端填127.0.0.1，远程服务端填实际可访问的IPv4；无需填写客户端IP。每次联机启动按到服务器的系统路由选择本机地址，再通过原生2916/2917初始化网络。多客户端同机运行可分别指定不同 `--client-port`（使用配置文件时以文件值为准）。守卫收到本局分配后只放行指定 IPv4 和 UDP 端口，换局时替换规则，离局后撤销。Nomad 模式连接节点地址，本机模式沿用大厅地址。独立离线启动不启用网络。服务端监听0.0.0.0、经127.0.0.1管理实例，不再下发对局IP；客户端始终使用配置的服务器IP，分配响应只提供端口和会话资料。此流程面向直连IPv4，不包含运行中切网恢复、NAT或反向代理适配。
 
 配置只声明网络许可，不自动启动游戏服务端，不生成分配/预订记录，也不代表进图已接通。守卫仍保留进程身份核对和动态规则清理；普通客户端启动需要UAC。已提升的独立验收工具可直接启动守卫，避免重复请求UAC。

@@ -2,6 +2,8 @@
 from __future__ import annotations
 import ctypes as C
 from ctypes import wintypes as W
+from ipaddress import IPv4Address
+from uuid import uuid4
 import hashlib, json, os, struct, subprocess, time, traceback
 from pathlib import Path
 from codol_rebuild.platform.win32 import (K,A,PTR,SIZE,api,check,close,wait,vquery,SI,PI,EVENT,MBI,SHELLINFO,low_token,token_info)
@@ -17,6 +19,34 @@ class ProcessSession:
         self.closed=False
         self.resumed=False
         self.runtime_lease=None
+
+    def set_game_endpoint(self, address, port):
+        """原子提交本局地址，守卫提交 WFP 事务并应答后才允许原生连接。"""
+        if address is not None:
+            address = str(IPv4Address(address))
+            if type(port) is not int or not 1 <= port <= 65535:
+                raise ValueError('DS 端口无效')
+        nonce = uuid4().hex
+        event = api(K, 'CreateEventW', W.HANDLE, W.LPVOID, W.BOOL, W.BOOL, W.LPCWSTR)(
+            None, False, False, 'Local\\CODOL-endpoint-' + nonce)
+        if not event:
+            raise ValueError('无法创建节点端点应答事件')
+        try:
+            pending = self.run_dir / 'endpoint.tmp'
+            pending.write_text(f'{nonce} {address or "0.0.0.0"} {port}', encoding='ascii')
+            deadline = time.monotonic() + 1
+            while True:
+                try:
+                    pending.replace(self.run_dir / 'endpoint.request')
+                    break
+                except PermissionError:
+                    if time.monotonic() >= deadline:
+                        raise ValueError('无法提交本局网络端点')
+                    time.sleep(0.01)
+            if wait(event, 3000) != 0:
+                raise ValueError('网络守卫未确认本局端点')
+        finally:
+            close(event)
 
     @staticmethod
     def periodic(interval):
@@ -167,8 +197,8 @@ class ProcessSession:
                 if time.monotonic() >= until:
                     raise
                 time.sleep(0.05)
-        expected_scope = 'local-game-udp' if game_address else 'offline-deny-all'
-        expected_filters = 6 if game_address else 4
+        expected_scope = 'match-endpoint-udp' if game_address else 'offline-deny-all'
+        expected_filters = 4
         if game_address and ready.get('game_ip') != game_address:
             raise ValueError('守卫游戏端点不符合本次配置')
         if ready['scope'] != expected_scope or len(ready['filter_ids']) != expected_filters or (not ready['job_kill_on_close']) or (ready['max_processes'] != 1) or (ready['child_pid'] != self.info.pid) or (int(ready['creation_filetime']) != times[0].value) or (not ready['dynamic']):

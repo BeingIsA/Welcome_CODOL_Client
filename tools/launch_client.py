@@ -40,7 +40,7 @@ def build_plan(options: argparse.Namespace) -> dict:
     requested_native = getattr(options, 'native_library', None)
     image = ROOT / 'bin/v1649370/codol1649370-offline.exe'
     patches = ROOT / 'manifests/offline-menu-patches.json'
-    for path in (image, patches, ROOT / 'bin/offline_guard.exe'):
+    for path in (image, patches, ROOT / 'bin/match_endpoint_guard.exe'):
         if not path.is_file():
             raise ValueError(f'离线入口缺少文件：{path}')
     if requested_native is None:

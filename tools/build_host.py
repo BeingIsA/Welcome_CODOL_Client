@@ -39,7 +39,7 @@ def compile_host(build_directory: Path) -> Path:
 def assemble_release(compiled_directory: Path, destination: Path) -> None:
     shutil.copytree(compiled_directory, destination)
     runtime_files = (
-        'bin/offline_guard.exe', 'bin/v1649370/codol1649370-offline.exe', 'config/server.ini',
+        'bin/match_endpoint_guard.exe', 'bin/v1649370/codol1649370-offline.exe', 'config/server.ini',
         'manifests/offline-menu-patches.json',
         *(f'bin/v1649370/packed-reader/{name}' for name in PACKED_READER_FILES),
     )

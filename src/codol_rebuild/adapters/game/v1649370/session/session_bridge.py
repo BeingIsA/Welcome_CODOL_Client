@@ -43,7 +43,7 @@ class GameSessionBridge:
         if match_session is not None and multiplayer is not None:
             from codol_rebuild.adapters.game.v1649370.matches.session_bridge import MatchBridge
             self.match_bridge = MatchBridge(process, match_session, multiplayer.confirmed_room_id,
-                args.server_address, record)
+                args.server_address, record, process.set_game_endpoint)
         self.broadcast_bridge = None
         if broadcast_session is not None:
             from codol_rebuild.adapters.game.v1649370.chat.broadcast import BroadcastBridge

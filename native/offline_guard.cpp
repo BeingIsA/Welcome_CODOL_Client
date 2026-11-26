@@ -10,6 +10,7 @@
 #include <fwpmu.h>
 #include <rpc.h>
 #include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 #include <stdexcept>
@@ -32,6 +33,7 @@ static const GUID CODOL_RECEIVE_V6 = {0xa3b42c97, 0x9f04, 0x4672, {0xb8,0x7e,0xc
 // 端点条件GUID来自同版本Windows SDK fwpmu.h。
 static const GUID CODOL_REMOTE_ADDRESS = {0xb235ae9a,0x1d64,0x49b8,{0xa4,0x4c,0x5f,0xf3,0xd9,0x09,0x50,0x45}};
 static const GUID CODOL_PROTOCOL = {0x3971ef2b,0x623e,0x4f9a,{0x8c,0xb1,0x6e,0x79,0xb8,0x06,0xb9,0xa7}};
+static const GUID CODOL_REMOTE_PORT = {0xc35a604d,0xd22b,0x4e1a,{0x91,0xb4,0x68,0xf6,0x74,0xee,0x67,0x4b}};
 static UINT32 parse_game_address(const wchar_t* text) {
     unsigned octets[4]; wchar_t trailing;
     if (swscanf(text,L"%u.%u.%u.%u%c",&octets[0],&octets[1],&octets[2],&octets[3],&trailing)!=4 ||
@@ -216,33 +218,45 @@ int wmain(int argc, wchar_t** argv) {
             filter_ids.push_back(id);
         }
         // 同一子层优先匹配精确UDP端点；其余流量继续命中下方全阻断。
-        if (game_address) {
-            FWPM_FILTER_CONDITION0 endpoint_conditions[3]{};
-            endpoint_conditions[0]=condition;
-            endpoint_conditions[1].fieldKey=CODOL_REMOTE_ADDRESS;
-            endpoint_conditions[1].matchType=FWP_MATCH_EQUAL;
-            endpoint_conditions[1].conditionValue.type=FWP_UINT32;
-            endpoint_conditions[1].conditionValue.uint32=game_address;
-            // 指定服务器的全部UDP端口均可用，其余流量保持阻断。
-            endpoint_conditions[2].fieldKey=CODOL_PROTOCOL;
-            endpoint_conditions[2].matchType=FWP_MATCH_EQUAL;
-            endpoint_conditions[2].conditionValue.type=FWP_UINT8;
-            endpoint_conditions[2].conditionValue.uint8=17;
-            for (const GUID& endpoint_layer : {CODOL_CONNECT_V4,CODOL_RECEIVE_V4}) {
-                FWPM_FILTER0 endpoint_filter{};
-                endpoint_filter.displayData.name=const_cast<wchar_t*>(L"CODOL configured game UDP");
-                endpoint_filter.layerKey=endpoint_layer;
-                endpoint_filter.subLayerKey=sub_key;
-                endpoint_filter.weight.type=FWP_UINT8;
-                endpoint_filter.weight.uint8=15;
-                endpoint_filter.numFilterConditions=3;
-                endpoint_filter.filterCondition=endpoint_conditions;
-                endpoint_filter.action.type=FWP_ACTION_PERMIT;
-                UINT64 endpoint_filter_id=0;
-                wfp(FwpmFilterAdd0(engine,&endpoint_filter,nullptr,&endpoint_filter_id),"Add configured UDP endpoint filter");
-                filter_ids.push_back(endpoint_filter_id);
+        std::vector<UINT64> endpoint_filters;
+        auto replace_endpoint = [&](UINT32 address, UINT16 port) {
+            wfp(FwpmTransactionBegin0(engine, 0), "Begin endpoint transaction");
+            for (UINT64 id : endpoint_filters)
+                wfp(FwpmFilterDeleteById0(engine, id), "Remove previous match endpoint");
+            endpoint_filters.clear();
+            if (port) {
+                FWPM_FILTER_CONDITION0 endpoint_conditions[4]{};
+                endpoint_conditions[0]=condition;
+                endpoint_conditions[1].fieldKey=CODOL_REMOTE_ADDRESS;
+                endpoint_conditions[1].matchType=FWP_MATCH_EQUAL;
+                endpoint_conditions[1].conditionValue.type=FWP_UINT32;
+                endpoint_conditions[1].conditionValue.uint32=address;
+                // 仅放行本局确认的远端 UDP 端口。
+                endpoint_conditions[3].fieldKey=CODOL_REMOTE_PORT;
+                endpoint_conditions[3].matchType=FWP_MATCH_EQUAL;
+                endpoint_conditions[3].conditionValue.type=FWP_UINT16;
+                endpoint_conditions[3].conditionValue.uint16=port;
+                endpoint_conditions[2].fieldKey=CODOL_PROTOCOL;
+                endpoint_conditions[2].matchType=FWP_MATCH_EQUAL;
+                endpoint_conditions[2].conditionValue.type=FWP_UINT8;
+                endpoint_conditions[2].conditionValue.uint8=17;
+                for (const GUID& endpoint_layer : {CODOL_CONNECT_V4,CODOL_RECEIVE_V4}) {
+                    FWPM_FILTER0 endpoint_filter{};
+                    endpoint_filter.displayData.name=const_cast<wchar_t*>(L"CODOL configured game UDP");
+                    endpoint_filter.layerKey=endpoint_layer;
+                    endpoint_filter.subLayerKey=sub_key;
+                    endpoint_filter.weight.type=FWP_UINT8;
+                    endpoint_filter.weight.uint8=15;
+                    endpoint_filter.numFilterConditions=4;
+                    endpoint_filter.filterCondition=endpoint_conditions;
+                    endpoint_filter.action.type=FWP_ACTION_PERMIT;
+                    UINT64 endpoint_filter_id=0;
+                    wfp(FwpmFilterAdd0(engine,&endpoint_filter,nullptr,&endpoint_filter_id),"Add configured UDP endpoint filter");
+                    endpoint_filters.push_back(endpoint_filter_id);
+                }
             }
-        }
+            wfp(FwpmTransactionCommit0(engine), "Commit match endpoint");
+        };
         wfp(FwpmTransactionCommit0(engine), "Commit all four offline filters");
         // ready 只包含数值和固定字符串，避免路径转义或编码问题。
         std::string ready = "{\"guard_pid\":" + std::to_string(GetCurrentProcessId()) +
@@ -251,12 +265,31 @@ int wmain(int argc, wchar_t** argv) {
         for (size_t i = 0; i < filter_ids.size(); ++i)
             ready += (i ? "," : "") + std::to_string(filter_ids[i]);
         ready += "],\"dynamic\":true,\"job_kill_on_close\":true,\"max_processes\":1,\"bound_seconds\":" +
-            std::to_string(bound_seconds) + ",\"scope\":\"" + (game_address ? "local-game-udp" : "offline-deny-all") + "\",\"identity_verified\":true,\"game_ip\":\"" + game_ip + "\"}";
+            std::to_string(bound_seconds) + ",\"scope\":\"" + (game_address ? "match-endpoint-udp" : "offline-deny-all") + "\",\"identity_verified\":true,\"game_ip\":\"" + game_ip + "\"}";
         write_new(run / L"guard-ready.json", ready);
         const ULONGLONG deadline = GetTickCount64() + bound_seconds * 1000;
+        std::string previous_nonce;
         while ((bound_seconds == 0 || GetTickCount64() < deadline) &&
-               !fs::exists(run / L"guard-done.json") && WaitForSingleObject(process, 0) == WAIT_TIMEOUT)
-            Sleep(100);
+               !fs::exists(run / L"guard-done.json") && WaitForSingleObject(process, 0) == WAIT_TIMEOUT) {
+            if (game_address) {
+                std::ifstream request(run / L"endpoint.request");
+                std::string nonce, address;
+                unsigned port = 0;
+                if (request >> nonce >> address >> port && nonce != previous_nonce) {
+                    require(nonce.size() == 32 && nonce.find_first_not_of("0123456789abcdef") == std::string::npos &&
+                            port <= 65535 && (port || address == "0.0.0.0"), "Invalid endpoint request");
+                    std::wstring wide_address(address.begin(), address.end());
+                    std::wstring event_name = L"Local\\CODOL-endpoint-" + std::wstring(nonce.begin(), nonce.end());
+                    HANDLE confirmation = OpenEventW(EVENT_MODIFY_STATE, FALSE, event_name.c_str());
+                    require(confirmation != nullptr, "Endpoint request expired");
+                    replace_endpoint(port ? parse_game_address(wide_address.c_str()) : 0, static_cast<UINT16>(port));
+                    SetEvent(confirmation);
+                    CloseHandle(confirmation);
+                    previous_nonce = nonce;
+                }
+            }
+            Sleep(50);
+        }
     } catch (const std::exception& error) { failure = error.what(); }
 
     // 先结束并确认子进程退出，再关闭动态网络过滤；身份不匹配时绝不碰该进程。

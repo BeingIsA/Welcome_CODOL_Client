@@ -62,8 +62,9 @@ def replacements():
 
 class MatchBridge:
     """一个受控原生记录对应一个分配；不拥有玩家或房间权威状态。"""
-    def __init__(self, process, session, current_room, server_address, record):
+    def __init__(self, process, session, current_room, server_address, record, set_game_endpoint):
         self.process, self.session, self.current_room = process, session, current_room
+        self.set_game_endpoint = set_game_endpoint
         self.server_address, self.record = server_address, record
         self.traps = {}
         self.allocation = None
@@ -369,6 +370,7 @@ class MatchBridge:
                 or self.delivered_allocation != self.allocation['allocationId']
                 or self.returned_allocation == self.delivered_allocation):
             return None
+        self.set_game_endpoint(None, 0)
         self.returned_allocation = self.delivered_allocation
         return self.room_id, self.allocation['startId']
 
@@ -379,6 +381,8 @@ class MatchBridge:
         self.member_start_id = None
         self.host_lock_pending = False
         self.pending_start_phase = None
+        if self.allocation:
+            self.set_game_endpoint(None, 0)
         self.allocation = None
         self.delivered_allocation = None
         if self.start_notification is not None:
@@ -485,15 +489,21 @@ class MatchBridge:
             return self.apply_start_completion(completion, resume_address)
         return None
 
+    def connection_fields(self, allocation):
+        address = allocation.get('address', self.server_address)
+        fields = allocation_fields(address, allocation['port'], bytes.fromhex(allocation['securityId']),
+            bytes.fromhex(allocation['securityKey']), int(allocation['serverUserId']),
+            allocation['serverName'], allocation['maxPlayers'])
+        self.set_game_endpoint(address, allocation['port'])
+        return fields
+
     def apply_allocation_completion(self, completion, resume_address):
         """转换分配字段并通过原生回调报告成功或失败。"""
         success = completion.error is None
         if success:
             allocation = completion.data
             try:
-                self.callback_fields = allocation_fields(self.server_address, allocation['port'],
-                    bytes.fromhex(allocation['securityId']), bytes.fromhex(allocation['securityKey']),
-                    int(allocation['serverUserId']), allocation['serverName'], allocation['maxPlayers'])
+                self.callback_fields = self.connection_fields(allocation)
                 self.allocation = allocation
             except (KeyError, TypeError, ValueError) as error:
                 self.record({'match_allocation_rejected': str(error)})
@@ -539,9 +549,7 @@ class MatchBridge:
             allocation = completion.data
             if completion.operation != 'member_connect' or allocation.get('startId') != self.member_start_id:
                 raise ValueError('成员连接结果与当前开局不匹配')
-            self.callback_fields = allocation_fields(self.server_address, allocation['port'],
-                bytes.fromhex(allocation['securityId']), bytes.fromhex(allocation['securityKey']),
-                int(allocation['serverUserId']), allocation['serverName'], allocation['maxPlayers'])
+            self.callback_fields = self.connection_fields(allocation)
             self.allocation = allocation
         except (KeyError, TypeError, ValueError) as error:
             self.notify('成员入局失败：'+str(error))

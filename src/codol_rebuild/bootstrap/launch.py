@@ -44,7 +44,7 @@ def run_session(args, reporter):
     def account_factory(schemas, tables, catalog):
         return AccountSession(AccountCodec(schemas, tables, catalog), online_profiles)
 
-    process=ProcessSession(args,run_dir,stage,log,record,phase_done,ROOT/'bin/offline_guard.exe')
+    process=ProcessSession(args,run_dir,stage,log,record,phase_done,ROOT/'bin/match_endpoint_guard.exe')
     bridge=None
     multiplayer=None
     online_session = None
