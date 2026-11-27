@@ -171,7 +171,7 @@ python -B -X utf8 .\tools\launch_client.py --prepare-only --verify-resources
 
 ## 服务端登录与房间
 
-先按[主控部署说明](../server/master/README.md)准备 Nomad、凭据和服务端依赖。使用项目的 CODOL-Linux 开发环境时，在另一终端运行 `server/master/start_server.cmd`。服务端使用默认 8080 端口时，可在项目根运行以下命令。
+先按[主控部署说明](../server/deploy/Ubuntu新主控部署.md)准备 Nomad 和服务端依赖。使用项目的 CODOL-Linux 开发环境时，在另一终端运行 `server/master/start_server.cmd`。服务端使用默认 8080 端口时，可在项目根运行以下命令。
 
 ```powershell
 .\client\start_client.cmd

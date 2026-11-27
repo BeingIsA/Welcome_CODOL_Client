@@ -8,11 +8,12 @@ from codol_rebuild.platform.win32 import K,PTR,SIZE,EVENT,api,check,close
 
 class DebugLoop:
     """不解释版本地址或业务状态，游戏事件由处理器承接。"""
-    def __init__(self, process, bridge, pe, forbidden):
+    def __init__(self, process, bridge, pe, forbidden, observe_fault=None):
         self.process=process;self.bridge=bridge;self.pe=pe
         self.args=process.args;self.log=process.log;self.record=process.record
         self.forbidden=forbidden;self.breaks={};self.file_traps={};self.tids=set();self.rearm={}
         self.termination_trace = None
+        self.observe_fault = observe_fault
         if getattr(self.args, 'trace_native_exit', False):
             from codol_rebuild.runtime.termination_trace import TerminationTrace
             self.termination_trace = TerminationTrace(process, self.record)
@@ -176,6 +177,8 @@ class DebugLoop:
                             close(thread)
                     except OSError as error:
                         row['context_error'] = str(error)
+                    if self.observe_fault is not None:
+                        self.observe_fault(self.process, row)
                     self.record(row)
                     disposition = 2147549185
                     if not first:
