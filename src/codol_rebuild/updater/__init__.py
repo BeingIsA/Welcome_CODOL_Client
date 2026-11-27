@@ -58,7 +58,7 @@ def install_release(root, base_url, release, *, progress=None):
                 parts = entry.filename.rstrip('/').split('/')
                 if any(part in ('', '.', '..') or part.endswith((' ', '.')) or os.path.isreserved(part) or '\\' in part or ':' in part for part in parts):
                     raise ValueError('更新包包含无效路径')
-                if parts[0].lower() in {'resources', 'workspaces', 'data', 'codollauncher.exe', 'installed-version.json', 'update-url.txt'}:
+                if entry.filename.lower() == 'codollauncher.exe':
                     continue
                 package.extract(entry, staged)
         marker = 'installed-version.json'
@@ -71,8 +71,6 @@ def install_release(root, base_url, release, *, progress=None):
                 target = root / relative
                 if target.resolve() != target:
                     raise ValueError('安装路径包含重定向')
-                if relative.parts[0].lower() == 'config' and target.exists():
-                    continue
                 target.parent.mkdir(parents=True, exist_ok=True)
                 backup = None
                 if target.exists():

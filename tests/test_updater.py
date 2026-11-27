@@ -24,8 +24,9 @@ class UpdateTests(unittest.TestCase):
         archive = io.BytesIO()
         with ZipFile(archive, 'w') as package:
             package.writestr('CODOL.exe', b'new')
+            package.writestr('CODOLLauncher.exe', b'new launcher')
             package.writestr('config/server.ini', b'default')
-            package.writestr('resources/example', b'unwanted')
+            package.writestr('resources/example', b'release resource')
             package.writestr('new.dll', b'data')
         self.data = archive.getvalue()
         self.release = dict(version='v0.1.10', size=len(self.data),
@@ -45,10 +46,16 @@ class UpdateTests(unittest.TestCase):
                 updater.check_release('https://example.test')
 
     def test_install(self):
+        launcher = self.root / 'CODOLLauncher.exe'
+        launcher.write_bytes(b'installed launcher')
+        local_config = self.config.with_name('local.ini')
+        local_config.write_bytes(b'local')
         self.install()
         self.assertEqual(self.program.read_bytes(), b'new')
-        self.assertEqual(self.config.read_bytes(), b'custom')
-        self.assertFalse((self.root / 'resources').exists())
+        self.assertEqual(self.config.read_bytes(), b'default')
+        self.assertEqual((self.root / 'resources/example').read_bytes(), b'release resource')
+        self.assertEqual(launcher.read_bytes(), b'installed launcher')
+        self.assertEqual(local_config.read_bytes(), b'local')
         self.assertEqual(json.loads((self.root / 'installed-version.json').read_text())['version'], 'v0.1.10')
 
     def test_corrupt(self):
@@ -67,3 +74,4 @@ class UpdateTests(unittest.TestCase):
             self.install()
         self.assertEqual(self.program.read_bytes(), b'old')
         self.assertFalse((self.root / 'new.dll').exists())
+        self.assertEqual(self.config.read_bytes(), b'custom')
