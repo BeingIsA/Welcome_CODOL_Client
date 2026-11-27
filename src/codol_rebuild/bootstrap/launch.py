@@ -12,6 +12,7 @@ from codol_rebuild.application.errors import OnlineError
 from codol_rebuild.adapters.game.v1649370.session.session_bridge import GameSessionBridge
 from codol_rebuild.runtime.session import ProcessSession, SessionLog
 from codol_rebuild.runtime.debug_loop import DebugLoop
+from codol_rebuild.adapters.game.v1649370.observation_points import capture_loadout_fault
 
 
 def select_client_address(server_url):
@@ -109,7 +110,7 @@ def run_session(args, reporter):
                                  rename_session=rename_session, broadcast_session=broadcast_session,
                                  realtime_dispatcher=realtime_dispatcher, chat_session=chat_session, online_session=online_session,
                                  match_session=match_session, inventory_session=inventory_session)
-        debugger=DebugLoop(process,bridge,prepared['pe'],FORBIDDEN)
+        debugger=DebugLoop(process,bridge,prepared['pe'],FORBIDDEN,observe_fault=capture_loadout_fault)
         process.start(prepared['exe'],prepared['players_directory'])
         debugger.run()
     except Exception as error:
