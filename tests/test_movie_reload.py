@@ -69,6 +69,7 @@ class MovieReloadTests(unittest.TestCase):
 
     def test_verified_patched_resource_is_not_written_again(self):
         bridge = object.__new__(GameSessionBridge)
+        bridge.training_catalog = None
         bridge.process = Mock()
         bridge.process.read.side_effect = self.memory(self.patched)
         bridge.process.regions.return_value = [(0x1000, 16)]

@@ -33,6 +33,7 @@ def replacements() -> list:
 
     return (list(ui_navigation.replacements()) + list(sanitize.replacements())
             + list(player_name.replacements()) + list(ui_theme.replacements())
+            + ui_theme.watermark_replacements()
             + list(ui_weekly_rewards.replacements())
             + list(purchase.replacements()) + list(room_member_menu.replacements())
             + list(ui_chat.replacements()) + list(room.replacements())

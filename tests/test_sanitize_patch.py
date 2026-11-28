@@ -32,7 +32,6 @@ class SanitizePatchTests(unittest.TestCase):
         return read
 
     def test_two_methods_replaced_in_place(self):
-        self.assertEqual(len(self.patched),len(self.original))
         tail = sanitize.SANITIZE_OFFSET+sanitize.SANITIZE_LENGTH-len(sanitize.SANITIZE_TAIL_BEFORE)
         self.assertEqual(self.patched[tail:tail+len(sanitize.SANITIZE_TAIL_AFTER)],
                          sanitize.SANITIZE_TAIL_AFTER)
@@ -41,11 +40,16 @@ class SanitizePatchTests(unittest.TestCase):
                          sanitize.LOADOUT_AFTER)
 
     def test_only_registered_spans_changed(self):
-        spans = [(offset,offset+len(before)) for offset,before,_ in ui_movie.replacements()]
-        for index,byte in enumerate(self.patched):
-            if any(start <= index < end for start,end in spans):
-                continue
-            self.assertEqual(byte,self.original[index],f'{index:#x} 越界改动')
+        original_cursor = patched_cursor = 0
+        for offset, before, after in sorted(ui_movie.replacements()):
+            unchanged_length = offset - original_cursor
+            self.assertEqual(self.patched[patched_cursor:patched_cursor + unchanged_length],
+                             self.original[original_cursor:offset])
+            patched_cursor += unchanged_length
+            self.assertEqual(self.patched[patched_cursor:patched_cursor + len(after)], after)
+            original_cursor = offset + len(before)
+            patched_cursor += len(after)
+        self.assertEqual(self.patched[patched_cursor:], self.original[original_cursor:])
 
     def test_sanitize_request_replaced_by_broadcast(self):
         self.assertNotIn(b'\x46\x28\x03',sanitize.SANITIZE_TAIL_AFTER)  # 原 request(...,3)
@@ -61,7 +65,7 @@ class SanitizePatchTests(unittest.TestCase):
     def test_rules_cover_combined_methods_without_overlap(self):
         rules = ui_movie.replacements()
         # 当前组合包含房间、聊天等已接入规则；仍严格检查数量与区间重叠。
-        self.assertEqual(len(rules),36)
+        self.assertEqual(len(rules),39)
         spans = sorted((offset,offset+len(before)) for offset,before,_ in rules)
         for (_,end),(next_start,_) in zip(spans,spans[1:]):
             self.assertLessEqual(end,next_start,'替换区间重叠')
@@ -98,6 +102,8 @@ class SanitizePatchTests(unittest.TestCase):
         self.assertEqual(zlib.decompress(plan['data_after']),self.patched)
         self.assertLessEqual(len(plan['data_after']),ui_movie.COMPRESSED_SIZE)
         self.assertEqual(struct.unpack('<I',plan['length_after'])[0],len(plan['data_after']))
+        self.assertEqual(struct.unpack('<II', plan['sizes_after']),
+                         (len(plan['data_after']), len(self.patched)))
 
     def test_navigation_scan_still_only_applies_hall_fix(self):
         plan = ui_navigation.find_resource_patch(self.memory(),[(0x1000,16)])

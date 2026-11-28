@@ -395,8 +395,8 @@ class GameSessionBridge:
         self.process.write(plan['data_address'], plan['data_after'])
         if self.process.read(plan['data_address'], len(plan['data_after'])) != plan['data_after']:
             raise ValueError('大厅资源补丁回读失败')
-        self.process.write(plan['length_address'], plan['length_after'])
-        if self.process.read(plan['length_address'], 4) != plan['length_after']:
+        self.process.write(plan['length_address'], plan['sizes_after'])
+        if self.process.read(plan['length_address'], len(plan['sizes_after'])) != plan['sizes_after']:
             raise ValueError('大厅资源长度回读失败')
         return {'installed': True, 'header': hex(plan['header_address']), 'compressed_size': len(plan['data_after']), 'patched_sha256': plan['patched_sha256'], 'patched_methods': ['MatchMakingStripView.onGetPlayerWarGodData', 'SanitizeController.sanitize', 'WeaponLoadOutController.onSetLoadoutNameHandle', 'MarketController.handleRedeemChangeName', 'MarketController.onRedeemChangeNameComplete', 'PlayerObj.getObj']}
 

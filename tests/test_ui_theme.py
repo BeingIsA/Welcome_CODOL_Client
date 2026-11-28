@@ -34,6 +34,38 @@ def theme_method(movie):
 
 
 class ThemeTests(unittest.TestCase):
+    def test_root_watermark_is_readonly_and_has_no_button_hit_area(self):
+        original = (ROOT/'research/client/ui-investigation/codo.gfx').read_bytes()
+        patched = ui_movie.patch_movie(original)
+        cursor = len(original) - 4
+        tags = []
+        while cursor < len(patched):
+            header, = struct.unpack_from('<H', patched, cursor)
+            cursor += 2
+            length = header & 63
+            if length == 63:
+                length, = struct.unpack_from('<I', patched, cursor)
+                cursor += 4
+            tags.append((header >> 6, patched[cursor:cursor + length]))
+            cursor += length
+        self.assertEqual(cursor, len(patched))
+        self.assertEqual([kind for kind, _ in tags], [37, 34, 26, 1, 0])
+        text_definition, button_definition, placement = (entry[1] for entry in tags[:3])
+        text_identifier, = struct.unpack_from('<H', text_definition)
+        rectangle_bits = 5 + 4 * (text_definition[2] >> 3)
+        flags_offset = 2 + (rectangle_bits + 7) // 8
+        self.assertEqual(text_definition[flags_offset:flags_offset + 2], b'\x8c\xb1')
+        color_offset = text_definition.index(b'$font_3\0', flags_offset) + len(b'$font_3\0') + 2
+        self.assertEqual(text_definition[color_offset:color_offset + 5], bytes((255, 255, 255, 190, 0)))
+        self.assertTrue(text_definition.endswith('Welcome CODOL 完全免费，严禁用于商业用途\0'.encode()))
+        button_identifier, _, action_offset, states, child_identifier = struct.unpack_from(
+            '<HBHBH', button_definition)
+        self.assertEqual((action_offset, states, child_identifier), (0, 7, text_identifier))
+        # 唯一的文字实例使用原坐标、原颜色，随后结束按钮记录。
+        self.assertEqual(struct.unpack_from('<H', button_definition, 8), (1,))
+        self.assertEqual(button_definition[10:], b'\0\0\0')
+        self.assertEqual(struct.unpack_from('<BHH', placement), (6, 1, button_identifier))
+
     def test_mini_client_warning_skips_only_popup_and_keeps_member_counter(self):
         """保留短路分支的落点及栈状态，仅移除整个零净栈变化的弹窗表达式。"""
         from codol_rebuild.adapters.game.v1649370.frontend import ui_theme

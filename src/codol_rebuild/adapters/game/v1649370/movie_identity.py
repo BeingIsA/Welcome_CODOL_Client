@@ -13,6 +13,7 @@ import zlib
 
 RESOURCE_NAME = b'scaleform/default/codo.gfx\0'
 RESOURCE_SIZE = 7664688
+FINAL_FRAME = b'\x40\x00\x00\x00'  # ShowFrame、End
 COMPRESSED_SIZE = 3023971
 RESOURCE_SHA256 = '314c4abd6936b02955e2f31f781b20ac119ea9878f83698d1a1d6f106558c31c'
 LOAD_SITE = 0x5EB9F7
@@ -22,7 +23,7 @@ LOAD_RETURN_BYTES = bytes.fromhex('8b0da0e97a0c')
 
 
 def apply_rules(original: bytes, rules) -> bytes:
-    """按原版指纹逐条校验等长替换；越界、重叠或原始字节不符均拒绝。"""
+    """按原版坐标校验补丁；仅允许在最终 ShowFrame 前插入标签。"""
     if (len(original) != RESOURCE_SIZE
             or hashlib.sha256(original).hexdigest() != RESOURCE_SHA256):
         raise ValueError('主电影资源指纹不符')
@@ -31,7 +32,10 @@ def apply_rules(original: bytes, rules) -> bytes:
     for offset, before, after in rules:
         if type(offset) is not int or offset < 0 or offset + len(before) > RESOURCE_SIZE:
             raise ValueError('主电影替换区间越界')
-        if len(before) != len(after):
+        if len(before) != len(after) and not (
+            offset == RESOURCE_SIZE - len(FINAL_FRAME)
+            and before == FINAL_FRAME and after.endswith(FINAL_FRAME)
+        ):
             raise ValueError('主电影替换必须保持方法体等长')
         if original[offset:offset + len(before)] != before:
             raise ValueError(f'主电影替换原始字节不符：{offset:#x}')
@@ -40,6 +44,8 @@ def apply_rules(original: bytes, rules) -> bytes:
                 raise ValueError('主电影替换区间重叠')
         spans.append((offset, offset + len(before)))
         patched[offset:offset + len(after)] = after
+    if struct.unpack_from('<I', patched, 4)[0] != len(patched):
+        raise ValueError('主电影文件头长度不符')
     return bytes(patched)
 
 
@@ -47,14 +53,15 @@ def build_resource_patch(read, header_address: int, rules) -> dict:
     """校验重定位 RawFile 头及完整解压内容，返回数据和长度两项显式写计划。"""
     header = read(header_address, 16)
     name, compressed_size, size, data = struct.unpack('<4I', header)
-    if size != RESOURCE_SIZE or not 0 < compressed_size <= COMPRESSED_SIZE:
+    patched_size = RESOURCE_SIZE + sum(len(after) - len(before) for _, before, after in rules)
+    if size not in (RESOURCE_SIZE, patched_size) or not 0 < compressed_size <= COMPRESSED_SIZE:
         raise ValueError('主电影 RawFile 长度不符')
     if read(name, len(RESOURCE_NAME)) != RESOURCE_NAME:
         raise ValueError('主电影 RawFile 名称不符')
     compressed = read(data, compressed_size)
     decoder = zlib.decompressobj()
-    original = decoder.decompress(compressed, RESOURCE_SIZE + 1)
-    if not decoder.eof or decoder.unused_data or decoder.unconsumed_tail:
+    original = decoder.decompress(compressed, size + 1)
+    if len(original) != size or not decoder.eof or decoder.unused_data or decoder.unconsumed_tail:
         raise ValueError('主电影压缩流不完整或包含尾部数据')
     already_applied = hashlib.sha256(original).hexdigest() != RESOURCE_SHA256
     if already_applied:
@@ -63,7 +70,7 @@ def build_resource_patch(read, header_address: int, rules) -> dict:
         for offset, before, after in rules:
             if original[offset:offset + len(after)] != after:
                 raise ValueError('主电影既有补丁内容不符')
-            restored[offset:offset + len(before)] = before
+            restored[offset:offset + len(after)] = before
         patched = apply_rules(bytes(restored), rules)
         if patched != original:
             raise ValueError('主电影既有补丁指纹不符')
@@ -77,12 +84,14 @@ def build_resource_patch(read, header_address: int, rules) -> dict:
             'data_address': data, 'data_before': compressed, 'data_after': replacement,
             'length_address': header_address + 4,
             'length_after': struct.pack('<I', len(replacement)),
+            'sizes_after': struct.pack('<II', len(replacement), len(patched)),
             'patched_sha256': hashlib.sha256(patched).hexdigest()}
 
 
 def find_resource_patch(read, regions, rules) -> dict:
     """扫描精确长度对后校验名称与完整资源指纹；歧义或缺失时拒绝修改。"""
-    marker = struct.pack('<I', RESOURCE_SIZE)
+    patched_size = RESOURCE_SIZE + sum(len(after) - len(before) for _, before, after in rules)
+    markers = tuple(struct.pack('<I', size) for size in {RESOURCE_SIZE, patched_size})
     found = {}
     for base, size in regions:
         for offset in range(0, size, 1024 * 1024):
@@ -90,17 +99,18 @@ def find_resource_patch(read, regions, rules) -> dict:
                 chunk = read(base + offset, min(size - offset, 1024 * 1024 + 16))
             except OSError:
                 continue
-            start = 0
-            while (index := chunk.find(marker, start)) >= 0:
-                start = index + 1
-                address = base + offset + index - 8
-                if address in found:
-                    continue
-                try:
-                    plan = build_resource_patch(read, address, rules)
-                except (OSError, ValueError, zlib.error):
-                    continue
-                found[address] = plan
+            for marker in markers:
+                start = 0
+                while (index := chunk.find(marker, start)) >= 0:
+                    start = index + 1
+                    address = base + offset + index - 8
+                    if address in found:
+                        continue
+                    try:
+                        plan = build_resource_patch(read, address, rules)
+                    except (OSError, ValueError, zlib.error):
+                        continue
+                    found[address] = plan
     if len(found) != 1:
         raise ValueError(f'主电影资源匹配数必须为 1，实际为 {len(found)}')
     return next(iter(found.values()))
